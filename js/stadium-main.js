@@ -547,7 +547,10 @@ async function refreshPoints() {
   }
 }
 function askLeague() {
-  for (const id of ["jump-btn", "zoom-ctl", "play-btn"]) { const e = document.getElementById(id); if (e) e.style.display = "none"; }
+  for (const id of ["jump-btn", "zoom-ctl", "play-btn"]) {
+    const e = document.getElementById(id);
+    if (e) e.style.display = "none";
+  }
   $("st-league").textContent = "Sleeper Stadium";
   $("st-score").textContent = "Paste your Sleeper league ID to open your stadium";
   const box = document.createElement("form");

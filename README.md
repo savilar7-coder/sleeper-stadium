@@ -5,6 +5,7 @@ facing its opponent, scores update every minute on game day, and the whole leagu
 
 **What's on the field**
 - 📺 **Live scores and projections** for every matchup, straight from Sleeper's public API
+- 🏈 **Touchdown alerts**: a banner with the player who scored when a team jumps 4+ points
 - 🔦 **Top scorer spotlight** on the week's highest scorer
 - 🚽 **The ASS Bowl**: the matchup between the two worst records gets its own sign, every week
 - 🪑 **Bench of shame** for whoever left the most points on the bench

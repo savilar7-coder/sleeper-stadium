@@ -645,15 +645,55 @@ class StadiumScene extends World {
       board.setText(`${a.points.toFixed(1)}  :  ${b.points.toFixed(1)}
 proj ${a.proj.toFixed(1)} : ${b.proj.toFixed(1)}`);
     }
-    const prev = this.prevPts || {};
+    const prev = this.prevPts || {}, prevSP = this.prevSP || {};
     for (const { s, t } of this.teamSprites.values()) {
-      if (prev[t.roster_id] != null && t.points > prev[t.roster_id] + 0.05) this.celebrate(s, t);
+      if (prev[t.roster_id] != null && t.points > prev[t.roster_id] + 0.05) {
+        const jump = t.points - prev[t.roster_id];
+        if (jump >= 4) {
+          const was = prevSP[t.roster_id] || [], now = t.starters_points || [];
+          let best = -1, bestUp = 0;
+          now.forEach((pts, i) => {
+            const up = pts - (was[i] || 0);
+            if (up > bestUp) {
+              bestUp = up;
+              best = i;
+            }
+          });
+          const pid = best >= 0 ? (t.starters || [])[best] : null, who = pid && this.league.players[pid] ? this.league.players[pid][0] : "";
+          this.touchdown(t, jump, who);
+        }
+        this.celebrate(s, t);
+      }
       prev[t.roster_id] = t.points;
+      prevSP[t.roster_id] = (t.starters_points || []).slice();
     }
     this.prevPts = prev;
+    this.prevSP = prevSP;
     this.updateProps();
     this.updateJumbo();
     this.applyUiScale();
+  }
+  touchdown(t, jump, who) {
+    const q = this.tdQueue = this.tdQueue || [];
+    q.push({ text: `\u{1F3C8} ${jump >= 5.5 ? "TOUCHDOWN" : "BIG PLAY"}`, who, sub: `+${jump.toFixed(1)} \xB7 ${t.name}`, mine: t.mine });
+    if (q.length === 1) this.nextTd();
+  }
+  nextTd() {
+    const q = this.tdQueue || [], item = q[0];
+    if (!item) return;
+    const el2 = document.createElement("div");
+    el2.className = "td-banner" + (item.mine ? " mine" : "") + (window.__calm ? " calm" : "");
+    el2.innerHTML = `<b></b><i></i><span></span>`;
+    el2.querySelector("b").textContent = item.text;
+    el2.querySelector("i").textContent = item.who || "";
+    el2.querySelector("span").textContent = item.sub;
+    document.body.appendChild(el2);
+    sfx.cheer && sfx.cheer();
+    setTimeout(() => {
+      el2.remove();
+      q.shift();
+      this.nextTd();
+    }, 3200);
   }
   celebrate(s, t) {
     sfx.pop && sfx.pop();

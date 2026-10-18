@@ -93,3 +93,15 @@
 .mg-btns button { font: inherit; font-size: 14px; padding: 3px 10px; border: 2px solid #6b4f2a; border-radius: 4px; background: #f1e4c3; cursor: pointer; }
 #prompt { cursor: pointer; }
 #play-btn[hidden] { display: none !important; }
+
+.td-banner { position: fixed; left: 50%; top: 42%; z-index: 50; transform: translate(-50%, -50%); pointer-events: none;
+  background: linear-gradient(180deg, #241773, #120b3d); border: 3px solid #ffd84a; border-radius: 14px; padding: 12px 22px; text-align: center;
+  box-shadow: 0 0 0 3px #1d140c, 0 12px 40px rgba(0,0,0,.6); animation: td-sweep 3.2s ease-in-out forwards; max-width: 92vw; min-width: 260px; white-space: nowrap; }
+.td-banner b { display: block; font: 800 26px "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #ffd84a; letter-spacing: 1px; text-shadow: 0 3px 0 #9e7c0c; }
+.td-banner i { display: block; font: 800 21px "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #ffffff; font-style: normal; margin-top: 2px; }
+.td-banner i:empty { display: none; }
+.td-banner span { display: block; font: 700 17px "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #fff4d6; margin-top: 4px; }
+.td-banner.mine { border-color: #9dff7a; }
+.td-banner.calm { animation: td-fade 3.2s ease forwards; }
+@keyframes td-sweep { 0% { transform: translate(-160%, -50%) skewX(-12deg); opacity: 1; } 14% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; } 20%, 82% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(80%, -50%) skewX(12deg); opacity: 0; } }
+@keyframes td-fade { 0% { opacity: 0; } 10%, 85% { opacity: 1; } 100% { opacity: 0; } }
