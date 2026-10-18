@@ -43,6 +43,12 @@ async function weekProjections(season, week) {
   return p;
 }
 async function champions(lg) {
+  const key = `st-champs-${lg.league_id}`;
+  try {
+    const kept = JSON.parse(store(key) || "null");
+    if (kept && kept.length) return kept;
+  } catch {
+  }
   const out = [];
   let id = lg.previous_league_id;
   for (let i = 0; id && id !== "0" && i < 6; i++) {
@@ -56,12 +62,12 @@ async function champions(lg) {
       break;
     }
   }
+  if (out.length) store(key, JSON.stringify(out));
   return out;
 }
 async function load(leagueId) {
-  const state = await get(`${API}/state/nfl`);
+  let [state, lg] = await Promise.all([get(`${API}/state/nfl`), get(`${API}/league/${leagueId}`)]);
   const season = state.league_season || state.season, week = Math.max(1, state.display_week || state.week || 1);
-  let lg = await get(`${API}/league/${leagueId}`);
   if (lg && String(lg.season) !== String(season)) {
     let next = null;
     try {
@@ -86,7 +92,7 @@ async function load(leagueId) {
     } catch {
     }
   }
-  const [users, rosters, matchups, picks, tx1, tx2, players, proj, champs] = await Promise.all([
+  const [users, rosters, matchups, picks, tx1, tx2, players, proj, champs, picked, blimpFile] = await Promise.all([
     get(`${API}/league/${leagueId}/users`),
     get(`${API}/league/${leagueId}/rosters`),
     get(`${API}/league/${leagueId}/matchups/${week}`),
@@ -95,7 +101,9 @@ async function load(leagueId) {
     get(`${API}/league/${leagueId}/transactions/${Math.max(1, week - 1)}`).catch(() => []),
     get("sleeper-players.json").catch(() => get("/api/sleeper/players")).catch(() => ({})),
     weekProjections(season, week),
-    champions(lg)
+    champions(lg),
+    get("stadium-avatars.json").catch(() => ({})),
+    get("stadium-blimp.json").catch(() => null)
   ]);
   const byUser = Object.fromEntries(users.map((u) => [u.user_id, u]));
   const byRoster = Object.fromEntries(matchups.map((m) => [m.roster_id, m]));
@@ -124,7 +132,7 @@ async function load(leagueId) {
     };
   });
   for (const t of teams) t.projPre = t.proj = t.starters.reduce((n, pid) => n + (proj[pid] || 0), 0);
-  const picked = await get("stadium-avatars.json").catch(() => ({})), local = JSON.parse(store("st-looks") || "{}");
+  const local = JSON.parse(store("st-looks") || "{}");
   for (const t of teams) t.look = local[t.roster_id] || picked[t.roster_id] || guessLook(t);
   const groups = {};
   for (const t of teams) (groups[t.matchup_id || `bye-${t.roster_id}`] = groups[t.matchup_id || `bye-${t.roster_id}`] || []).push(t);
@@ -143,7 +151,7 @@ async function load(leagueId) {
     picks,
     news: [...tx1, ...tx2].filter((x) => x.status === "complete").sort((a, b) => b.status_updated - a.status_updated),
     champs,
-    blimp: (await get("stadium-blimp.json").catch(() => null) || {}).message || ""
+    blimp: (blimpFile || {}).message || ""
   };
 }
 function playerValue(pid) {
@@ -673,6 +681,13 @@ function askLeague() {
   $("st-table").addEventListener("click", standings);
   $("st-news").addEventListener("click", news);
   $("st-trade").addEventListener("click", () => tradeMaker(null));
+  const fold = (on) => {
+    $("st-hud").classList.toggle("mini", on);
+    $("st-fold").textContent = on ? "\u25BE" : "\u25B4";
+    store("st-fold", on ? "1" : "0");
+  };
+  fold(store("st-fold") === "1");
+  $("st-fold").addEventListener("click", () => fold(!$("st-hud").classList.contains("mini")));
   $("st-mine").addEventListener("click", () => {
     const m = mine();
     if (m) teamPanel(m.roster_id);

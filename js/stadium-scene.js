@@ -646,6 +646,7 @@ class StadiumScene extends World {
       board.setText(`${a.points.toFixed(1)}  :  ${b.points.toFixed(1)}
 proj ${a.proj.toFixed(1)} : ${b.proj.toFixed(1)}`);
     }
+    this.updateMoods();
     const prev = this.prevPts || {}, prevSP = this.prevSP || {};
     for (const { s, t } of this.teamSprites.values()) {
       if (prev[t.roster_id] != null && t.points > prev[t.roster_id] + 0.05) {
@@ -826,11 +827,16 @@ proj ${a.proj.toFixed(1)} : ${b.proj.toFixed(1)}`);
       beam: this.add.triangle(0, 0, 0, 0, 60, 0, 30, 150, 16774080, 0.16).setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setDepth(99990).setVisible(false),
       pool: this.add.image(0, 0, "soft-glow").setScale(1.8, 0.8).setTint(16773296).setBlendMode(Phaser.BlendModes.ADD).setVisible(false)
     };
-    const jy = (F.y1 - 5) * T;
-    this.add.rectangle(mid, jy, 300, 112, 1382429).setStrokeStyle(6, 3817287).setDepth(jy);
-    this.add.rectangle(mid - 120, jy + 66, 8, 22, 3817287).setDepth(jy - 1);
-    this.add.rectangle(mid + 120, jy + 66, 8, 22, 3817287).setDepth(jy - 1);
-    this.jumbo = this.add.text(mid, jy, "", { ...sans, fontSize: "17px", color: "#9ff3ff", align: "center", lineSpacing: 4 }).setOrigin(0.5).setDepth(jy + 1);
+    const ticker = document.getElementById("st-ticker"), tickText = ticker && ticker.firstElementChild;
+    this.jumbo = { setText: () => {
+    }, setAll: (pages) => {
+      if (!tickText) return;
+      const s = pages.map((p) => p.replace("\n", ":  ").replace(/\n/g, "  \xB7  ")).join("      \u2B29      ");
+      if (tickText.textContent === s) return;
+      tickText.textContent = s;
+      ticker.hidden = false;
+      tickText.style.animationDuration = `${Math.max(14, s.length * 0.16)}s`;
+    } };
     this.jumboPage = 0;
     this.time.addEvent({ delay: 5e3, loop: true, callback: () => {
       this.jumboPage++;
@@ -1047,7 +1053,37 @@ ${name(cl)} ${cl.points.toFixed(1)}`);
 ${name(t)}
 ${t.points.toFixed(1)} pts`);
     }
-    this.jumbo.setText(pages[this.jumboPage % pages.length]);
+    this.jumbo.setAll(pages);
+  }
+  updateMoods() {
+    const live = [...this.teamSprites.values()].filter((x) => x.t.points > 0);
+    this.moods = this.moods || new Map();
+    const want = new Map();
+    if (live.length >= this.teamSprites.size / 2) {
+      const by = [...live].sort((a, b) => b.t.points - a.t.points);
+      by.slice(0, 2).forEach((x) => want.set(x.t.roster_id, "\u{1F525}"));
+      by.slice(-2).forEach((x) => {
+        if (!want.has(x.t.roster_id)) want.set(x.t.roster_id, "\u{1F327}\uFE0F");
+      });
+    }
+    for (const [id, m] of this.moods) if (want.get(id) !== m.icon) {
+      m.txt.destroy();
+      this.moods.delete(id);
+    }
+    for (const [id, icon] of want) {
+      if (this.moods.has(id)) continue;
+      const txt = this.add.text(0, 0, icon, { fontSize: `${Math.round(30 * DPR)}px` }).setOrigin(0.5, 1).setResolution(1).setScale(1 / DPR);
+      this.moods.set(id, { icon, txt });
+    }
+  }
+  placeMoods(time) {
+    for (const [id, m] of this.moods || []) {
+      const x = this.teamSprites.get(id);
+      if (!x) continue;
+      const out = x.side === 0 ? -1 : 1, fire = m.icon === "\u{1F525}";
+      m.txt.setPosition(x.s.x + out * 30, x.s.y - (fire ? 2 : 34) + Math.sin(time / (fire ? 120 : 500) + id) * (fire ? 1.5 : 3)).setDepth(x.s.y + 1);
+      if (fire) m.txt.setScale((1 + Math.sin(time / 90 + id) * 0.08) / DPR);
+    }
   }
   addLife() {
     const T = TILE, r = rng(77);
@@ -1192,6 +1228,7 @@ ${t.points.toFixed(1)} pts`);
   }
   update(time, delta) {
     this.drawBars();
+    this.placeMoods(time);
     const k = this.keys;
     let vx = 0, vy = 0;
     if (!panelOpen) {

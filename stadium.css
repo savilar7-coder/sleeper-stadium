@@ -105,3 +105,15 @@
 .td-banner.calm { animation: td-fade 3.2s ease forwards; }
 @keyframes td-sweep { 0% { transform: translate(-160%, -50%) skewX(-12deg); opacity: 1; } 14% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; } 20%, 82% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(80%, -50%) skewX(12deg); opacity: 0; } }
 @keyframes td-fade { 0% { opacity: 0; } 10%, 85% { opacity: 1; } 100% { opacity: 0; } }
+
+
+#st-ticker { position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; overflow: hidden; white-space: nowrap; pointer-events: none;
+  padding: 6px 0 calc(6px + env(safe-area-inset-bottom)); background: rgba(16,19,24,.92); border-top: 2px solid #3a3f47;
+  font: 700 14px/1.2 "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #9ff3ff; }
+#st-ticker[hidden] { display: none; }
+#st-ticker span { display: inline-block; padding-left: 100%; animation: st-tick 30s linear infinite; }
+@keyframes st-tick { to { transform: translateX(-100%); } }
+#zoom-ctl, #jump-btn { margin-bottom: 30px; }
+#st-fold { position: absolute; top: 2px; right: 4px; font: 700 14px/1 sans-serif; padding: 4px 8px; border: 0; background: none; color: #6b4f2a; cursor: pointer; }
+#st-hud.mini #st-league, #st-hud.mini #st-proj, #st-hud.mini .st-btns { display: none; }
+#st-hud.mini { padding-top: 4px; padding-bottom: 4px; }

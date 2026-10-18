@@ -17,15 +17,18 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap">
   <link rel="stylesheet" href="village.css">
   <link rel="stylesheet" href="stadium.css">
+  <link rel="preconnect" href="https://api.sleeper.app" crossorigin>
 </head>
 <body>
   <div id="game"></div>
   <div id="st-hud">
+    <button id="st-fold" type="button" aria-label="Fold the top bar">▴</button>
     <div id="st-league">Loading the league from Sleeper…</div>
     <div id="st-score"></div>
     <div id="st-proj"></div>
     <div class="st-btns"><button id="st-mine" type="button">👑 My team</button><button id="st-trade" type="button">🔁 Trade</button><button id="st-news" type="button">📰 News</button><button id="st-table" type="button">🏆 Table</button></div>
   </div>
+  <div id="st-ticker" hidden><span></span></div> 
   <div id="prompt" hidden></div>
   <div id="stick" hidden><div id="stick-knob"></div></div>
   <div id="zoom-ctl"><button id="zoom-in" type="button" aria-label="Zoom in">＋</button><button id="zoom-out" type="button" aria-label="Zoom out">－</button></div>
