@@ -54,3 +54,8 @@ Then open `http://localhost:8080/?league=<LEAGUE_ID>`.
 - Game engine: [Phaser](https://phaser.io) (MIT).
 
 Code: MIT (see `LICENSE`).
+
+---
+
+**Want a custom stadium for your league?** Your own characters, banner, colors and inside jokes:
+[lamaisonwebstudio.com](https://lamaisonwebstudio.com)
