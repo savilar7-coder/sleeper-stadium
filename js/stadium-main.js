@@ -99,7 +99,7 @@ async function load(leagueId) {
       proj: 0
     };
   });
-  for (const t of teams) t.proj = t.starters.reduce((n, pid) => n + (proj[pid] || 0), 0);
+  for (const t of teams) t.projPre = t.proj = t.starters.reduce((n, pid) => n + (proj[pid] || 0), 0);
   const picked = await get("stadium-avatars.json").catch(() => ({})), local = JSON.parse(store("st-looks") || "{}");
   for (const t of teams) t.look = local[t.roster_id] || picked[t.roster_id] || guessLook(t);
   const groups = {};
@@ -533,6 +533,30 @@ function setMine(rid) {
   hud();
   if (game) game.scene.getScene("stadium").scene.restart({ league: L });
 }
+async function gameStatus() {
+  try {
+    const games = await get(`https://api.sleeper.com/schedule/nfl/regular/${L.season}`), map = {};
+    for (const g of games || []) if (String(g.week) === String(L.week)) {
+      map[g.home] = g.status;
+      map[g.away] = g.status;
+    }
+    L.games = map;
+  } catch {
+  }
+}
+function liveProj(t) {
+  const G = L.games || {};
+  return (t.starters || []).reduce((n, pid, i) => {
+    const pre = L.proj[pid] || 0, got = (t.starters_points || [])[i] || 0;
+    const team = L.players[pid] ? L.players[pid][2] : pid, st = G[team];
+    if (st === "complete") return n + got;
+    if (st === "in_game") return n + got + Math.max(0, pre - got) * 0.5;
+    return n + (got || pre);
+  }, 0);
+}
+function updateProj() {
+  for (const t of L.teams) t.proj = liveProj(t);
+}
 async function refreshPoints() {
   if (!L || document.hidden) return;
   try {
@@ -540,6 +564,8 @@ async function refreshPoints() {
       const t = L.teams.find((y) => y.roster_id === x.roster_id);
       if (t) Object.assign(t, { points: x.points || 0, starters_points: x.starters_points || [], players_points: x.players_points || {} });
     }
+    await gameStatus();
+    updateProj();
     const s = game && game.scene.getScene("stadium");
     if (s && s.refreshScores) s.refreshScores();
     hud();
@@ -582,6 +608,8 @@ function askLeague() {
     await Promise.race([document.fonts.load('13px "Pixelify Sans"'), new Promise((r) => setTimeout(r, 2500))]);
   } catch {
   }
+  await gameStatus();
+  updateProj();
   hud();
   game = new Phaser.Game({
     type: (navigator.maxTouchPoints || 0) > 0 ? Phaser.AUTO : Phaser.CANVAS,
