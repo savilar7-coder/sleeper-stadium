@@ -624,7 +624,9 @@ class StadiumScene extends World {
         const board = this.label(mid, y - 40, "", "#ffffff").setOrigin(0.5, 0).setFontSize(Math.round(19 * DPR));
         board.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", align: "center", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
         const bar = this.add.graphics().setDepth(1e5);
-        this.boards.push({ board, bar, a: pair[0], b: pair[1] });
+        const projTxt = this.label(mid, y, "", "#9aa3ad").setOrigin(0.5, 0).setFontSize(Math.round(11 * DPR));
+        projTxt.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif' });
+        this.boards.push({ board, bar, projTxt, a: pair[0], b: pair[1] });
         if (pair === assBowl) {
           const sign = this.label(mid, y + 46, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(16 * DPR));
           sign.setStyle({ backgroundColor: "rgba(92,52,20,0.95)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
@@ -643,8 +645,7 @@ class StadiumScene extends World {
       tag.setText(`${t.mine ? "\u{1F451} " : ""}${nm}`).setColor(t.mine ? "#ffe08a" : opp && t.points > opp.points ? "#b9f5a8" : "#fff4d6");
     }
     for (const { board, a, b } of this.boards || []) {
-      board.setText(`${a.points.toFixed(1)}  :  ${b.points.toFixed(1)}
-proj ${a.proj.toFixed(1)} : ${b.proj.toFixed(1)}`);
+      board.setText(`${a.points.toFixed(1)}  :  ${b.points.toFixed(1)}`);
     }
     this.updateMoods();
     const prev = this.prevPts || {}, prevSP = this.prevSP || {};
@@ -1213,8 +1214,8 @@ ${t.points.toFixed(1)} pts`);
     ]);
   }
   drawBars() {
-    for (const { board, bar, a, b } of this.boards || []) {
-      const r = board.getBounds(), pad = r.height * 0.08, h = Math.max(5, r.height * 0.18), half = r.width / 2 - pad;
+    for (const { board, bar, projTxt, a, b } of this.boards || []) {
+      const r = board.getBounds(), pad = r.height * 0.08, h = Math.max(6, r.width * 0.035), half = r.width / 2 - pad;
       const max = Math.max(a.proj, b.proj, a.points, b.points, 1), y = r.bottom, cx = r.centerX;
       bar.clear().fillStyle(1580582, 0.92).fillRect(r.x, y, r.width, h + pad * 2);
       [[a, -1], [b, 1]].forEach(([t, dir]) => {
@@ -1224,6 +1225,9 @@ ${t.points.toFixed(1)} pts`);
         bar.lineStyle(Math.max(1, h * 0.18), 16777215, 0.75).strokeRect(dir < 0 ? cx - proj : cx, y + pad, proj, h);
       });
       bar.fillStyle(16777215, 1).fillRect(cx - 1, y + pad - 2, 2, h + 4);
+      const pt = `${a.proj.toFixed(1)}  proj  ${b.proj.toFixed(1)}`;
+      if (projTxt.text !== pt) projTxt.setText(pt);
+      projTxt.setPosition(cx, y + h + pad * 2).setDepth(board.depth);
     }
   }
   update(time, delta) {
