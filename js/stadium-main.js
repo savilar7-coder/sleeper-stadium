@@ -61,7 +61,31 @@ async function champions(lg) {
 async function load(leagueId) {
   const state = await get(`${API}/state/nfl`);
   const season = state.league_season || state.season, week = Math.max(1, state.display_week || state.week || 1);
-  const lg = await get(`${API}/league/${leagueId}`);
+  let lg = await get(`${API}/league/${leagueId}`);
+  if (lg && String(lg.season) !== String(season)) {
+    let next = null;
+    try {
+      const members = await get(`${API}/league/${leagueId}/users`);
+      for (const m of (members || []).slice(0, 4)) {
+        const mine2 = await get(`${API}/user/${m.user_id}/leagues/nfl/${season}`);
+        next = (mine2 || []).find((x) => x.previous_league_id === String(leagueId));
+        if (next) break;
+      }
+    } catch {
+    }
+    if (!next) throw new Error(`that league ID is from the ${lg.season} season. Sleeper gives every league a new ID each season: copy this season's ID (League > Settings > League ID)`);
+    leagueId = next.league_id;
+    lg = next;
+    try {
+      const u = new URL(location.href);
+      if (u.searchParams.get("league")) {
+        u.searchParams.set("league", leagueId);
+        history.replaceState(null, "", u);
+      }
+      store("st-league-id", leagueId);
+    } catch {
+    }
+  }
   const [users, rosters, matchups, picks, tx1, tx2, players, proj, champs] = await Promise.all([
     get(`${API}/league/${leagueId}/users`),
     get(`${API}/league/${leagueId}/rosters`),
