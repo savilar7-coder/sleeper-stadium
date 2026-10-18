@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Sleeper Stadium</title>
+  <meta name="description" content="Your Sleeper fantasy league as a live pixel stadium.">
+  <meta property="og:title" content="Sleeper Stadium">
+  <meta property="og:description" content="Your Sleeper fantasy league as a live pixel stadium: live scores, the top scorer in the spotlight, the ASS Bowl and the bench of shame.">
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#20262e">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="village.css">
+  <link rel="stylesheet" href="stadium.css">
+</head>
+<body>
+  <div id="game"></div>
+  <div id="st-hud">
+    <div id="st-league">Loading the league from Sleeper…</div>
+    <div id="st-score"></div>
+    <div id="st-proj"></div>
+    <div class="st-btns"><button id="st-mine" type="button">👑 My team</button><button id="st-trade" type="button">🔁 Trade</button><button id="st-news" type="button">📰 News</button><button id="st-table" type="button">🏆 Table</button></div>
+  </div>
+  <div id="prompt" hidden></div>
+  <div id="stick" hidden><div id="stick-knob"></div></div>
+  <div id="zoom-ctl"><button id="zoom-in" type="button" aria-label="Zoom in">＋</button><button id="zoom-out" type="button" aria-label="Zoom out">－</button></div>
+  <button id="jump-btn" type="button" aria-label="Jump">⤒ Jump</button>
+  <button id="play-btn" type="button" hidden>🏈 Play</button> 
+  <div id="mg-hud" hidden><div id="mg-score"></div><div id="mg-down"></div><div id="mg-msg"></div><div class="mg-btns"><button id="mg-again" type="button">↻ Again</button><button id="mg-exit" type="button">✕ Back to stadium</button></div></div>
+  <div id="zoom-hint" hidden>🔍 Pinch out to fit</div>
+  <div id="panel" hidden role="dialog" aria-modal="true" aria-labelledby="panel-title">
+    <div class="panel-head"><h2 id="panel-title"></h2><button id="panel-close" type="button" aria-label="Close">✕</button></div>
+    <div id="panel-body"></div>
+  </div>
+  <script src="vendor/phaser.min.js"></script>
+  <script type="module" src="js/stadium-main.js"></script>
+</body>
+</html>
