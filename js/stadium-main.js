@@ -640,6 +640,7 @@ function askLeague() {
     if (s) s.setZoom(s.logicalZoom() / 1.25);
   });
   $("jump-btn").textContent = "\u2694\uFE0F Matchup";
+  $("jump-btn").hidden = false;
   $("jump-btn").addEventListener("click", () => {
     const m = mine();
     if (m) matchup(m.roster_id);
