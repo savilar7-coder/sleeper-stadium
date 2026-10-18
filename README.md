@@ -59,4 +59,4 @@ Code: MIT (see `LICENSE`).
 ---
 
 **Want a custom stadium for your league?** Your own characters, banner, colors and inside jokes:
-[lamaisonwebstudio.com](https://lamaisonwebstudio.com)
+[Custom stadium for your league: $25, pay after you see it](https://lamaisonwebstudio.com/stadium/)
