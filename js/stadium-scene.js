@@ -623,9 +623,10 @@ class StadiumScene extends World {
       if (pair.length === 2) {
         const board = this.label(mid, y - 40, "", "#ffffff").setOrigin(0.5, 0).setFontSize(Math.round(19 * DPR));
         board.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", align: "center", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
-        this.boards.push({ board, a: pair[0], b: pair[1] });
+        const bar = this.add.graphics().setDepth(1e5);
+        this.boards.push({ board, bar, a: pair[0], b: pair[1] });
         if (pair === assBowl) {
-          const sign = this.label(mid, y + 30, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(16 * DPR));
+          const sign = this.label(mid, y + 46, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(16 * DPR));
           sign.setStyle({ backgroundColor: "rgba(92,52,20,0.95)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
           this.tweens.add({ targets: sign, angle: { from: -3, to: 3 }, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
         }
@@ -1175,7 +1176,22 @@ ${t.points.toFixed(1)} pts`);
       bench.length ? [el("h3", {}, "Bench"), el("table", {}, bench.map((pid) => row(pid, (t.players_points || {})[pid])))] : null
     ]);
   }
+  drawBars() {
+    for (const { board, bar, a, b } of this.boards || []) {
+      const r = board.getBounds(), pad = r.height * 0.08, h = Math.max(5, r.height * 0.18), half = r.width / 2 - pad;
+      const max = Math.max(a.proj, b.proj, a.points, b.points, 1), y = r.bottom, cx = r.centerX;
+      bar.clear().fillStyle(1580582, 0.92).fillRect(r.x, y, r.width, h + pad * 2);
+      [[a, -1], [b, 1]].forEach(([t, dir]) => {
+        const opp = t === a ? b : a, live = half * t.points / max, proj = half * Math.max(t.proj, t.points) / max;
+        bar.fillStyle(t.points > opp.points ? 7328618 : t.points < opp.points ? 14727242 : 13160666, 1);
+        bar.fillRect(dir < 0 ? cx - live : cx, y + pad, live, h);
+        bar.lineStyle(Math.max(1, h * 0.18), 16777215, 0.75).strokeRect(dir < 0 ? cx - proj : cx, y + pad, proj, h);
+      });
+      bar.fillStyle(16777215, 1).fillRect(cx - 1, y + pad - 2, 2, h + 4);
+    }
+  }
   update(time, delta) {
+    this.drawBars();
     const k = this.keys;
     let vx = 0, vy = 0;
     if (!panelOpen) {
