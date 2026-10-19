@@ -808,7 +808,13 @@ function askLeague() {
   demo.onclick = () => {
     location.search = "?league=1&sample=1";
   };
-  $("st-proj").replaceChildren(box, demo);
+  const look = document.createElement("img");
+  look.src = "stadium.gif";
+  look.alt = "A live league on the field";
+  look.width = 300;
+  look.height = 420;
+  look.style.cssText = "display:block;margin:10px auto 0;max-width:80vw;height:auto;border-radius:12px;border:2px solid #9e7c0c;image-rendering:pixelated";
+  $("st-proj").replaceChildren(box, demo, look);
 }
 (async function main() {
   count("open");

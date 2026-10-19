@@ -43,7 +43,7 @@ class StadiumScene extends World {
     MAP_H = FIELD.y1 + 5;
   }
   preload() {
-    preloadArt(this);
+    preloadArt(this, true);
     preloadDecor(this);
     for (const t of this.league.teams) if (!["Dumpster", "Steeler", "Raven", "Shorty"].includes(t.look) && !this.textures.exists(`a-ch-${t.look}`)) this.load.image(`a-ch-${t.look}`, `assets/chars/${t.look}.png`);
   }
