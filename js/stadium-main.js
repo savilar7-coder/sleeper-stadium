@@ -741,7 +741,14 @@ function askLeague() {
     const v = (document.getElementById("lg-id").value || "").replace(/[^0-9]/g, "");
     if (v) location.search = `?league=${v}`;
   };
-  $("st-proj").replaceChildren(box);
+  const demo = document.createElement("button");
+  demo.type = "button";
+  demo.textContent = "No league? Try a sample league";
+  demo.style.cssText = "display:block;margin:8px auto 0;font:600 14px sans-serif;padding:6px 12px;background:#ffd84a;border:1px solid #9e7c0c;border-radius:8px";
+  demo.onclick = () => {
+    location.search = "?league=1&sample=1";
+  };
+  $("st-proj").replaceChildren(box, demo);
 }
 (async function main() {
   count("open");
@@ -750,7 +757,7 @@ function askLeague() {
     askLeague();
     return;
   }
-  store("st-league-id", leagueId);
+  if (!q.get("sample")) store("st-league-id", leagueId);
   try {
     L = await load(leagueId);
   } catch (err) {

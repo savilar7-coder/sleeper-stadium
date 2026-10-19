@@ -21,6 +21,18 @@
   <link rel="stylesheet" href="village.css">
   <link rel="stylesheet" href="stadium.css">
   <link rel="preconnect" href="https://api.sleeper.app" crossorigin>
+<script>
+(function () {
+  if (!/[?&]sample=1/.test(location.search)) return;
+  var real = window.fetch.bind(window);
+  window.fetch = function (u, o) {
+    var url = typeof u === 'string' ? u : (u && u.url) || '';
+    if (!/api\.sleeper\.(app|com)\//.test(url)) return real(u, o);
+    var key = url.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '_').slice(0, 150) + '.json';
+    return real('sample/' + key).then(function (r) { return r.ok ? r : new Response('[]', { headers: { 'Content-Type': 'application/json' } }); });
+  };
+})();
+</script>
 </head>
 <body>
   <div id="game"></div>
@@ -50,7 +62,7 @@
 (function () {
   var b = document.getElementById('share-lg'), id = '';
   try { id = (new URLSearchParams(location.search).get('league') || localStorage.getItem('st-league-id') || '').replace(/[^0-9]/g, ''); } catch (e) {}
-  if (!id) return;
+  if (!id || /[?&]sample=1/.test(location.search)) return;
   b.hidden = false;
   var q = new URLSearchParams(location.search); q.set('league', id); q.delete('v'); q.delete('notitle');
   var url = location.origin + location.pathname + '?' + q.toString();  // keeps a League Pass's blimp + looks
