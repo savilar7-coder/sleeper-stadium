@@ -6,6 +6,9 @@
   <title>Sleeper Stadium</title>
   <meta name="description" content="Your Sleeper fantasy league as a live pixel stadium.">
   <meta property="og:title" content="Sleeper Stadium">
+  <meta property="og:image" content="https://savilar7-coder.github.io/sleeper-stadium/og.png">
+  <meta property="og:url" content="https://savilar7-coder.github.io/sleeper-stadium/">
+  <meta name="twitter:card" content="summary_large_image">
   <meta property="og:description" content="Your Sleeper fantasy league as a live pixel stadium: live scores, touchdown alerts, the top scorer in the spotlight, the ASS Bowl and the bench of shame.">
   <link rel="icon" href="assets/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icon-180.png">
@@ -42,6 +45,22 @@
   </div>
   <script src="vendor/phaser.min.js"></script>
   <script type="module" src="js/stadium-main.js"></script>
+<button id="share-lg" type="button" hidden style="position:fixed;right:10px;bottom:88px;z-index:50;font:600 13px system-ui,sans-serif;color:#1d140c;background:#ffd84a;border:1px solid #9e7c0c;border-radius:16px;padding:6px 11px;box-shadow:0 2px 6px #0006">&#128279; Share your stadium</button>
+<script>
+(function () {
+  var b = document.getElementById('share-lg'), id = '';
+  try { id = (new URLSearchParams(location.search).get('league') || localStorage.getItem('st-league-id') || '').replace(/[^0-9]/g, ''); } catch (e) {}
+  if (!id) return;
+  b.hidden = false;
+  var url = location.origin + location.pathname + '?league=' + id;
+  b.onclick = function () {
+    if (navigator.share) { navigator.share({ title: 'Our league stadium', url: url }).catch(function () {}); return; }
+    var done = function () { b.textContent = '\u2705 Link copied'; setTimeout(function () { b.innerHTML = '&#128279; Share your stadium'; }, 2000); };
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, function () { prompt('Copy this link:', url); });
+    else prompt('Copy this link:', url);
+  };
+})();
+</script>
 <a id="gh-star" href="https://github.com/savilar7-coder/sleeper-stadium" target="_blank" rel="noopener" style="position:fixed;right:10px;bottom:48px;z-index:50;font:600 13px system-ui,sans-serif;color:#fff;background:#24292f;border:1px solid #57606a;border-radius:16px;padding:6px 11px;text-decoration:none;box-shadow:0 2px 6px #0006">&#11088; Star on GitHub &middot; free &amp; open source</a>
 </body>
 </html>
