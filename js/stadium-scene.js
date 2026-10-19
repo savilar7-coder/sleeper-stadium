@@ -659,7 +659,8 @@ class StadiumScene extends World {
   refreshScores() {
     for (const { tag, t } of this.teamSprites.values()) {
       const opp = this.league.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o.roster_id !== t.roster_id);
-      const nm = t.name.length > 15 ? `${t.name.slice(0, 14)}\u2026` : t.name;
+      const nm = t.name.length > 22 ? `${t.name.slice(0, 21)}\u2026` : t.name, len = nm.length + (t.mine ? 2 : 0);
+      tag.setFontSize(Math.round((len <= 13 ? 18 : len <= 17 ? 15 : 13) * DPR));
       tag.setText(`${t.mine ? "\u{1F451} " : ""}${nm}`).setColor(t.mine ? "#ffe08a" : opp && t.points > opp.points ? "#b9f5a8" : "#fff4d6");
     }
     for (const { board, a, b } of this.boards || []) {
