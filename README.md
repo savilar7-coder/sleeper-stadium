@@ -3,10 +3,10 @@
 Turn your [Sleeper](https://sleeper.com) fantasy football league into a live pixel stadium. Every team stands on the field
 facing its opponent, scores update every minute on game day, and the whole league can watch from their phones.
 
-**[▶ Try it with your league](https://savilar7-coder.github.io/sleeper-stadium/)** · free, no login, no ads ·
+**[▶ Try it with your league](https://stadium.lamaisonwebstudio.com/)** · free, no login, no ads ·
 if you like it, a ⭐ helps a lot
 
-[![Sleeper Stadium: a live league on one field](stadium.gif)](https://savilar7-coder.github.io/sleeper-stadium/)
+[![Sleeper Stadium: a live league on one field](stadium.gif)](https://stadium.lamaisonwebstudio.com/)
 
 **What's on the field**
 - 📺 **Live scores and projections** for every matchup, straight from Sleeper's public API
