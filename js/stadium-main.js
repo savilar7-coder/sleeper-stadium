@@ -814,7 +814,10 @@ function askLeague() {
   look.width = 300;
   look.height = 420;
   look.style.cssText = "display:block;margin:10px auto 0;max-width:80vw;height:auto;border-radius:12px;border:2px solid #9e7c0c;image-rendering:pixelated";
-  $("st-proj").replaceChildren(box, demo, look);
+  const by = document.createElement("p");
+  by.style.cssText = "margin:8px auto 0;font:13px system-ui,sans-serif;color:#5a4a33;max-width:320px;text-align:center";
+  by.innerHTML = 'Built by <a href="https://lamaisonwebstudio.com/" target="_blank" rel="noopener">lamaisonwebstudio.com</a>. Podcast, Discord or business? <a href="https://lamaisonwebstudio.com/stadium/#custom" target="_blank" rel="noopener">Let&#39;s build yours.</a>';
+  $("st-proj").replaceChildren(box, demo, look, by);
 }
 (async function main() {
   count("open");

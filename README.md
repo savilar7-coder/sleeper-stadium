@@ -69,3 +69,6 @@ Code: MIT (see `LICENSE`).
 
 **Want it set up for your league in a minute?** Your own link, your trash talk on the blimp and a mascot for every
 manager: [the $5 League Pass](https://lamaisonwebstudio.com/stadium/) (you make it and see it first, pay only if you like it).
+
+**Podcast, Discord or business?** A stadium in your brand for your whole community (logo, colors, sponsors on the
+jumbotron), or any other web tool or site: built by [lamaisonwebstudio.com](https://lamaisonwebstudio.com/stadium/#custom).
