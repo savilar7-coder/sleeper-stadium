@@ -629,6 +629,7 @@ class StadiumScene extends World {
         this.boards.push({ board, bar, projTxt, a: pair[0], b: pair[1] });
         if (pair === assBowl) for (const t of pair) {
           const x = this.teamSprites.get(t.roster_id), d = x.side === 0 ? -1 : 1;
+          (this.thrones = this.thrones || new Set()).add(t.roster_id);
           this.add.image(x.s.x + d * 12, y + 6, this.throneTex()).setOrigin(0.5, 1).setFlipX(x.side === 1).setDepth(y - 1);
         }
         if (pair === assBowl) {
@@ -1137,8 +1138,9 @@ ${t.points.toFixed(1)} pts`);
         this.podiums.delete(id);
       }
       if (x.tagY == null) x.tagY = x.tag.y;
-      if (!this.tweens.isTweening(x.s)) x.s.y = on ? x.baseY - 22 : x.baseY;
-      x.tag.y = on ? x.tagY - 22 : x.tagY;
+      const lift = on ? 22 : this.thrones && this.thrones.has(id) ? 30 : 0;
+      if (!this.tweens.isTweening(x.s)) x.s.y = x.baseY - lift;
+      x.tag.y = x.tagY - lift;
     }
   }
   placeMoods(time) {
