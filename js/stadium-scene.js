@@ -627,6 +627,10 @@ class StadiumScene extends World {
         const projTxt = this.label(mid, y, "", "#9aa3ad").setOrigin(0.5, 0).setFontSize(Math.round(11 * DPR));
         projTxt.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif' });
         this.boards.push({ board, bar, projTxt, a: pair[0], b: pair[1] });
+        if (pair === assBowl) for (const t of pair) {
+          const x = this.teamSprites.get(t.roster_id);
+          this.add.image(x.s.x, y + 26, this.throneTex()).setOrigin(0.5, 1).setDepth(y - 1);
+        }
         if (pair === assBowl) {
           const sign = this.label(mid, y + 46, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(16 * DPR));
           sign.setStyle({ backgroundColor: "rgba(92,52,20,0.95)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
@@ -648,6 +652,7 @@ class StadiumScene extends World {
       board.setText(`${a.points.toFixed(1)}  :  ${b.points.toFixed(1)}`);
     }
     this.updateMoods();
+    this.updatePodiums();
     const prev = this.prevPts || {}, prevSP = this.prevSP || {};
     for (const { s, t } of this.teamSprites.values()) {
       if (prev[t.roster_id] != null && t.points > prev[t.roster_id] + 0.05) {
@@ -1075,6 +1080,61 @@ ${t.points.toFixed(1)} pts`);
       if (this.moods.has(id)) continue;
       const txt = this.add.text(0, 0, icon, { fontSize: `${Math.round(30 * DPR)}px` }).setOrigin(0.5, 1).setResolution(1).setScale(1 / DPR);
       this.moods.set(id, { icon, txt });
+    }
+  }
+  pixTex(key, w, h, draw, U = 3) {
+    if (this.textures.exists(key)) return key;
+    const ct = this.textures.createCanvas(key, w * U, h * U), c = ct.getContext();
+    draw((col, x, y, ww = 1, hh = 1) => {
+      c.fillStyle = col;
+      c.fillRect(x * U, y * U, ww * U, hh * U);
+    });
+    ct.refresh();
+    return key;
+  }
+  throneTex() {
+    return this.pixTex("st-throne", 16, 20, (r) => {
+      const O = "#5b6470", W = "#f4f6f8", S = "#d5dbe2", G = "#ffd84a";
+      r(O, 3, 0, 10, 8);
+      r(W, 4, 1, 8, 6);
+      r(S, 4, 5, 8, 2);
+      r(G, 10, 2, 2, 1);
+      r(O, 0, 8, 16, 5);
+      r(W, 1, 9, 14, 3);
+      r(S, 2, 11, 12, 1);
+      r(G, 1, 8, 14, 1);
+      r(O, 4, 13, 8, 7);
+      r(W, 5, 13, 6, 6);
+      r(S, 5, 17, 6, 2);
+      r(O, 3, 19, 10, 1);
+    }, 5);
+  }
+  podiumTex() {
+    return this.pixTex("st-podium", 20, 9, (r) => {
+      const O = "#6b5a3a", M = "#efe6d2", D = "#cbbf9f", G = "#ffd84a";
+      r(O, 0, 0, 20, 9);
+      r(M, 1, 1, 18, 7);
+      r(D, 1, 6, 18, 2);
+      for (const x of [3, 7, 12, 16]) r(D, x, 2, 1, 4);
+      r(G, 9, 2, 2, 3);
+    });
+  }
+  updatePodiums() {
+    this.podiums = this.podiums || new Map();
+    const pairs = (this.boards || []).filter(({ a, b }) => a.points + b.points > 0);
+    const top = pairs.sort((p, q) => q.a.points + q.b.points - (p.a.points + p.b.points))[0];
+    const want = new Set(top ? [top.a.roster_id, top.b.roster_id] : []);
+    for (const [id, x] of this.teamSprites) {
+      if (x.baseY == null) x.baseY = x.s.y;
+      const on = want.has(id);
+      if (on && !this.podiums.has(id)) this.podiums.set(id, this.add.image(x.s.x, x.baseY + 4, this.podiumTex()).setOrigin(0.5, 1).setDepth(x.baseY - 1));
+      if (!on && this.podiums.has(id)) {
+        this.podiums.get(id).destroy();
+        this.podiums.delete(id);
+      }
+      if (x.tagY == null) x.tagY = x.tag.y;
+      if (!this.tweens.isTweening(x.s)) x.s.y = on ? x.baseY - 22 : x.baseY;
+      x.tag.y = on ? x.tagY - 22 : x.tagY;
     }
   }
   placeMoods(time) {
