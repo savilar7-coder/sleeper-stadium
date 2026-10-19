@@ -37,6 +37,11 @@
   };
 })();
 </script>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Stadium">
+  <meta name="theme-color" content="#20262e">
 </head>
 <body>
   <div id="game"></div>
@@ -72,9 +77,11 @@
   var q = new URLSearchParams(location.search); q.set('league', id); q.delete('v'); q.delete('notitle');
   var url = location.origin + location.pathname + '?' + q.toString();  // keeps a League Pass's blimp + looks
   b.onclick = function () {
-    if (navigator.share) { navigator.share({ title: 'Our league stadium', url: url }).catch(function () {}); return; }
+    // Oct 19 2026 commissioner kit: the share carries a ready line for the league chat
+    var msg = 'Our league has a live stadium: scores, TD alerts, the ASS Bowl. Commish, pin this in the league chat!';
+    if (navigator.share) { navigator.share({ title: 'Our league stadium', text: msg, url: url }).catch(function () {}); return; }
     var done = function () { b.textContent = '\u2705 Link copied'; setTimeout(function () { b.innerHTML = '&#128279; Share your stadium'; }, 2000); };
-    if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, function () { prompt('Copy this link:', url); });
+    if (navigator.clipboard) navigator.clipboard.writeText(msg + ' ' + url).then(done, function () { prompt('Copy this link:', url); });
     else prompt('Copy this link:', url);
   };
 })();
@@ -83,7 +90,8 @@
 <button id="nudge-x" type="button" aria-label="Close" style="position:absolute;top:4px;right:6px;border:0;background:none;font-size:18px;cursor:pointer">&times;</button>
 <b>Enjoying it?</b> It's free, no ads, made by one person. A GitHub star is how other leagues find it.<br>
 <a class="star-a" href="https://github.com/savilar7-coder/sleeper-stadium" target="_blank" rel="noopener" style="display:block;margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#24292f;color:#fff;text-decoration:none;font-weight:700;font-size:16px;text-align:center">&#11088; Star it on GitHub</a><button id="nudge-share" type="button" style="margin-top:8px;padding:6px 10px;border-radius:10px;border:1px solid #9e7c0c;background:#ffd84a;font-weight:600">&#128279; Share with your league</button>
-<div style="margin-top:8px;font-size:14px">&#127866; Keep it free: <a class="tip-a" href="https://ko-fi.com/lamaisonstudio" target="_blank" rel="noopener" style="font-weight:700;color:#7a4b00">tip on Ko-fi</a> (Apple Pay, card) &middot; <a class="tip-a" href="https://paypal.me/lamaisonstudio" target="_blank" rel="noopener" style="color:#7a4b00">PayPal</a></div>
+<div style="margin-top:8px;font-size:14px">&#127866; <a class="tip-a" href="https://ko-fi.com/lamaisonstudio" target="_blank" rel="noopener" style="font-weight:700;color:#7a4b00">Buy a beer on Ko-fi</a> (Apple Pay, card): your team gets a golden jersey &#127942; &middot; <a class="tip-a" href="https://paypal.me/lamaisonstudio" target="_blank" rel="noopener" style="color:#7a4b00">PayPal</a></div>
+<div class="tip-thanks" hidden style="margin-top:4px;font-size:13px;color:#7a4b00;font-weight:600"></div>
 <div style="margin-top:4px;font-size:12px;color:#5a4a33">Built by <a href="https://lamaisonwebstudio.com/" target="_blank" rel="noopener" style="color:#5a4a33">lamaisonwebstudio.com</a>. Podcast, Discord or business? <a href="https://lamaisonwebstudio.com/stadium/#custom" target="_blank" rel="noopener" style="color:#7a4b00;font-weight:700">Let's talk</a></div>
 </div>
 <div id="tip" hidden style="position:fixed;left:50%;top:150px;transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:12px;padding:10px 12px;font:14px system-ui,sans-serif;box-shadow:0 6px 18px #0008">
@@ -120,7 +128,8 @@
 </script>
 <div id="live-tip" hidden style="position:fixed;left:50%;bottom:156px;transform:translateX(-50%);z-index:60;width:min(340px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:14px;padding:12px 14px;box-shadow:0 8px 24px #0008;font:15px system-ui,sans-serif">
 <button id="live-tip-x" type="button" aria-label="Close" style="position:absolute;top:4px;right:6px;border:0;background:none;color:#fff4d6;font-size:18px;cursor:pointer">&times;</button>
-<b id="live-tip-t">&#127944; A game is live.</b> Sweating it? &#127866; Buy the dev a beer: it keeps the stadium free and ad-free.
+<b id="live-tip-t">&#127944; A game is live.</b> Sweating it? &#127866; Buy a beer and your team plays in a <b style="color:#ffd84a">golden jersey &#127942;</b> with your trash talk on the blimp. Put your Sleeper league ID + team in the Ko-fi note.
+<div class="tip-thanks" hidden style="margin-top:6px;font-size:13px;color:#ffd84a"></div>
 <a class="tip-a" href="https://ko-fi.com/lamaisonstudio" target="_blank" rel="noopener" style="display:block;margin-top:10px;text-align:center;padding:10px;border-radius:10px;background:#ffd84a;color:#1d140c;font-weight:800;text-decoration:none">&#127866; Buy a beer &middot; Apple Pay or card</a><div style="margin-top:6px;text-align:center;font-size:13px">or <a class="tip-a" href="https://paypal.me/lamaisonstudio" target="_blank" rel="noopener" style="color:#ffd84a">PayPal</a></div>
 </div>
 <script>
@@ -138,24 +147,62 @@
       if (on.length) cb(on.length === 1 ? on[0].away + ' @ ' + on[0].home : on.length + ' games');
     }).catch(function () {});
   };
+  var shown = false;
+  var fire = function (title) {
+    if (shown) return;
+    var pn = document.getElementById('panel'), n = document.getElementById('nudge');
+    if ((pn && !pn.hidden) || (n && !n.hidden)) { setTimeout(function () { fire(title); }, 5000); return; }
+    shown = true;
+    var c = document.getElementById('live-tip');
+    document.getElementById('live-tip-t').innerHTML = title;
+    c.hidden = false;
+    try { localStorage.setItem(key, '1'); } catch (e) {}
+    var close = function () { c.hidden = true; };
+    document.getElementById('live-tip-x').onclick = close;
+    c.addEventListener('click', function (e) { if (e.target.closest('.tip-a')) setTimeout(close, 300); });
+    setTimeout(close, 25000);
+  };
+  // Oct 19 2026: your own touchdown is the best moment to ask (stadium-scene.js sends stadium:mytd)
+  window.addEventListener('stadium:mytd', function (e) {
+    if (firstVisit && !test) return;
+    setTimeout(function () { fire('&#127944; That was YOUR touchdown' + (e.detail && e.detail.who ? ' (' + e.detail.who + ')' : '') + '!'); }, 3600);
+  });
   setTimeout(function () {
     if (firstVisit && !test) return;
-    live(function (game) {
-      var show = function () {
-        var pn = document.getElementById('panel'), n = document.getElementById('nudge');
-        if ((pn && !pn.hidden) || (n && !n.hidden)) { setTimeout(show, 5000); return; }
-        var c = document.getElementById('live-tip');
-        document.getElementById('live-tip-t').innerHTML = '&#127944; ' + game + ' is live.';
-        c.hidden = false;
-        try { localStorage.setItem(key, '1'); } catch (e) {}
-        var close = function () { c.hidden = true; };
-        document.getElementById('live-tip-x').onclick = close;
-        c.addEventListener('click', function (e) { if (e.target.closest('.tip-a')) setTimeout(close, 300); });
-        setTimeout(close, 25000);
-      };
-      show();
-    });
+    live(function (game) { fire('&#127944; ' + game + ' is live.'); });
   }, test ? 3000 : 75000);
+})();
+</script>
+<div id="a2hs" hidden style="position:fixed;left:50%;top:150px;transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#fff8e6;color:#1d140c;border:2px solid #9e7c0c;border-radius:12px;padding:10px 12px;font:14px system-ui,sans-serif;box-shadow:0 6px 18px #0008">
+<b>&#128242; Keep the stadium one tap away:</b> <span id="a2hs-how"></span> <button id="a2hs-x" type="button" style="margin-left:4px;border:0;background:#ffd84a;border-radius:6px;font-weight:700;padding:2px 8px">OK</button></div>
+<script>
+(function () {
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if (standalone || !/[?&]league=\d/.test(location.search) || /[?&]sample=1/.test(location.search)) return;
+  var box = document.getElementById('a2hs'), how = document.getElementById('a2hs-how'), deferred = null;
+  var seen = function () { try { return localStorage.getItem('st-a2hs'); } catch (e) { return '1'; } };
+  var mark = function () { try { localStorage.setItem('st-a2hs', '1'); } catch (e) {} };
+  var day = new Date().toISOString().slice(0, 10), first = null;
+  try { first = localStorage.getItem('st-first-day'); if (!first) localStorage.setItem('st-first-day', day); } catch (e) {}
+  if (!first || first === day || seen()) return;  // only from the 2nd day someone comes back
+  var show = function (html) {
+    var pn = document.getElementById('panel'); if (pn && !pn.hidden) { setTimeout(function () { show(html); }, 5000); return; }
+    how.innerHTML = html; box.hidden = false; mark();
+    document.getElementById('a2hs-x').onclick = function () { box.hidden = true; };
+    setTimeout(function () { box.hidden = true; }, 15000);
+  };
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault(); deferred = e;
+    setTimeout(function () { show('<button id="a2hs-go" type="button" style="border:0;background:#24292f;color:#fff;border-radius:6px;font-weight:700;padding:3px 9px">Install</button>');
+      var g = document.getElementById('a2hs-go'); if (g) g.onclick = function () { box.hidden = true; deferred.prompt(); }; }, 20000);
+  });
+  if (/iPhone|iPad/.test(navigator.userAgent)) setTimeout(function () { show('tap Share &#11014;&#65039; then <b>Add to Home Screen</b>.'); }, 20000);
+})();
+(function () {  // honest thank-you line: real tips only (tips.json, updated by hand when a Ko-fi tip arrives)
+  fetch('tips.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (t) {
+    var n = (t && t.beers) | 0; if (n < 1) return;
+    document.querySelectorAll('.tip-thanks').forEach(function (d) { d.textContent = '\uD83C\uDF7A ' + n + (n === 1 ? ' beer' : ' beers') + ' so far, thank you!'; d.hidden = false; });
+  }).catch(function () {});
 })();
 </script>
 <script>setTimeout(function () { var b = document.getElementById('gh-star'); if (b) { b.innerHTML = '&#11088; Star'; b.style.padding = '5px 9px'; } }, 8000);</script>

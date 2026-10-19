@@ -637,6 +637,11 @@ class StadiumScene extends World {
         const x = xs[side], key = `team-${t.roster_id}-`;
         this.makeChar(key, t.look);
         const s = this.add.sprite(x, y, `${key}${side === 0 ? "right" : "left"}0`).setOrigin(0.5, 1).setDepth(y).setScale(1.5);
+        if (t.gold) {
+          s.setTint(16769126, 16769126, 16756736, 16756736);
+          const halo = this.add.image(x, y - 22, "soft-glow").setScale(2.4, 1.8).setTint(16762938).setAlpha(1).setBlendMode(Phaser.BlendModes.ADD).setDepth(y - 3);
+          this.tweens.add({ targets: halo, alpha: 0.45, duration: 900, yoyo: true, repeat: -1 });
+        }
         if (t.mine) this.add.image(x, y - 2, "soft-glow").setScale(1.4, 0.7).setTint(16767050).setBlendMode(Phaser.BlendModes.ADD).setDepth(y - 2);
         const tag = this.label(x, y - 54, "", t.mine ? "#ffe08a" : "#fff4d6").setFontSize(Math.round(18 * DPR));
         this.addBlocker(x - 7, y - 8, 14, 8);
@@ -671,7 +676,7 @@ class StadiumScene extends World {
       const opp = this.league.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o.roster_id !== t.roster_id);
       const nm = t.name.length > 22 ? `${t.name.slice(0, 21)}\u2026` : t.name, len = nm.length + (t.mine ? 2 : 0);
       tag.setFontSize(Math.round((len <= 13 ? 18 : len <= 17 ? 15 : 13) * DPR));
-      tag.setText(`${t.mine ? "\u{1F451} " : ""}${nm}`).setColor(t.mine ? "#ffe08a" : opp && t.points > opp.points ? "#b9f5a8" : "#fff4d6");
+      tag.setText(`${t.mine ? "\u{1F451} " : ""}${t.gold ? "\u{1F3C6} " : ""}${nm}`).setColor(t.mine ? "#ffe08a" : opp && t.points > opp.points ? "#b9f5a8" : "#fff4d6");
     }
     for (const { board, a, b } of this.boards || []) {
       board.setText(`${a.points.toFixed(1)}  :  ${b.points.toFixed(1)}`);
@@ -711,6 +716,7 @@ class StadiumScene extends World {
     q.push({ text: `\u{1F3C8} ${jump >= 5.5 ? "TOUCHDOWN" : "BIG PLAY"}`, who, sub: `+${jump.toFixed(1)} \xB7 ${t.name}`, mine: t.mine });
     const ts = this.teamSprites && this.teamSprites.get(t.roster_id);
     this.tdCheer = { left: ts ? ts.side === 0 : true, until: this.time.now + 2600 };
+    if (t.mine) window.dispatchEvent(new CustomEvent("stadium:mytd", { detail: { who, team: t.name } }));
     if (q.length === 1) this.nextTd();
   }
   nextTd() {

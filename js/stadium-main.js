@@ -136,6 +136,8 @@ async function load(leagueId) {
   const okLook = (v) => ALL_LOOKS.includes(v) || ["Raven", "Dumpster", "Steeler", "Shorty"].includes(v);
   const urlLooks = Object.fromEntries((new URLSearchParams(location.search).get("looks") || "").split(",").map((p) => p.split(".")).filter((p) => p.length === 2 && /^\d+$/.test(p[0]) && okLook(p[1])));
   for (const t of teams) t.look = urlLooks[t.roster_id] || local[t.roster_id] || picked[t.roster_id] || guessLook(t);
+  const gold = new Set((new URLSearchParams(location.search).get("gold") || "").split(",").filter((x) => /^\d+$/.test(x)).map(Number));
+  for (const t of teams) t.gold = gold.has(t.roster_id);
   const groups = {};
   for (const t of teams) (groups[t.matchup_id || `bye-${t.roster_id}`] = groups[t.matchup_id || `bye-${t.roster_id}`] || []).push(t);
   const slots = (lg.roster_positions || []).filter((p) => !["BN", "TAXI", "IR"].includes(p));
@@ -439,27 +441,60 @@ function exitGame() {
   for (const id of ["st-hud", "zoom-ctl", "jump-btn", "play-btn"]) $(id).style.display = "";
   game.scene.wake("stadium");
 }
+async function trophies() {
+  if (L.trophies) return L.trophies;
+  const weeks = [];
+  for (let w = 1; w < Number(L.week); w++) weeks.push(w);
+  const all = await Promise.all(weeks.map((w) => get(`${API}/league/${L.id}/matchups/${w}`).catch(() => [])));
+  const name = (rid) => (L.teams.find((t) => t.roster_id === rid) || {}).name || `Team ${rid}`;
+  let hi = null;
+  const lows = {}, run = {}, best = {};
+  all.forEach((ms, i) => {
+    const scored = (ms || []).filter((m) => m.points > 0);
+    if (!scored.length) return;
+    for (const m of scored) if (!hi || m.points > hi.p) hi = { rid: m.roster_id, p: m.points, w: weeks[i] };
+    const low = scored.reduce((a, b) => b.points < a.points ? b : a);
+    lows[low.roster_id] = (lows[low.roster_id] || 0) + 1;
+    const g = {};
+    for (const m of scored) if (m.matchup_id) (g[m.matchup_id] = g[m.matchup_id] || []).push(m);
+    for (const p of Object.values(g)) if (p.length === 2) for (const [x, y] of [[p[0], p[1]], [p[1], p[0]]]) {
+      run[x.roster_id] = x.points > y.points ? (run[x.roster_id] || 0) + 1 : 0;
+      best[x.roster_id] = Math.max(best[x.roster_id] || 0, run[x.roster_id]);
+    }
+  });
+  const top = (o) => Object.entries(o).sort((a, b) => b[1] - a[1])[0], lw = top(lows), bs = top(best);
+  L.trophies = [
+    hi && `\u{1F3C6} Highest week: ${name(hi.rid)} \xB7 ${fmt(hi.p)} (week ${hi.w})`,
+    lw && lw[1] > 1 && `\u{1F6BD} Most last-place weeks: ${name(+lw[0])} \xB7 ${lw[1]}\xD7`,
+    bs && bs[1] > 1 && `\u{1F525} Longest win streak: ${name(+bs[0])} \xB7 ${bs[1]} in a row`
+  ].filter(Boolean);
+  return L.trophies;
+}
 function standings() {
   const rows = [...L.teams].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
   const power = [...L.teams].sort((a, b) => b.fpts - a.fpts).map((t) => t.roster_id);
-  openPanel(`\u{1F3C6} ${L.name}`, async () => [
-    el(
-      "table",
-      {},
-      el("tr", {}, el("th", {}, "#"), el("th", {}, "Team"), el("th", {}, "W-L"), el("th", { class: "num" }, "PF"), el("th", { class: "num" }, "Power")),
-      rows.map((t, i) => el(
-        "tr",
-        t.mine ? { class: "mine" } : {},
-        el("td", {}, String(i + 1)),
-        el("td", {}, `${t.mine ? "\u{1F451} " : ""}${t.name}`),
-        el("td", {}, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}`),
-        el("td", { class: "num" }, fmt(t.fpts)),
-        el("td", { class: "num" }, `#${power.indexOf(t.roster_id) + 1}`)
-      ))
-    ),
-    el("p", { class: "small" }, "Power = rank by points scored this season. Top 6 make the playoffs (from week 15)."),
-    L.champs.length ? [el("h3", {}, "Champions"), el("div", { class: "chips" }, L.champs.map((c) => el("span", { class: "chip gold" }, `\u{1F3C6} ${c.season}: ${c.team}`)))] : null
-  ]);
+  openPanel(`\u{1F3C6} ${L.name}`, async () => {
+    const tr = await trophies();
+    return [
+      el(
+        "table",
+        {},
+        el("tr", {}, el("th", {}, "#"), el("th", {}, "Team"), el("th", {}, "W-L"), el("th", { class: "num" }, "PF"), el("th", { class: "num" }, "Power")),
+        rows.map((t, i) => el(
+          "tr",
+          t.mine ? { class: "mine" } : {},
+          el("td", {}, String(i + 1)),
+          el("td", {}, `${t.mine ? "\u{1F451} " : ""}${t.name}`),
+          el("td", {}, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}`),
+          el("td", { class: "num" }, fmt(t.fpts)),
+          el("td", { class: "num" }, `#${power.indexOf(t.roster_id) + 1}`)
+        ))
+      ),
+      el("p", { class: "small" }, "Power = rank by points scored this season. Top 6 make the playoffs (from week 15)."),
+      tr.length ? [el("h3", {}, "Season trophies"), el("div", { class: "chips" }, tr.map((x) => el("span", { class: "chip" }, x)))] : null,
+      L.champs.length ? [el("h3", {}, "Champions"), el("div", { class: "chips" }, L.champs.map((c) => el("span", { class: "chip gold" }, `\u{1F3C6} ${c.season}: ${c.team}`)))] : null
+    ];
+  });
 }
 function news() {
   const name = (rid) => (L.teams.find((t) => t.roster_id === rid) || {}).name || `Team ${rid}`;
@@ -646,6 +681,26 @@ function matchupCard(me, opp) {
   c.font = `bold 30px ${font}`;
   c.fillText(stadiumLink(), W / 2, H - 70);
   sharePicture(cv, `week-${L.week}-matchup.png`, `${me.name} vs ${opp.name}`);
+}
+function recapReady() {
+  const G = Object.values(L.games || {}), k = `st-recap-${L.id}-${L.week}`;
+  if (!G.length || G.some((s) => s !== "complete") || store(k)) return;
+  store(k, "1");
+  const b = el(
+    "div",
+    { id: "recap-ready", style: "position:fixed;left:50%;top:150px;transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:12px;padding:10px 12px;font:14px system-ui,sans-serif;box-shadow:0 6px 18px #0008" },
+    el("b", {}, `\u{1F4F8} Week ${L.week} is final.`),
+    " Your recap card is ready for the group chat. ",
+    el("button", { type: "button", class: "rr-go", style: "margin-left:4px;border:0;background:#ffd84a;border-radius:6px;font-weight:700;padding:3px 9px" }, "Make it"),
+    el("button", { type: "button", class: "rr-x", "aria-label": "Close", style: "margin-left:4px;border:0;background:none;color:#fff4d6;font-size:16px" }, "\xD7")
+  );
+  b.querySelector(".rr-go").onclick = () => {
+    b.remove();
+    recap();
+  };
+  b.querySelector(".rr-x").onclick = () => b.remove();
+  document.body.appendChild(b);
+  setTimeout(() => b.remove(), 15e3);
 }
 function recap() {
   const pct = (t) => {
@@ -843,6 +898,7 @@ function askLeague() {
   await gameStatus();
   updateProj();
   hud();
+  setTimeout(recapReady, 4e3);
   game = new Phaser.Game({
     type: (navigator.maxTouchPoints || 0) > 0 ? Phaser.AUTO : Phaser.CANVAS,
     parent: "game",
