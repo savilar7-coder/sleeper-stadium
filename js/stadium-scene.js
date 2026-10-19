@@ -113,7 +113,8 @@ class StadiumScene extends World {
   setZoom(z) {
     const cam = this.cameras.main, W = MAP_W * TILE, H = MAP_H * TILE;
     const fitAll = Math.min(this.scale.width / W, this.scale.height / H);
-    setVillageZoom(Phaser.Math.Clamp(z, Math.max(0.3, fitAll / DPR), 2.5));
+    const zc = Phaser.Math.Clamp(z, Math.max(0.3, fitAll / DPR), 2.5);
+    setVillageZoom(Math.max(0.5, Math.round(zc * DPR * 2)) / (2 * DPR));
     cam.setZoom(villageZoom * DPR);
     const vw = this.scale.width / cam.zoom, vh = this.scale.height / cam.zoom;
     cam.setBounds(Math.min(0, (W - vw) / 2), Math.min(0, (H - vh) / 2), Math.max(W, vw), Math.max(H, vh));

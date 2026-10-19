@@ -3,7 +3,7 @@ const PLOT = 12;
 const MARGIN = 16;
 const POLL_MS = 5e3;
 const SPEED = 240;
-const DPR = Math.max(1, Math.min(2, Math.round((window.devicePixelRatio || 1) * 4) / 4));
+const DPR = Math.max(1, Math.min(window.__DPR_MAX || 2, Math.round((window.devicePixelRatio || 1) * 4) / 4));
 const STATUS = {
   working: { color: 13666842, label: "working" },
   attention: { color: 12597547, label: "needs attention" },
