@@ -656,7 +656,7 @@ class StadiumScene extends World {
           this.add.image(x.s.x + d * 12, y + 6, this.throneTex()).setOrigin(0.5, 1).setFlipX(x.side === 1).setDepth(y - 1);
         }
         if (pair === assBowl) {
-          const sign = this.label(mid, y + 64, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(16 * DPR));
+          const sign = this.label(mid, y - 76, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 1).setFontSize(Math.round(16 * DPR));
           sign.setStyle({ backgroundColor: "rgba(92,52,20,0.95)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
           this.tweens.add({ targets: sign, angle: { from: -3, to: 3 }, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
         }
