@@ -189,6 +189,14 @@ class StadiumScene extends World {
         g.fillRect(x + 1, y + 5, 6, 5);
         g.fillStyle = "rgba(0,0,0,0.25)";
         g.fillRect(x + 6, y + 5, 1, 5);
+        if (r() < 0.14) {
+          g.fillStyle = shirt;
+          g.fillRect(x + 2, y - 1, 4, 2);
+          g.fillRect(x + 5, y + 1, 2, 1);
+        } else if (r() < 0.25) {
+          g.fillStyle = "rgba(244,241,234,0.85)";
+          g.fillRect(x + 1, y + 7, 6, 1);
+        }
         if (r() < 0.08) {
           g.fillStyle = "#ffd84a";
           g.fillRect(x + 6, y - 3, 2, 4);
@@ -1173,7 +1181,7 @@ ${t.points.toFixed(1)} pts`);
       c.fillRect(10, 3, 1, 3);
       ct.refresh();
     }
-    const fanTex = (key, skin, hair, shirt, up, extra) => {
+    const fanTex = (key, skin, hair, shirt, up, extra, hat = "", hatCol = shirt, stripe = false) => {
       if (this.textures.exists(key)) return key;
       const ct = this.textures.createCanvas(key, 12, 18), c = ct.getContext(), p = (col, x, y, w = 1, h = 1) => {
         c.fillStyle = col;
@@ -1189,9 +1197,32 @@ ${t.points.toFixed(1)} pts`);
       p(skin, 4, 7, 4, 3);
       p("#1d140c", 5, 8);
       p("#1d140c", 7, 8);
+      if (hat === "cap") {
+        p(hatCol, 4, 4, 4, 2);
+        p(hatCol, 7, 6, 2, 1);
+        p("rgba(255,255,255,0.25)", 4, 4, 4, 1);
+      }
+      if (hat === "beanie") {
+        p(hatCol, 4, 4, 4, 3);
+        p("#f4f1ea", 4, 6, 4, 1);
+        p("#f4f1ea", 5, 3, 2, 1);
+      }
       p(shirt, 3, 10, 6, 6);
       p("rgba(255,255,255,0.18)", 3, 10, 6, 1);
       p("rgba(0,0,0,0.25)", 8, 11, 1, 5);
+      if (stripe) {
+        p("#f4f1ea", 3, 12, 6, 1);
+        p("#f4f1ea", 5, 13, 2, 2);
+      }
+      if (!up && extra === "drink") {
+        p("#e8e2d0", 9, 11, 2, 3);
+        p("#c84a3a", 9, 11, 2, 1);
+      }
+      if (!up && extra === "popcorn") {
+        p("#c84a3a", 1, 12, 3, 3);
+        p("#f4f1ea", 2, 12, 1, 3);
+        p("#fff4c2", 1, 11, 3, 1);
+      }
       if (up) {
         p(shirt, 2, 6, 1, 4);
         p(shirt, 9, 6, 1, 4);
@@ -1216,16 +1247,20 @@ ${t.points.toFixed(1)} pts`);
     const skinsL = ["#f1c6a4", "#e3b08a", "#c98d68", "#8d5a3b"], hairsL = ["#1d140c", "#3a2a1e", "#6b4423", "#c9a227"];
     this.fans = [];
     const fx0 = (FIELD.x0 - 1) * T - 22, fx1 = (FIELD.x1 + 2) * T + 22;
+    const seats = this.add.graphics().setDepth(-6);
     for (let y = (FIELD.y0 - 1) * T; y < (FIELD.y1 + 2) * T; y += 14) for (const x0 of [fx0 - 30, fx0 - 18, fx1 + 4, fx1 + 16]) {
-      if (r() < 0.22) continue;
       const ravens = x0 < (FIELD.x0 + FIELD.x1) / 2 * T;
+      seats.fillStyle(ravens ? 2365299 : 3818064, 1).fillRect(x0 - 6, y - 7, 12, 5).fillStyle(0, 0.3).fillRect(x0 - 6, y - 3, 12, 1);
+      if (r() < 0.12) continue;
       const skin = skinsL[Math.floor(r() * skinsL.length)], hair = hairsL[Math.floor(r() * hairsL.length)];
       const shirt = ravens ? shirtsR[Math.floor(r() * shirtsR.length)] : shirtsO[Math.floor(r() * shirtsO.length)];
-      const extra = r() < 0.12 ? "finger" : r() < 0.08 ? "sign" : "";
-      const id = `fan-${skin}-${hair}-${shirt}-${extra}`;
-      const down = fanTex(`${id}-d`, skin, hair, shirt, false, extra), up = fanTex(`${id}-u`, skin, hair, shirt, true, extra);
-      const s = this.add.image(x0, y, extra ? up : down).setOrigin(0.5, 1).setDepth(-5);
-      this.fans.push({ s, up, down, keep: !!extra, y, ph: r() * 6.28 });
+      const roll = r(), extra = roll < 0.1 ? "finger" : roll < 0.16 ? "sign" : roll < 0.24 ? "drink" : roll < 0.29 ? "popcorn" : "";
+      const hr = r(), hat = hr < 0.18 ? "cap" : hr < 0.27 ? "beanie" : "", hatCol = ravens ? r() < 0.5 ? "#241773" : "#c9a227" : shirtsO[Math.floor(r() * shirtsO.length)];
+      const stripe = r() < 0.3, keep = extra === "finger" || extra === "sign";
+      const id = `fan-${skin}-${hair}-${shirt}-${extra}-${hat}-${hatCol}-${stripe}`;
+      const down = fanTex(`${id}-d`, skin, hair, shirt, false, extra, hat, hatCol, stripe), up = fanTex(`${id}-u`, skin, hair, shirt, true, extra, hat, hatCol, stripe);
+      const s = this.add.image(x0, y, keep ? up : down).setOrigin(0.5, 1).setDepth(-5);
+      this.fans.push({ s, up, down, keep, y, ph: r() * 6.28 });
     }
     this.time.addEvent({ delay: 350, loop: true, callback: () => {
       if (window.__calm || !this.fans.length) return;
