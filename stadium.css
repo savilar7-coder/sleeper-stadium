@@ -133,3 +133,4 @@
 .tp-more { margin-top: 10px; }
 .tp-more summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 .tp-card .mu-pts { font: 700 17px "Segoe UI", "Helvetica Neue", Arial, sans-serif; } 
+.mu-share { display: block; margin: 12px auto 4px; font: 600 15px system-ui, sans-serif; padding: 8px 14px; background: #ffd84a; color: #1d140c; border: 1px solid #9e7c0c; border-radius: 10px; cursor: pointer; }

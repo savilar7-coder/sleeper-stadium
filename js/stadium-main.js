@@ -303,6 +303,11 @@ function matchup(rid) {
       el("div", { class: `mu-team ${lead === "right" ? "lead" : ""}` }, el("b", {}, fmt(opp.points)), el("small", {}, `proj ${fmt(opp.proj)}`), el("span", {}, opp.name))
     ),
     el("div", { class: "mu-rows" }, rows),
+    (() => {
+      const b = el("button", { type: "button", class: "mu-share" }, "\u{1F4F8} Share this matchup");
+      b.onclick = () => matchupCard(me, opp);
+      return b;
+    })(),
     el("p", { class: "small" }, `Week ${L.week} \xB7 points refresh every minute during games \xB7 projections from Sleeper (half PPR).`)
   ], true);
 }
@@ -576,6 +581,72 @@ function shareOffer(me, partner, give, get_, a, b) {
     el("a", { href: URL.createObjectURL(blob), download: "trade-offer.png" }).click();
   });
 }
+const stadiumLink = () => `${location.host}${location.pathname.replace(/index\.html$/, "")}${L.id && !/dynasty-stadium/.test(location.host) && !/[?&]sample=1/.test(location.search) ? `?league=${L.id}` : ""}`;
+function sharePicture(cv, name, title) {
+  cv.toBlob(async (blob) => {
+    const file = new File([blob], name, { type: "image/png" });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title });
+        return;
+      }
+    } catch {
+      return;
+    }
+    el("a", { href: URL.createObjectURL(blob), download: name }).click();
+  });
+}
+function matchupCard(me, opp) {
+  const W = 1080, H = 1080, cv = el("canvas", { width: W, height: H }), c = cv.getContext("2d"), font = 'system-ui, "Segoe UI", Arial, sans-serif';
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#2e1f8f");
+  g.addColorStop(1, "#0b0a1a");
+  c.fillStyle = g;
+  c.fillRect(0, 0, W, H);
+  const fit = (t, px, max) => {
+    c.font = `bold ${px}px ${font}`;
+    let w = t;
+    while (c.measureText(w).width > max && w.length > 4) w = w.slice(0, -1);
+    return w === t ? t : `${w.trim()}\u2026`;
+  };
+  const best = (t) => {
+    let k = -1;
+    t.starters.forEach((pid2, i) => {
+      if (k < 0 || (t.starters_points[i] || 0) > (t.starters_points[k] || 0)) k = i;
+    });
+    const pid = t.starters[k];
+    return pid && L.players[pid] ? `${L.players[pid][0]} ${fmt(t.starters_points[k] || 0)}` : "";
+  };
+  c.textAlign = "center";
+  c.fillStyle = "#c9a227";
+  c.font = `bold 32px ${font}`;
+  c.fillText(`${L.name} \xB7 WEEK ${L.week}`.toUpperCase().slice(0, 40), W / 2, 100);
+  [[me, 280], [opp, W - 280]].forEach(([t, x]) => {
+    c.fillStyle = "#fff4d6";
+    c.fillText(fit(t.name, 46, 440), x, 300);
+    c.fillStyle = "#ffd84a";
+    c.font = `900 150px ${font}`;
+    c.fillText(fmt(t.points), x, 470);
+    c.fillStyle = "#b9b3d9";
+    c.font = `bold 30px ${font}`;
+    c.fillText(`proj ${fmt(t.proj)}`, x, 530);
+    c.fillStyle = "#9dff7a";
+    c.fillText(fit(best(t) ? `\u2B50 ${best(t)}` : "", 28, 440), x, 600);
+  });
+  c.fillStyle = "#e0394c";
+  c.font = `900 64px ${font}`;
+  c.fillText("VS", W / 2, 440);
+  c.fillStyle = "#fff4d6";
+  c.font = `900 80px ${font}`;
+  c.fillText("WHO YOU GOT? \u{1F447}", W / 2, 800);
+  c.fillStyle = "#c9a227";
+  c.font = `bold 26px ${font}`;
+  c.fillText("WATCH IT LIVE", W / 2, H - 112);
+  c.fillStyle = "#e8e2ff";
+  c.font = `bold 30px ${font}`;
+  c.fillText(stadiumLink(), W / 2, H - 70);
+  sharePicture(cv, `week-${L.week}-matchup.png`, `${me.name} vs ${opp.name}`);
+}
 function recap() {
   const pct = (t) => {
     const g2 = t.wins + t.losses + t.ties;
@@ -643,19 +714,8 @@ function recap() {
   c.fillText("LIVE STADIUM", W / 2, H - 112);
   c.fillStyle = "#e8e2ff";
   c.font = `bold 30px ${font}`;
-  c.fillText(`${location.host}${location.pathname.replace(/index\.html$/, "")}${L.id && !/dynasty-stadium/.test(location.host) ? `?league=${L.id}` : ""}`, W / 2, H - 70);
-  cv.toBlob(async (blob) => {
-    const file = new File([blob], `week-${L.week}-recap.png`, { type: "image/png" });
-    try {
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: `Week ${L.week} recap` });
-        return;
-      }
-    } catch {
-      return;
-    }
-    el("a", { href: URL.createObjectURL(blob), download: `week-${L.week}-recap.png` }).click();
-  });
+  c.fillText(stadiumLink(), W / 2, H - 70);
+  sharePicture(cv, `week-${L.week}-recap.png`, `Week ${L.week} recap`);
 }
 function whoAreYou() {
   openPanel("\u{1F44B} Who are you?", async () => [

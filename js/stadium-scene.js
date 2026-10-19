@@ -697,6 +697,8 @@ class StadiumScene extends World {
   touchdown(t, jump, who) {
     const q = this.tdQueue = this.tdQueue || [];
     q.push({ text: `\u{1F3C8} ${jump >= 5.5 ? "TOUCHDOWN" : "BIG PLAY"}`, who, sub: `+${jump.toFixed(1)} \xB7 ${t.name}`, mine: t.mine });
+    const ts = this.teamSprites && this.teamSprites.get(t.roster_id);
+    this.tdCheer = { left: ts ? ts.side === 0 : true, until: this.time.now + 2600 };
     if (q.length === 1) this.nextTd();
   }
   nextTd() {
@@ -1378,10 +1380,12 @@ ${t.points.toFixed(1)} pts`);
       this.youRing.setPosition(P.x, P.y - 2).setDepth(P.y - 3).setScale(1 + Math.sin(t / 300) * 0.08);
       this.youTag.setOrigin(0, 0.5).setPosition(P.x + 20 + Math.abs(Math.sin(t / 260)) * 4, P.y - 30);
     }
+    const midX = (FIELD.x0 + FIELD.x1 + 1) / 2 * TILE, ch = this.tdCheer && time < this.tdCheer.until ? this.tdCheer : null;
     for (const f of this.fans || []) {
       const wave = Math.max(0, Math.sin(time / 420 - f.y / 90)) ** 6 * 7, bob = Math.abs(Math.sin(time / 280 + f.ph)) * 1.5;
-      f.s.y = f.y + 12 - wave - bob;
-      if (!f.keep) f.s.setTexture(wave > 3.5 ? f.up : f.down);
+      const jump = ch && f.s.x < midX === ch.left ? Math.abs(Math.sin(time / 95 + f.ph)) * 6 : 0;
+      f.s.y = f.y + 12 - wave - bob - jump;
+      if (!f.keep) f.s.setTexture(wave > 3.5 || jump > 0 ? f.up : f.down);
     }
     let best = null, bestD = 44;
     for (const d of this.doors) {
