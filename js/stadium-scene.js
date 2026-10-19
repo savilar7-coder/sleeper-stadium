@@ -1358,16 +1358,18 @@ ${t.points.toFixed(1)} pts`);
       bar.clear();
       for (let i = 0; i < len; i += 2) {
         const x = x1 + i, sag = Math.sin(i / len * Math.PI) * 3;
-        bar.fillStyle(Math.floor(i / 4) % 2 ? 12094026 : 9069108, 1).fillRect(x, hy + sag - 1.5, 2, 3);
+        bar.fillStyle(3810836, 1).fillRect(x, hy + sag - 3, 2, 6);
+        bar.fillStyle(Math.floor(i / 4) % 2 ? 13935452 : 10251832, 1).fillRect(x, hy + sag - 2, 2, 4);
       }
-      bar.fillStyle(13777466, 1).fillRect(kx - 3, hy - 3, 6, 6).fillRect(kx - 2, hy + 3, 4, 7);
-      bar.fillStyle(16747146, 1).fillRect(kx - 2, hy - 2, 2, 2);
+      bar.fillStyle(1905676, 1).fillRect(kx - 6, hy - 6, 12, 12).fillRect(kx - 5, hy + 5, 10, 12);
+      bar.fillStyle(13777466, 1).fillRect(kx - 5, hy - 5, 10, 10).fillRect(kx - 4, hy + 5, 8, 11);
+      bar.fillStyle(16747146, 1).fillRect(kx - 4, hy - 4, 3, 3);
       bar.setDepth(Math.min(A.s.depth, B.s.depth) - 1);
       if (!o.pct) o.pct = this.add.text(0, 0, "", { fontFamily: 'system-ui, "Segoe UI", Arial, sans-serif', fontStyle: "bold", color: "#9dff7a", stroke: "#0f141a" }).setOrigin(0.5, 0).setResolution(1);
       const pct = Math.round(Math.max(pa, 1 - pa) * 100), t = lead ? `${pct}%` : "50 / 50";
       if (o.pct.text !== t) o.pct.setText(t);
       const fs = Math.round(15 * DPR / Math.max(0.5, this.cameras.main.zoom / DPR));
-      o.pct.setFontSize(Math.round(14 * DPR)).setStroke("#0f141a", Math.round(3 * DPR)).setColor(lead ? "#9dff7a" : "#e8e2ff").setScale(board.scaleX).setOrigin(0.5, 1).setPosition(kx, hy - 4).setDepth(board.depth + 1);
+      o.pct.setFontSize(Math.round(14 * DPR)).setStroke("#0f141a", Math.round(3 * DPR)).setColor(lead ? "#9dff7a" : "#e8e2ff").setScale(board.scaleX).setOrigin(0.5, 1).setPosition(kx, hy - 8).setDepth(board.depth + 1);
       const pt = `proj ${a.proj.toFixed(1)} \u2013 ${b.proj.toFixed(1)}`;
       if (projTxt.text !== pt) projTxt.setText(pt);
       const r = board.getBounds();
