@@ -108,6 +108,13 @@
   }, 40000);
 })();
 </script>
+<script>
+(function () {
+  var pnl = document.getElementById('panel'); if (!pnl || !window.MutationObserver) return;
+  var sync = function () { var open = !pnl.hidden; ['gh-star', 'share-lg'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.visibility = open ? 'hidden' : ''; }); };
+  new MutationObserver(sync).observe(pnl, { attributes: true, attributeFilter: ['hidden'] }); sync();
+})();
+</script>
 <a id="gh-star" href="https://github.com/savilar7-coder/sleeper-stadium" target="_blank" rel="noopener" style="position:fixed;right:10px;bottom:48px;z-index:50;font:600 13px system-ui,sans-serif;color:#fff;background:#24292f;border:1px solid #57606a;border-radius:16px;padding:6px 11px;text-decoration:none;box-shadow:0 2px 6px #0006">&#11088; Star on GitHub &middot; free &amp; open source</a>
 </body>
 </html>
