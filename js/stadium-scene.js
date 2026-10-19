@@ -113,14 +113,22 @@ class StadiumScene extends World {
     return this.findPath(from, goal) || [goal];
   }
   setZoom(z) {
+    const W = MAP_W * TILE, H = MAP_H * TILE, fitAll = Math.min(this.scale.width / W, this.scale.height / H);
+    this.applyZoom(Phaser.Math.Clamp(z, Math.max(0.3, fitAll / DPR), 2.5));
+    if (this.zoomSettle) this.zoomSettle.remove();
+    if (this.zoomTween) this.zoomTween.stop();
+    this.zoomSettle = this.time.delayedCall(160, () => {
+      const target = Math.max(0.5, Math.round(villageZoom * DPR * 2)) / (2 * DPR), o = { z: villageZoom };
+      if (Math.abs(target - villageZoom) < 2e-3) return;
+      this.zoomTween = this.tweens.add({ targets: o, z: target, duration: 140, ease: "Sine.easeOut", onUpdate: () => this.applyZoom(o.z) });
+    });
+  }
+  applyZoom(z) {
     const cam = this.cameras.main, W = MAP_W * TILE, H = MAP_H * TILE;
-    const fitAll = Math.min(this.scale.width / W, this.scale.height / H);
-    const zc = Phaser.Math.Clamp(z, Math.max(0.3, fitAll / DPR), 2.5);
-    setVillageZoom(Math.max(0.5, Math.round(zc * DPR * 2)) / (2 * DPR));
-    cam.setZoom(villageZoom * DPR);
+    setVillageZoom(z);
+    cam.setZoom(z * DPR);
     const vw = this.scale.width / cam.zoom, vh = this.scale.height / cam.zoom;
     cam.setBounds(Math.min(0, (W - vw) / 2), Math.min(0, (H - vh) / 2), Math.max(W, vw), Math.max(H, vh));
-    if (this.player) cam.centerOn(this.player.x, this.player.y);
     this.applyUiScale();
   }
   applyUiScale() {
