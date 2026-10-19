@@ -632,6 +632,17 @@ async function refreshPoints() {
   } catch {
   }
 }
+function count(what) {
+  const site = { "savilar7-coder.github.io": "demo" }[location.hostname];
+  if (!site) return;
+  const k = `${site}-${what}`, day = (new Date()).toISOString().slice(0, 10);
+  try {
+    if (store(`ev-${k}`) === day) return;
+    store(`ev-${k}`, day);
+    navigator.sendBeacon(`https://philosophers-trail.pages.dev/e?k=${k}`);
+  } catch {
+  }
+}
 function askLeague() {
   for (const id of ["jump-btn", "zoom-ctl", "play-btn"]) {
     const e = document.getElementById(id);
@@ -650,6 +661,7 @@ function askLeague() {
   $("st-proj").replaceChildren(box);
 }
 (async function main() {
+  count("open");
   const leagueId = (q.get("league") || store("st-league-id") || "").replace(/[^0-9]/g, "");
   if (!leagueId) {
     askLeague();
@@ -662,6 +674,7 @@ function askLeague() {
     $("st-league").textContent = `Could not load the league from Sleeper (${err.message}). Try again in a minute.`;
     return;
   }
+  count("league");
   const saved = Number(store(`st-me-${L.id}`));
   for (const t of L.teams) t.mine = t.roster_id === saved;
   try {
