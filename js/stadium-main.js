@@ -576,6 +576,87 @@ function shareOffer(me, partner, give, get_, a, b) {
     el("a", { href: URL.createObjectURL(blob), download: "trade-offer.png" }).click();
   });
 }
+function recap() {
+  const pct = (t) => {
+    const g2 = t.wins + t.losses + t.ties;
+    return g2 ? (t.wins + t.ties / 2) / g2 : 0.5;
+  };
+  const pairs = Object.values(L.teams.reduce((m, t) => {
+    if (t.matchup_id) (m[t.matchup_id] = m[t.matchup_id] || []).push(t);
+    return m;
+  }, {})).filter((p) => p.length === 2);
+  const live = L.teams.filter((t) => t.matchup_id);
+  if (!pairs.length) return;
+  const top = [...live].sort((a, b) => b.points - a.points)[0], low = [...live].sort((a, b) => a.points - b.points)[0];
+  const gap = (p) => Math.abs(p[0].points - p[1].points), byGap = [...pairs].sort((a, b) => gap(b) - gap(a));
+  const blow = byGap[0], close = byGap[byGap.length - 1];
+  const ass = [...pairs].sort((a, b) => pct(a[0]) + pct(a[1]) - (pct(b[0]) + pct(b[1])) || a[0].fpts + a[1].fpts - (b[0].fpts + b[1].fpts))[0];
+  const bench = (t) => Object.entries(t.players_points || {}).filter(([pid]) => !t.starters.includes(pid)).reduce((n, [, v]) => n + (v || 0), 0);
+  const shame = [...live].sort((a, b) => bench(b) - bench(a))[0];
+  const lead = (p) => p[0].points >= p[1].points ? p : [p[1], p[0]];
+  const W = 1080, H = 1350, cv = el("canvas", { width: W, height: H }), c = cv.getContext("2d"), font = 'system-ui, "Segoe UI", Arial, sans-serif';
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#2e1f8f");
+  g.addColorStop(1, "#0b0a1a");
+  c.fillStyle = g;
+  c.fillRect(0, 0, W, H);
+  c.textAlign = "center";
+  c.fillStyle = "#c9a227";
+  c.font = `bold 34px ${font}`;
+  c.fillText(`${L.name}`.toUpperCase().slice(0, 34), W / 2, 110);
+  c.fillStyle = "#ffd84a";
+  c.font = `900 96px ${font}`;
+  c.fillText(`WEEK ${L.week} RECAP`, W / 2, 220);
+  const rows = [
+    ["\u{1F525} Top score", `${top.name}`, fmt(top.points)],
+    ["\u{1F327}\uFE0F Lowest score", `${low.name}`, fmt(low.points)],
+    ["\u{1F4A5} Biggest blowout", `${lead(blow)[0].name} over ${lead(blow)[1].name}`, `by ${fmt(gap(blow))}`],
+    ["\u{1F62C} Closest game", `${lead(close)[0].name} over ${lead(close)[1].name}`, `by ${fmt(gap(close))}`],
+    ["\u{1F6BD} ASS Bowl", `${lead(ass)[0].name} vs ${lead(ass)[1].name}`, `${fmt(lead(ass)[0].points)} \u2013 ${fmt(lead(ass)[1].points)}`],
+    ["\u{1FA91} Bench of shame", `${shame.name}`, `${fmt(bench(shame))} left on the bench`]
+  ];
+  rows.forEach(([k, who, n], i) => {
+    const y = 290 + i * 156;
+    c.fillStyle = "rgba(255,255,255,0.08)";
+    c.beginPath();
+    c.roundRect(70, y, W - 140, 136, 22);
+    c.fill();
+    c.textAlign = "left";
+    c.fillStyle = "#c9a227";
+    c.font = `bold 30px ${font}`;
+    c.fillText(k, 110, y + 46);
+    c.font = `bold 36px ${font}`;
+    const room = W - 220 - c.measureText(n).width - 40;
+    c.textAlign = "right";
+    c.fillStyle = "#9dff7a";
+    c.fillText(n, W - 110, y + 104);
+    c.textAlign = "left";
+    c.fillStyle = "#fff4d6";
+    c.font = `bold 40px ${font}`;
+    let w = who;
+    while (c.measureText(`${w}\u2026`).width > room && w.length > 4) w = w.slice(0, -1);
+    c.fillText(w === who ? w : `${w.trim()}\u2026`, 110, y + 104);
+  });
+  c.textAlign = "center";
+  c.fillStyle = "#c9a227";
+  c.font = `bold 26px ${font}`;
+  c.fillText("LIVE STADIUM", W / 2, H - 112);
+  c.fillStyle = "#e8e2ff";
+  c.font = `bold 30px ${font}`;
+  c.fillText(`${location.host}${location.pathname.replace(/index\.html$/, "")}${L.id && !/dynasty-stadium/.test(location.host) ? `?league=${L.id}` : ""}`, W / 2, H - 70);
+  cv.toBlob(async (blob) => {
+    const file = new File([blob], `week-${L.week}-recap.png`, { type: "image/png" });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: `Week ${L.week} recap` });
+        return;
+      }
+    } catch {
+      return;
+    }
+    el("a", { href: URL.createObjectURL(blob), download: `week-${L.week}-recap.png` }).click();
+  });
+}
 function whoAreYou() {
   openPanel("\u{1F44B} Who are you?", async () => [
     el("p", {}, "Pick your team: you'll walk the field as your own player, with your matchup on top."),
@@ -723,6 +804,7 @@ function askLeague() {
   });
   $("st-table").addEventListener("click", standings);
   $("st-news").addEventListener("click", news);
+  $("st-recap").addEventListener("click", recap);
   $("st-trade").addEventListener("click", () => tradeMaker(null));
   const fold = (on) => {
     $("st-hud").classList.toggle("mini", on);
