@@ -644,7 +644,7 @@ class StadiumScene extends World {
         this.doors.push({ x, y: y + 14, id: `team-${t.roster_id}`, name: t.name, verb: "Scout", open: () => window.__stadium ? window.__stadium.teamPanel(t.roster_id) : this.teamPanel(t.roster_id) });
       });
       if (pair.length === 2) {
-        const board = this.label(mid, y - 40, "", "#ffffff").setOrigin(0.5, 0).setFontSize(Math.round(19 * DPR));
+        const board = this.label(mid, y + 4, "", "#ffffff").setOrigin(0.5, 0).setFontSize(Math.round(19 * DPR));
         board.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", align: "center", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
         const bar = this.add.graphics().setDepth(1e5);
         const projTxt = this.label(mid, y, "", "#9aa3ad").setOrigin(0.5, 0).setFontSize(Math.round(11 * DPR));
@@ -656,7 +656,7 @@ class StadiumScene extends World {
           this.add.image(x.s.x + d * 12, y + 6, this.throneTex()).setOrigin(0.5, 1).setFlipX(x.side === 1).setDepth(y - 1);
         }
         if (pair === assBowl) {
-          const sign = this.label(mid, y + 46, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(16 * DPR));
+          const sign = this.label(mid, y + 64, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(16 * DPR));
           sign.setStyle({ backgroundColor: "rgba(92,52,20,0.95)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
           this.tweens.add({ targets: sign, angle: { from: -3, to: 3 }, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
         }
@@ -1332,21 +1332,46 @@ ${t.points.toFixed(1)} pts`);
       bench.length ? [el("h3", {}, "Bench"), el("table", {}, bench.map((pid) => row(pid, (t.players_points || {})[pid])))] : null
     ]);
   }
+  winChance(a, b) {
+    const remA = Math.max(0, a.proj - a.points), remB = Math.max(0, b.proj - b.points), diff = a.proj - b.proj;
+    if (remA + remB < 0.5) return a.points === b.points ? 0.5 : a.points > b.points ? 1 : 0;
+    const sigma = 6 + 0.32 * (remA + remB);
+    return 1 / (1 + Math.exp(-1.702 * diff / sigma));
+  }
   drawBars() {
-    for (const { board, bar, projTxt, a, b } of this.boards || []) {
-      const r = board.getBounds(), pad = r.height * 0.08, h = Math.max(6, r.width * 0.035), half = r.width / 2 - pad;
-      const max = Math.max(a.proj, b.proj, a.points, b.points, 1), y = r.bottom, cx = r.centerX;
-      bar.clear().fillStyle(1580582, 0.92).fillRect(r.x, y, r.width, h + pad * 2);
-      [[a, -1], [b, 1]].forEach(([t, dir]) => {
-        const opp = t === a ? b : a, live = half * t.points / max, proj = half * Math.max(t.proj, t.points) / max;
-        bar.fillStyle(t.points > opp.points ? 7328618 : t.points < opp.points ? 14727242 : 13160666, 1);
-        bar.fillRect(dir < 0 ? cx - live : cx, y + pad, live, h);
-        bar.lineStyle(Math.max(1, h * 0.18), 16777215, 0.75).strokeRect(dir < 0 ? cx - proj : cx, y + pad, proj, h);
-      });
-      bar.fillStyle(16777215, 1).fillRect(cx - 1, y + pad - 2, 2, h + 4);
-      const pt = `${a.proj.toFixed(1)}  proj  ${b.proj.toFixed(1)}`;
+    const now = this.time.now;
+    for (const o of this.boards || []) {
+      const { board, bar, projTxt, a, b } = o, A = this.teamSprites.get(a.roster_id), B = this.teamSprites.get(b.roster_id);
+      if (!A || !B) continue;
+      const pa = this.winChance(a, b), k = Math.abs(pa - 0.5) * 2, lead = pa > 0.5 ? A : pa < 0.5 ? B : null;
+      const tug = Math.sin(now / 260 + a.roster_id) * 0.04;
+      for (const [S, dir] of [[A, -1], [B, 1]]) {
+        if (this.thrones && this.thrones.has(S.t.roster_id)) {
+          S.s.setRotation(0);
+          continue;
+        }
+        const back = S === lead ? 0.1 + 0.14 * k : S === (lead === A ? B : A) ? -0.05 - 0.06 * k : 0.08;
+        S.s.setRotation(dir * (back + tug));
+      }
+      const hy = A.s.y - 20, x1 = A.s.x + 12, x2 = B.s.x - 12, len = x2 - x1;
+      const kx = x1 + len * Phaser.Math.Clamp(1 - pa, 0.2, 0.8) + Math.sin(now / 260 + a.roster_id) * 2;
+      bar.clear();
+      for (let i = 0; i < len; i += 2) {
+        const x = x1 + i, sag = Math.sin(i / len * Math.PI) * 3;
+        bar.fillStyle(Math.floor(i / 4) % 2 ? 12094026 : 9069108, 1).fillRect(x, hy + sag - 1.5, 2, 3);
+      }
+      bar.fillStyle(13777466, 1).fillRect(kx - 3, hy - 3, 6, 6).fillRect(kx - 2, hy + 3, 4, 7);
+      bar.fillStyle(16747146, 1).fillRect(kx - 2, hy - 2, 2, 2);
+      bar.setDepth(Math.min(A.s.depth, B.s.depth) - 1);
+      if (!o.pct) o.pct = this.add.text(0, 0, "", { fontFamily: 'system-ui, "Segoe UI", Arial, sans-serif', fontStyle: "bold", color: "#9dff7a", stroke: "#0f141a" }).setOrigin(0.5, 0).setResolution(1);
+      const pct = Math.round(Math.max(pa, 1 - pa) * 100), t = lead ? `${pct}%` : "50 / 50";
+      if (o.pct.text !== t) o.pct.setText(t);
+      const fs = Math.round(15 * DPR / Math.max(0.5, this.cameras.main.zoom / DPR));
+      o.pct.setFontSize(Math.round(14 * DPR)).setStroke("#0f141a", Math.round(3 * DPR)).setColor(lead ? "#9dff7a" : "#e8e2ff").setScale(board.scaleX).setOrigin(0.5, 1).setPosition(kx, hy - 4).setDepth(board.depth + 1);
+      const pt = `proj ${a.proj.toFixed(1)} \u2013 ${b.proj.toFixed(1)}`;
       if (projTxt.text !== pt) projTxt.setText(pt);
-      projTxt.setPosition(cx, y + h + pad * 2).setDepth(board.depth);
+      const r = board.getBounds();
+      projTxt.setPosition(r.centerX, r.bottom + 1).setDepth(board.depth);
     }
   }
   update(time, delta) {
