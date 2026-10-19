@@ -81,9 +81,8 @@
 </script>
 <div id="nudge" hidden style="position:fixed;left:50%;bottom:130px;transform:translateX(-50%);z-index:60;width:min(340px,calc(100vw - 32px));background:#fff8e6;color:#1d140c;border:2px solid #9e7c0c;border-radius:14px;padding:12px 14px;box-shadow:0 8px 24px #0008;font:15px system-ui,sans-serif">
 <button id="nudge-x" type="button" aria-label="Close" style="position:absolute;top:4px;right:6px;border:0;background:none;font-size:18px;cursor:pointer">&times;</button>
-<b>Enjoying it?</b> It's free and built in public.<br>
-<a href="https://github.com/savilar7-coder/sleeper-stadium" target="_blank" rel="noopener" style="display:inline-block;margin:8px 6px 0 0;padding:6px 10px;border-radius:10px;background:#24292f;color:#fff;text-decoration:none;font-weight:600">&#11088; Star on GitHub</a><button id="nudge-share" type="button" style="margin-top:8px;padding:6px 10px;border-radius:10px;border:1px solid #9e7c0c;background:#ffd84a;font-weight:600">&#128279; Share with your league</button>
-<div style="margin-top:8px;font-size:13px">&#10024; Your league's own link + your blimp message: <a href="https://lamaisonwebstudio.com/stadium/" target="_blank" rel="noopener" style="color:#7a4b00;font-weight:700">$5 League Pass</a></div>
+<b>Enjoying it?</b> It's free, no ads, made by one person. A GitHub star is how other leagues find it.<br>
+<a class="star-a" href="https://github.com/savilar7-coder/sleeper-stadium" target="_blank" rel="noopener" style="display:block;margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#24292f;color:#fff;text-decoration:none;font-weight:700;font-size:16px;text-align:center">&#11088; Star it on GitHub</a><button id="nudge-share" type="button" style="margin-top:8px;padding:6px 10px;border-radius:10px;border:1px solid #9e7c0c;background:#ffd84a;font-weight:600">&#128279; Share with your league</button>
 <div style="margin-top:8px;font-size:14px">&#127866; Keep it free, tip what you like: <a class="tip-a" href="https://paypal.me/lamaisonstudio/1USD" target="_blank" rel="noopener" style="font-weight:700;color:#7a4b00">$1</a> &middot; <a class="tip-a" href="https://paypal.me/lamaisonstudio/3USD" target="_blank" rel="noopener" style="font-weight:700;color:#7a4b00">$3</a> &middot; <a class="tip-a" href="https://paypal.me/lamaisonstudio/5USD" target="_blank" rel="noopener" style="font-weight:700;color:#7a4b00">$5</a> &middot; <a class="tip-a" href="https://paypal.me/lamaisonstudio" target="_blank" rel="noopener" style="font-weight:700;color:#7a4b00">any</a></div>
 <div style="margin-top:4px;font-size:12px;color:#5a4a33">Built by <a href="https://lamaisonwebstudio.com/" target="_blank" rel="noopener" style="color:#5a4a33">lamaisonwebstudio.com</a>. Podcast, Discord or business? <a href="https://lamaisonwebstudio.com/stadium/#custom" target="_blank" rel="noopener" style="color:#7a4b00;font-weight:700">Let's talk</a></div>
 </div>
@@ -102,12 +101,13 @@
     try { if (localStorage.getItem('st-tip')) return; localStorage.setItem('st-tip', '1'); } catch (x) {}
     setTimeout(function () { var t = document.getElementById('tip'); t.hidden = false; document.getElementById('tip-x').onclick = function () { t.hidden = true; }; setTimeout(function () { t.hidden = true; }, 9000); }, 2500);
   }, true);
-  setTimeout(function () {
+  setTimeout(function show() {
+    var pn = document.getElementById('panel'); if (pn && !pn.hidden) { setTimeout(show, 5000); return; }  // never on top of a menu
     var n = document.getElementById('nudge'); n.hidden = false;
     try { localStorage.setItem('st-nudge', '1'); } catch (e) {}
     document.getElementById('nudge-x').onclick = function () { n.hidden = true; };
     document.getElementById('nudge-share').onclick = function () { n.hidden = true; var b = document.getElementById('share-lg'); if (b) b.click(); };
-  }, 40000);
+  }, 30000);
 })();
 </script>
 <a id="tip-pill" href="https://paypal.me/lamaisonstudio/3USD" target="_blank" rel="noopener" hidden style="position:fixed;right:96px;bottom:48px;z-index:50;font:600 13px system-ui,sans-serif;color:#1d140c;background:#ffd84a;border:1px solid #9e7c0c;border-radius:16px;padding:5px 10px;text-decoration:none;box-shadow:0 2px 6px #0006">&#127866; Tip</a>
@@ -126,6 +126,7 @@
   new MutationObserver(sync).observe(pnl, { attributes: true, attributeFilter: ['hidden'] }); sync();
 })();
 </script>
-<a id="gh-star" href="https://github.com/savilar7-coder/sleeper-stadium" target="_blank" rel="noopener" style="position:fixed;right:10px;bottom:48px;z-index:50;font:600 13px system-ui,sans-serif;color:#fff;background:#24292f;border:1px solid #57606a;border-radius:16px;padding:6px 11px;text-decoration:none;box-shadow:0 2px 6px #0006">&#11088; Star on GitHub &middot; free &amp; open source</a>
+<a id="gh-star" class="star-a" href="https://github.com/savilar7-coder/sleeper-stadium" target="_blank" rel="noopener" style="position:fixed;right:10px;bottom:48px;z-index:50;font:600 13px system-ui,sans-serif;color:#fff;background:#24292f;border:1px solid #57606a;border-radius:16px;padding:6px 11px;text-decoration:none;box-shadow:0 2px 6px #0006">&#11088; Star on GitHub &middot; free &amp; open source</a>
+<script>document.addEventListener('click', function (e) { if (!e.target.closest || !e.target.closest('.star-a')) return; try { var day = new Date().toISOString().slice(0, 10); if (localStorage.getItem('ev-demo-star') !== day) { localStorage.setItem('ev-demo-star', day); navigator.sendBeacon('https://philosophers-trail.pages.dev/e?k=demo-star'); } } catch (x) {} }, true);</script>
 </body>
 </html>
