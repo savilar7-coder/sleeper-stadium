@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Sleeper Stadium</title>
+  <link rel="preconnect" href="https://api.sleeper.app" crossorigin>
+  <link rel="preload" href="vendor/phaser.min.js" as="script">
+  <link rel="modulepreload" href="js/stadium.bundle.js">
+  <link rel="preload" href="sleeper-players.json" as="fetch" crossorigin="anonymous">
   <meta name="description" content="Your Sleeper fantasy league as a live pixel stadium.">
   <meta property="og:title" content="Sleeper Stadium">
   <meta property="og:image" content="https://savilar7-coder.github.io/sleeper-stadium/og.png">
@@ -56,7 +60,7 @@
     <div id="panel-body"></div>
   </div>
   <script src="vendor/phaser.min.js"></script>
-  <script type="module" src="js/stadium-main.js"></script>
+  <script type="module" src="js/stadium.bundle.js"></script>
 <button id="share-lg" type="button" hidden style="position:fixed;right:10px;bottom:88px;z-index:50;font:600 13px system-ui,sans-serif;color:#1d140c;background:#ffd84a;border:1px solid #9e7c0c;border-radius:16px;padding:6px 11px;box-shadow:0 2px 6px #0006">&#128279; Share your stadium</button>
 <script>
 (function () {
