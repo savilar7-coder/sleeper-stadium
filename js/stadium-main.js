@@ -211,17 +211,45 @@ function rosterTable(pids, t, withPts) {
     })
   );
 }
+const POS_COL = { QB: "#c8463c", RB: "#2f8f4e", WR: "#2f6fb8", TE: "#d77a35", K: "#7a6a52", DEF: "#4b4f58" };
+const posBadge = (pos) => el("span", { class: "tp-pos", style: `background:${POS_COL[pos] || "#7b4fa0"}` }, pos || "?");
+function rosterCards(pids, t, withPts) {
+  return el("div", { class: "tp-list" }, pids.map((pid, i) => {
+    const p = L.players[pid] || [pid && pid !== "0" ? "Unknown" : "Empty", "", "", null, 0];
+    const pts = withPts ? t.starters_points[i] ?? t.players_points[pid] : null, proj = L.proj[pid];
+    return el(
+      "div",
+      { class: "tp-card" },
+      pid && pid !== "0" ? face(pid) : el("span", { class: "mu-face" }),
+      posBadge(p[1]),
+      el("div", { class: "mu-who" }, el("b", {}, p[0]), el("small", {}, [p[2], p[3] ? `age ${p[3]}` : "", proj != null ? `proj ${fmt(proj)}` : ""].filter(Boolean).join(" \xB7 "))),
+      withPts ? el("span", { class: "mu-pts" }, pts == null ? "\u2013" : fmt(pts)) : null
+    );
+  }));
+}
 function teamPanel(rid) {
   const t = L.teams.find((x) => x.roster_id === rid);
   const bench = t.players.filter((p) => !t.starters.includes(p) && !t.taxi.includes(p) && !t.reserve.includes(p));
   const pk = picksOf(rid);
   openPanel(`${t.mine ? "\u{1F451} " : ""}${t.name}`, async () => [
     t.mine ? el("button", { type: "button", class: "st-wide st-ghost st-who" }, "\u{1F64B} Not you? Pick your team") : null,
-    el("p", { class: "small" }, `${t.owner} \xB7 ${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""} \xB7 ${fmt(t.fpts)} PF \xB7 week ${L.week}: ${fmt(t.points)} (proj ${fmt(t.proj)})`),
+    el(
+      "div",
+      { class: "tp-head" },
+      el("div", { class: "tp-score" }, el("small", {}, `Week ${L.week}`), el("b", {}, fmt(t.points)), el("small", {}, `proj ${fmt(t.proj)}`)),
+      el(
+        "div",
+        { class: "tp-stats" },
+        el("span", {}, el("b", {}, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}`), "record"),
+        el("span", {}, el("b", {}, `#${[...L.teams].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts).indexOf(t) + 1}`), "rank"),
+        el("span", {}, el("b", {}, fmt(t.fpts)), "points for")
+      ),
+      el("small", { class: "tp-owner" }, t.owner)
+    ),
     el("h3", {}, "Starters"),
-    rosterTable(t.starters, t, true),
-    bench.length ? [el("h3", {}, "Bench"), rosterTable(bench, t, false)] : null,
-    t.taxi.length ? [el("h3", {}, "Taxi squad"), rosterTable(t.taxi, t, false)] : null,
+    rosterCards(t.starters, t, true),
+    bench.length ? el("details", { class: "tp-more" }, el("summary", {}, `Bench (${bench.length})`), rosterCards(bench, t, false)) : null,
+    t.taxi.length ? el("details", { class: "tp-more" }, el("summary", {}, `Taxi squad (${t.taxi.length})`), rosterCards(t.taxi, t, false)) : null,
     el("h3", {}, "Draft picks"),
     pk.length ? el("div", { class: "chips" }, pk.map((p) => el("span", { class: "chip" }, p.label))) : el("div", { class: "empty" }, "No picks in the next three drafts."),
     t.mine ? el("button", { type: "button", class: "st-wide" }, "\u{1F501} Make a trade") : el("button", { type: "button", class: "st-wide" }, `\u{1F501} Trade with ${t.name}`),

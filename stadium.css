@@ -117,3 +117,19 @@
 #st-fold { position: absolute; top: 2px; right: 4px; font: 700 14px/1 sans-serif; padding: 4px 8px; border: 0; background: none; color: #6b4f2a; cursor: pointer; }
 #st-hud.mini #st-league, #st-hud.mini #st-proj, #st-hud.mini .st-btns { display: none; }
 #st-hud.mini { padding-top: 4px; padding-bottom: 4px; }
+
+
+.tp-head { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center; padding: 10px 12px; margin-bottom: 6px; border-radius: 8px; background: #2b3a24; color: #fff; }
+.tp-score { display: grid; text-align: center; padding-right: 14px; border-right: 1px solid rgba(255,255,255,.2); }
+.tp-score b { font: 700 30px/1.1 "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+.tp-score small, .tp-owner { color: #c9d4bf; font-size: 12px; }
+.tp-stats { display: flex; gap: 14px; flex-wrap: wrap; }
+.tp-stats span { display: grid; font-size: 11px; color: #c9d4bf; }
+.tp-stats b { font: 700 17px "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #fff; }
+.tp-owner { grid-column: 1 / -1; }
+.tp-list { display: grid; gap: 4px; }
+.tp-card { display: grid; grid-template-columns: 36px 38px 1fr auto; align-items: center; gap: 8px; padding: 4px 8px; background: #fff8e8; border: 1px solid #f1e4c3; border-radius: 6px; min-width: 0; }
+.tp-pos { font: 700 11px "Segoe UI", Arial, sans-serif; color: #fff; text-align: center; padding: 3px 0; border-radius: 4px; }
+.tp-more { margin-top: 10px; }
+.tp-more summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+.tp-card .mu-pts { font: 700 17px "Segoe UI", "Helvetica Neue", Arial, sans-serif; } 
