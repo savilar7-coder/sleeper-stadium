@@ -118,6 +118,46 @@
   document.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('#tip-pill, .tip-a')) count(); }, true);
 })();
 </script>
+<div id="live-tip" hidden style="position:fixed;left:50%;bottom:156px;transform:translateX(-50%);z-index:60;width:min(340px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:14px;padding:12px 14px;box-shadow:0 8px 24px #0008;font:15px system-ui,sans-serif">
+<button id="live-tip-x" type="button" aria-label="Close" style="position:absolute;top:4px;right:6px;border:0;background:none;color:#fff4d6;font-size:18px;cursor:pointer">&times;</button>
+<b id="live-tip-t">&#127944; A game is live.</b> Sweating it? &#127866; Buy the dev a beer: it keeps the stadium free and ad-free.
+<div style="display:flex;gap:8px;margin-top:10px"><a class="tip-a" href="https://paypal.me/lamaisonstudio/1USD" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:8px;border-radius:10px;background:#ffd84a;color:#1d140c;font-weight:800;text-decoration:none">$1</a><a class="tip-a" href="https://paypal.me/lamaisonstudio/3USD" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:8px;border-radius:10px;background:#ffd84a;color:#1d140c;font-weight:800;text-decoration:none">$3</a><a class="tip-a" href="https://paypal.me/lamaisonstudio/5USD" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:8px;border-radius:10px;background:#ffd84a;color:#1d140c;font-weight:800;text-decoration:none">$5</a></div>
+</div>
+<script>
+(function () {
+  var test = /[?&]livetest=1/.test(location.search);
+  if (!test && (!/[?&]league=\d/.test(location.search) || /[?&]sample=1/.test(location.search))) return;
+  var day = new Date().toISOString().slice(0, 10), key = 'st-live-tip-' + day;
+  try { if (!test && localStorage.getItem(key)) return; } catch (e) {}
+  var firstVisit = false; try { firstVisit = !localStorage.getItem('st-nudge'); } catch (e) {}  // first visit: the nudge asks this time
+  var live = function (cb) {
+    if (test) return cb('WAS @ SF');
+    var y = new Date().getFullYear();
+    fetch('https://api.sleeper.com/schedule/nfl/regular/' + y).then(function (r) { return r.json(); }).then(function (g) {
+      var on = (g || []).filter(function (x) { return x.status === 'in_game'; });
+      if (on.length) cb(on.length === 1 ? on[0].away + ' @ ' + on[0].home : on.length + ' games');
+    }).catch(function () {});
+  };
+  setTimeout(function () {
+    if (firstVisit && !test) return;
+    live(function (game) {
+      var show = function () {
+        var pn = document.getElementById('panel'), n = document.getElementById('nudge');
+        if ((pn && !pn.hidden) || (n && !n.hidden)) { setTimeout(show, 5000); return; }
+        var c = document.getElementById('live-tip');
+        document.getElementById('live-tip-t').innerHTML = '&#127944; ' + game + ' is live.';
+        c.hidden = false;
+        try { localStorage.setItem(key, '1'); } catch (e) {}
+        var close = function () { c.hidden = true; };
+        document.getElementById('live-tip-x').onclick = close;
+        c.addEventListener('click', function (e) { if (e.target.closest('.tip-a')) setTimeout(close, 300); });
+        setTimeout(close, 25000);
+      };
+      show();
+    });
+  }, test ? 3000 : 75000);
+})();
+</script>
 <script>setTimeout(function () { var b = document.getElementById('gh-star'); if (b) { b.innerHTML = '&#11088; Star'; b.style.padding = '5px 9px'; } }, 8000);</script>
 <script>
 (function () {
