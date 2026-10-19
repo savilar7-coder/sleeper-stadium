@@ -74,7 +74,7 @@ class StadiumScene extends World {
     this.placeTeams();
     this.addLife();
     this.addProps();
-    this.player = this.physics.add.sprite((FIELD.x0 + FIELD.x1 + 1) / 2 * TILE, (FIELD.y0 + 9.2) * TILE, "playerup0").setOrigin(0.5, 1);
+    this.player = this.physics.add.sprite(((FIELD.x0 + FIELD.x1 + 1) / 2 + 2.6) * TILE, (FIELD.y0 + 9.6) * TILE, "playerup0").setOrigin(0.5, 1);
     this.player.body.setSize(14, 8).setOffset(9, 24);
     this.player.setScale(1.5);
     this.youRing = this.add.ellipse(0, 0, 44, 16, 16767050, 0.35).setStrokeStyle(2, 16767050, 0.9);
@@ -83,6 +83,8 @@ class StadiumScene extends World {
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.blockers);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+    this.cameras.main.setFollowOffset(2.6 * TILE, 0);
+    this.spawnOffset = true;
     const fitZoom = () => this.setZoom(villageZoom || (window.innerWidth < 600 ? 0.86 : Math.min(1.4, window.innerHeight / 640)));
     fitZoom();
     this.scale.on("resize", fitZoom);
@@ -300,7 +302,7 @@ class StadiumScene extends World {
     g.font = '600 34px "Pixelify Sans", sans-serif';
     g.textAlign = "center";
     g.fillStyle = "#c9a227";
-    g.fillText((this.league.name || "STADIUM").toUpperCase().slice(0, 16), fx + fw / 2, fy + 44);
+    g.fillText((this.league.name || "STADIUM").toUpperCase().slice(0, 16), fx + fw / 2, fy + 58);
     g.fillStyle = "rgba(255,255,255,0.85)";
     g.fillText(`${name || "FF"} \xB7 WEEK ${this.league.week}`, fx + fw / 2, fy + fh - 22);
     ct.refresh();
@@ -879,7 +881,7 @@ class StadiumScene extends World {
     });
     const champs = (L.champs || []).slice(0, 3);
     this.add.image(mid - 70, ty, "trophy").setOrigin(0.5, 1).setScale(1.5).setDepth(ty);
-    this.add.text(mid - 48, ty - 22, champs.length ? champs.map((c) => `\u{1F3C6} ${c.season}  ${c.team}`).join("\n") : "\u{1F3C6} Champions: first title still up for grabs", { ...sans, fontSize: "13px", color: "#ffe08a", backgroundColor: "rgba(30,22,10,0.85)", padding: { x: 6, y: 4 } }).setOrigin(0, 0.5).setDepth(ty + 1);
+    this.add.text(mid - 48, ty - 22, champs.length ? champs.map((c) => `\u{1F3C6} ${c.season}  ${c.team}`).join("\n") : "\u{1F3C6} Champions: first title still up for grabs", { ...sans, fontSize: "13px", color: "#ffe08a", backgroundColor: "rgba(30,22,10,0.85)", padding: { x: 6, y: 4 } }).setOrigin(0, 1).setDepth(ty + 1);
     px("bench", 20, 8, (p) => {
       p("#7a5232", 0, 0, 20, 2);
       p("#5a3a22", 0, 2, 20, 1);
@@ -1095,7 +1097,7 @@ ${t.points.toFixed(1)} pts`);
     }
     for (const [id, icon] of want) {
       if (this.moods.has(id)) continue;
-      const txt = this.add.text(0, 0, icon, { fontSize: `${Math.round(30 * DPR)}px` }).setOrigin(0.5, 1).setResolution(1).setScale(1 / DPR);
+      const txt = this.add.text(0, 0, icon, { fontSize: `${Math.round((icon === "\u{1F525}" ? 30 : 24) * DPR)}px` }).setOrigin(0.5, 1).setResolution(1).setScale(1 / DPR);
       this.moods.set(id, { icon, txt });
     }
   }
@@ -1164,7 +1166,7 @@ ${t.points.toFixed(1)} pts`);
       const x = this.teamSprites.get(id);
       if (!x) continue;
       const out = x.side === 0 ? -1 : 1, fire = m.icon === "\u{1F525}";
-      m.txt.setPosition(x.s.x + out * 30, x.s.y - (fire ? 2 : 34) + Math.sin(time / (fire ? 120 : 500) + id) * (fire ? 1.5 : 3)).setDepth(x.s.y + 1);
+      m.txt.setPosition(x.s.x + out * 30, x.s.y - (fire ? 2 : 22) + Math.sin(time / (fire ? 120 : 500) + id) * (fire ? 1.5 : 3)).setDepth(x.s.y + 1);
       if (fire) m.txt.setScale((1 + Math.sin(time / 90 + id) * 0.08) / DPR);
     }
   }
@@ -1283,7 +1285,7 @@ ${t.points.toFixed(1)} pts`);
         const sa = this.teamSprites.get(a.roster_id), sb = this.teamSprites.get(b.roster_id);
         if (!sa || !sb) continue;
         const [from, to] = Math.random() < 0.5 ? [sa.s, sb.s] : [sb.s, sa.s];
-        const ball = this.add.image(from.x, from.y - 30, "football").setDepth(1e5).setScale(1.2);
+        const ball = this.add.image(from.x, from.y - 30, "football").setDepth(99990).setScale(1.2);
         const shadow = this.add.image(from.x, from.y - 4, "soft-shadow").setScale(0.5, 0.5).setDepth(from.y - 1);
         const st = { k: 0 };
         this.tweens.add({
@@ -1353,6 +1355,10 @@ ${t.points.toFixed(1)} pts`);
     if (!vx && !vy && !panelOpen && this.stick && this.stick.active) {
       vx = this.stick.vx;
       vy = this.stick.vy;
+    }
+    if (this.spawnOffset && (vx || vy || this.target)) {
+      this.spawnOffset = false;
+      this.cameras.main.setFollowOffset(0, 0);
     }
     if (vx || vy || panelOpen) {
       this.target = null;
