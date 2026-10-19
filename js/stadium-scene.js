@@ -7,7 +7,8 @@ import { sfx } from "./sfx.js";
 import { World } from "./world.js";
 const ROW = 5;
 const RAVENS = ["#241773", "#241773", "#2e1f8f", "#000000", "#9e7c0c", "#c9a227"];
-const MAP_W = 22, MAP_H = 49;
+const MAP_W = 22;
+let MAP_H = 49;
 const FIELD = { x0: 4, x1: 17, y0: 4, y1: 44 };
 const LOOKS = [
   "Knight",
@@ -37,6 +38,9 @@ class StadiumScene extends World {
   }
   init(data) {
     this.league = data.league;
+    const rows = (this.league.pairs || []).length || 6;
+    FIELD.y1 = Math.max(44, FIELD.y0 + 7 + (rows - 1) * ROW + 8);
+    MAP_H = FIELD.y1 + 5;
   }
   preload() {
     preloadArt(this);
