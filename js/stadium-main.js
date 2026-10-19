@@ -776,7 +776,7 @@ async function refreshPoints() {
   }
 }
 function count(what) {
-  const site = { "savilar7-coder.github.io": "demo" }[location.hostname];
+  const site = { "savilar7-coder.github.io": "demo", "stadium.lamaisonwebstudio.com": "demo" }[location.hostname];
   if (!site) return;
   const k = `${site}-${what}`, day = (new Date()).toISOString().slice(0, 10);
   try {
