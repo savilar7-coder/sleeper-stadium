@@ -6,7 +6,7 @@ facing its opponent, scores update every minute on game day, and the whole leagu
 **[▶ Try it with your league](https://savilar7-coder.github.io/sleeper-stadium/)** · free, no login, no ads ·
 if you like it, a ⭐ helps a lot
 
-[![Sleeper Stadium: your whole league live on one field](og.png)](https://savilar7-coder.github.io/sleeper-stadium/)
+[![Sleeper Stadium: a live league on one field](stadium.gif)](https://savilar7-coder.github.io/sleeper-stadium/)
 
 **What's on the field**
 - 📺 **Live scores and projections** for every matchup, straight from Sleeper's public API
