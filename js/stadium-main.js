@@ -133,7 +133,9 @@ async function load(leagueId) {
   });
   for (const t of teams) t.projPre = t.proj = t.starters.reduce((n, pid) => n + (proj[pid] || 0), 0);
   const local = JSON.parse(store("st-looks") || "{}");
-  for (const t of teams) t.look = local[t.roster_id] || picked[t.roster_id] || guessLook(t);
+  const okLook = (v) => ALL_LOOKS.includes(v) || ["Raven", "Dumpster", "Steeler", "Shorty"].includes(v);
+  const urlLooks = Object.fromEntries((new URLSearchParams(location.search).get("looks") || "").split(",").map((p) => p.split(".")).filter((p) => p.length === 2 && /^\d+$/.test(p[0]) && okLook(p[1])));
+  for (const t of teams) t.look = urlLooks[t.roster_id] || local[t.roster_id] || picked[t.roster_id] || guessLook(t);
   const groups = {};
   for (const t of teams) (groups[t.matchup_id || `bye-${t.roster_id}`] = groups[t.matchup_id || `bye-${t.roster_id}`] || []).push(t);
   const slots = (lg.roster_positions || []).filter((p) => !["BN", "TAXI", "IR"].includes(p));
@@ -151,7 +153,7 @@ async function load(leagueId) {
     picks,
     news: [...tx1, ...tx2].filter((x) => x.status === "complete").sort((a, b) => b.status_updated - a.status_updated),
     champs,
-    blimp: (blimpFile || {}).message || ""
+    blimp: (new URLSearchParams(location.search).get("blimp") || (blimpFile || {}).message || "").slice(0, 60)
   };
 }
 function playerValue(pid) {

@@ -52,7 +52,8 @@
   try { id = (new URLSearchParams(location.search).get('league') || localStorage.getItem('st-league-id') || '').replace(/[^0-9]/g, ''); } catch (e) {}
   if (!id) return;
   b.hidden = false;
-  var url = location.origin + location.pathname + '?league=' + id;
+  var q = new URLSearchParams(location.search); q.set('league', id); q.delete('v'); q.delete('notitle');
+  var url = location.origin + location.pathname + '?' + q.toString();  // keeps a League Pass's blimp + looks
   b.onclick = function () {
     if (navigator.share) { navigator.share({ title: 'Our league stadium', url: url }).catch(function () {}); return; }
     var done = function () { b.textContent = '\u2705 Link copied'; setTimeout(function () { b.innerHTML = '&#128279; Share your stadium'; }, 2000); };
