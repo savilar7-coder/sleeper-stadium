@@ -1338,8 +1338,26 @@ ${t.points.toFixed(1)} pts`);
     const sigma = 6 + 0.32 * (remA + remB);
     return 1 / (1 + Math.exp(-1.702 * diff / sigma));
   }
+  sweatOn() {
+    if (/[?&]sweat=1/.test(location.search)) return true;
+    const st = Object.values(this.league.games || {}), left = st.filter((s) => s !== "complete").length / 2;
+    return st.length > 0 && left > 0 && left <= 2;
+  }
+  playersLeft(t) {
+    const G = this.league.games || {}, P = this.league.players || {};
+    return (t.starters || []).filter((pid) => pid && pid !== "0" && G[P[pid] ? P[pid][2] : pid] !== "complete").map((pid) => P[pid] ? String(P[pid][0]).split(" ").slice(-1)[0] : pid);
+  }
+  sweatLine(a, b) {
+    const la = this.playersLeft(a), lb = this.playersLeft(b);
+    if (!la.length && !lb.length) return { text: "FINAL", done: true };
+    const [lead, trail, lt, ll] = a.points >= b.points ? [a, b, lb, la] : [b, a, la, lb];
+    const gap = (lead.points - trail.points).toFixed(1), names = (n) => n.length > 2 ? `${n.slice(0, 2).join(", ")} +${n.length - 2}` : n.join(", ");
+    const who = String(trail.name || "").slice(0, 14);
+    if (!lt.length) return { text: `${who} needs ${gap} \xB7 no one left`, done: false };
+    return { text: `${who} needs ${gap} \xB7 ${names(lt)} left${ll.length ? ` vs ${ll.length}` : ""}`, done: false };
+  }
   drawBars() {
-    const now = this.time.now;
+    const now = this.time.now, sweat = this.sweatOn();
     for (const o of this.boards || []) {
       const { board, bar, projTxt, a, b } = o, A = this.teamSprites.get(a.roster_id), B = this.teamSprites.get(b.roster_id);
       if (!A || !B) continue;
@@ -1370,8 +1388,15 @@ ${t.points.toFixed(1)} pts`);
       if (o.pct.text !== t) o.pct.setText(t);
       const fs = Math.round(15 * DPR / Math.max(0.5, this.cameras.main.zoom / DPR));
       o.pct.setFontSize(Math.round(14 * DPR)).setStroke("#0f141a", Math.round(3 * DPR)).setColor(lead ? "#9dff7a" : "#e8e2ff").setScale(board.scaleX).setOrigin(0.5, 1).setPosition(kx, hy - 8).setDepth(board.depth + 1);
-      const pt = `proj ${a.proj.toFixed(1)} \u2013 ${b.proj.toFixed(1)}`;
+      const sw = sweat ? this.sweatLine(a, b) : null, pt = sw ? sw.text : `proj ${a.proj.toFixed(1)} \u2013 ${b.proj.toFixed(1)}`;
       if (projTxt.text !== pt) projTxt.setText(pt);
+      projTxt.setColor(sw && !sw.done ? "#ffd84a" : "#9aa3ad");
+      if (o.sweatStyle !== !!sw) {
+        o.sweatStyle = !!sw;
+        projTxt.setFontSize(Math.round((sw ? 13 : 11) * DPR)).setStroke("#0f141a", sw ? Math.round(3 * DPR) : 0);
+      }
+      const dim = sw && sw.done ? 0.45 : 1;
+      for (const g of [A.s, B.s, board, bar, o.pct, projTxt]) if (g && g.alpha !== dim) g.setAlpha(dim);
       const r = board.getBounds();
       projTxt.setPosition(r.centerX, r.bottom + 1).setDepth(board.depth);
     }
