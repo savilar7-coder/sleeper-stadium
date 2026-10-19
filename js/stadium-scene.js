@@ -628,8 +628,8 @@ class StadiumScene extends World {
         projTxt.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif' });
         this.boards.push({ board, bar, projTxt, a: pair[0], b: pair[1] });
         if (pair === assBowl) for (const t of pair) {
-          const x = this.teamSprites.get(t.roster_id);
-          this.add.image(x.s.x, y + 26, this.throneTex()).setOrigin(0.5, 1).setDepth(y - 1);
+          const x = this.teamSprites.get(t.roster_id), d = x.side === 0 ? -1 : 1;
+          this.add.image(x.s.x + d * 12, y + 6, this.throneTex()).setOrigin(0.5, 1).setFlipX(x.side === 1).setDepth(y - 1);
         }
         if (pair === assBowl) {
           const sign = this.label(mid, y + 46, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(16 * DPR));
@@ -1093,21 +1093,25 @@ ${t.points.toFixed(1)} pts`);
     return key;
   }
   throneTex() {
-    return this.pixTex("st-throne", 16, 20, (r) => {
-      const O = "#5b6470", W = "#f4f6f8", S = "#d5dbe2", G = "#ffd84a";
-      r(O, 3, 0, 10, 8);
-      r(W, 4, 1, 8, 6);
-      r(S, 4, 5, 8, 2);
-      r(G, 10, 2, 2, 1);
-      r(O, 0, 8, 16, 5);
-      r(W, 1, 9, 14, 3);
-      r(S, 2, 11, 12, 1);
-      r(G, 1, 8, 14, 1);
-      r(O, 4, 13, 8, 7);
-      r(W, 5, 13, 6, 6);
-      r(S, 5, 17, 6, 2);
-      r(O, 3, 19, 10, 1);
-    }, 5);
+    return this.pixTex("st-throne2", 20, 22, (r) => {
+      const O = "#4b525c", W = "#f4f6f8", S = "#cfd6de", G = "#ffd84a";
+      r(O, 0, 0, 8, 13);
+      r(W, 1, 2, 6, 10);
+      r(S, 5, 2, 2, 10);
+      r(O, 0, 0, 8, 2);
+      r(W, 1, 1, 6, 1);
+      r(G, 6, 4, 2, 1);
+      r(O, 4, 11, 16, 3);
+      r(G, 5, 11, 14, 1);
+      r(W, 5, 12, 14, 1);
+      r(O, 6, 14, 13, 4);
+      r(W, 7, 14, 11, 3);
+      r(S, 14, 14, 4, 3);
+      r(O, 9, 18, 8, 4);
+      r(W, 10, 18, 6, 3);
+      r(S, 14, 18, 2, 3);
+      r(O, 8, 21, 10, 1);
+    }, 4);
   }
   podiumTex() {
     return this.pixTex("st-podium", 20, 9, (r) => {
