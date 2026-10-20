@@ -5,7 +5,12 @@ import { el, openPanel } from "./panel.js";
 import { drivePlayer, setupTouch } from "./touch.js";
 import { sfx } from "./sfx.js";
 import { World } from "./world.js";
-const ROW = 5;
+let ROW = 5;
+const sweatActive = (L) => {
+  if (/[?&]sweat=1/.test(location.search)) return true;
+  const st = Object.values(L && L.games || {}), left = st.filter((x) => x !== "complete").length / 2;
+  return st.length > 0 && left > 0 && left <= 2;
+};
 const RAVENS = ["#241773", "#241773", "#2e1f8f", "#000000", "#9e7c0c", "#c9a227"];
 const MAP_W = 22;
 let MAP_H = 49;
@@ -39,6 +44,7 @@ class StadiumScene extends World {
   init(data) {
     this.league = data.league;
     const rows = (this.league.pairs || []).length || 6;
+    ROW = sweatActive(this.league) ? 6 : 5;
     FIELD.y1 = Math.max(44, FIELD.y0 + 7 + (rows - 1) * ROW + 8);
     MAP_H = FIELD.y1 + 5;
   }
@@ -1392,9 +1398,7 @@ ${t.points.toFixed(1)} pts`);
     return 1 / (1 + Math.exp(-1.702 * diff / sigma));
   }
   sweatOn() {
-    if (/[?&]sweat=1/.test(location.search)) return true;
-    const st = Object.values(this.league.games || {}), left = st.filter((s) => s !== "complete").length / 2;
-    return st.length > 0 && left > 0 && left <= 2;
+    return sweatActive(this.league);
   }
   playersLeft(t) {
     const G = this.league.games || {}, P = this.league.players || {};
@@ -1451,7 +1455,7 @@ ${t.points.toFixed(1)} pts`);
         o.sweatStyle = !!sw;
         projTxt.setFontSize(Math.round((sw ? 13 : 11) * DPR)).setStroke("#0f141a", sw ? Math.round(3 * DPR) : 0);
       }
-      const dim = sw && sw.done ? 0.45 : 1;
+      const dim = sw && sw.done && !a.mine && !b.mine ? 0.7 : 1;
       for (const g of [A.s, B.s, board, bar, o.pct, projTxt]) if (g && g.alpha !== dim) g.setAlpha(dim);
       const r = board.getBounds();
       projTxt.setPosition(r.centerX, r.bottom + 1).setDepth(board.depth);
