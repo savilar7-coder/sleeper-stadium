@@ -133,7 +133,7 @@ async function load(leagueId) {
   });
   for (const t of teams) t.projPre = t.proj = t.starters.reduce((n, pid) => n + (proj[pid] || 0), 0);
   const local = JSON.parse(store("st-looks") || "{}");
-  const okLook = (v) => ALL_LOOKS.includes(v) || ["Raven", "Dumpster", "Steeler", "Shorty"].includes(v);
+  const okLook = (v) => ALL_LOOKS.includes(v) || ["Raven", "Dumpster", "Steeler", "Shorty"].includes(v) || /^FB\d+$/.test(v);
   const urlLooks = Object.fromEntries((new URLSearchParams(location.search).get("looks") || "").split(",").map((p) => p.split(".")).filter((p) => p.length === 2 && /^\d+$/.test(p[0]) && okLook(p[1])));
   for (const t of teams) t.look = urlLooks[t.roster_id] || local[t.roster_id] || picked[t.roster_id] || guessLook(t);
   const gold = new Set((new URLSearchParams(location.search).get("gold") || "").split(",").filter((x) => /^\d+$/.test(x)).map(Number));
@@ -326,6 +326,7 @@ const NAME_LOOKS = [
   [/monkey|ape/i, "MonkeyBoxerRed"]
 ];
 function guessLook(t) {
+  if (q.get("fb") !== "0") return `FB${t.roster_id * 5 % 12}`;
   const m = NAME_LOOKS.find(([re]) => re.test(t.name));
   return m ? m[1] : LOOKS[t.roster_id * 7 % LOOKS.length];
 }
@@ -943,7 +944,7 @@ function askLeague() {
     $("st-fold").textContent = on ? "\u25BE" : "\u25B4";
     store("st-fold", on ? "1" : "0");
   };
-  fold(store("st-fold") === "1");
+  fold(store("st-fold") === "1" || store("st-fold") == null && window.innerWidth < 520 && !!mine());
   $("st-fold").addEventListener("click", () => fold(!$("st-hud").classList.contains("mini")));
   $("st-mine").addEventListener("click", () => {
     const m = mine();

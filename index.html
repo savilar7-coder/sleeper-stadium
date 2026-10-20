@@ -67,20 +67,20 @@
   <script>window.__DPR_MAX = 3; /* every pixel on 3x phones (core.js) */</script>
   <script src="vendor/phaser.min.js"></script>
   <script type="module" src="js/stadium.bundle.js"></script>
-<button id="share-lg" type="button" hidden style="position:fixed;right:10px;bottom:88px;z-index:50;font:600 13px system-ui,sans-serif;color:#1d140c;background:#ffd84a;border:1px solid #9e7c0c;border-radius:16px;padding:6px 11px;box-shadow:0 2px 6px #0006">&#128279; Share your stadium</button>
+<button id="share-lg" type="button" hidden aria-label="Share your stadium" title="Share your stadium" style="position:fixed;right:158px;bottom:48px;z-index:50;font:600 13px system-ui,sans-serif;color:#1d140c;background:#ffd84a;border:1px solid #9e7c0c;border-radius:16px;padding:6px 11px;box-shadow:0 2px 6px #0006">&#128279;</button>
 <script>
 (function () {
   var b = document.getElementById('share-lg'), id = '';
   try { id = (new URLSearchParams(location.search).get('league') || localStorage.getItem('st-league-id') || '').replace(/[^0-9]/g, ''); } catch (e) {}
   if (!id || /[?&]sample=1/.test(location.search)) return;
-  b.hidden = false;
+  setTimeout(function () { b.hidden = false; }, 8500);  // after the Star pill folds (8 s), so they never overlap
   var q = new URLSearchParams(location.search); q.set('league', id); q.delete('v'); q.delete('notitle');
   var url = location.origin + location.pathname + '?' + q.toString();  // keeps a League Pass's blimp + looks
   b.onclick = function () {
     // Oct 19 2026 commissioner kit: the share carries a ready line for the league chat
     var msg = 'Our league has a live stadium: scores, TD alerts, the ASS Bowl. Commish, pin this in the league chat!';
     if (navigator.share) { navigator.share({ title: 'Our league stadium', text: msg, url: url }).catch(function () {}); return; }
-    var done = function () { b.textContent = '\u2705 Link copied'; setTimeout(function () { b.innerHTML = '&#128279; Share your stadium'; }, 2000); };
+    var done = function () { b.textContent = '\u2705 Link copied'; setTimeout(function () { b.innerHTML = '&#128279;'; }, 2000); };  // Oct 19 2026: one row with Tip + Star, it covered the last matchup
     if (navigator.clipboard) navigator.clipboard.writeText(msg + ' ' + url).then(done, function () { prompt('Copy this link:', url); });
     else prompt('Copy this link:', url);
   };
