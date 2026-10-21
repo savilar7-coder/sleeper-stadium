@@ -1739,9 +1739,17 @@ ${t.points.toFixed(1)} pts`);
       }
     }
   }
+  keepTagsOnScreen() {
+    const wv = this.cameras.main.worldView, pad = 4 / this.cameras.main.zoom;
+    for (const x of this.teamSprites.values()) {
+      const half = x.tag.displayWidth * x.tag.originX, lo = wv.x + pad + half, hi = wv.right - pad - (x.tag.displayWidth - half);
+      x.tag.x = lo > hi ? x.s.x : Math.min(hi, Math.max(lo, x.s.x));
+    }
+  }
   update(time, delta) {
     this.drawBars();
     this.placeMoods(time);
+    this.keepTagsOnScreen();
     const k = this.keys;
     let vx = 0, vy = 0;
     if (!panelOpen) {

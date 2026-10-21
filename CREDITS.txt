@@ -1,3 +1,3 @@
 Art: "Ninja Adventure" asset pack by Pixel-boy and AAA (CC0, public domain).
-Font: Pixelify Sans (SIL Open Font License), via Google Fonts.
+Font: Pixelify Sans (SIL Open Font License, assets/fonts/OFL.txt).
 Game engine: Phaser (MIT).
