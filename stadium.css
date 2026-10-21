@@ -51,7 +51,7 @@
 
 .mu-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin-bottom: 10px; text-align: center; }
 .mu-team { display: grid; padding: 8px; border-radius: 6px; background: #f1e4c3; }
-.mu-team b { font-family: "Pixelify Sans", "Segoe UI", sans-serif; font-size: 28px; }
+.mu-team b { font: 800 30px "Segoe UI", "Helvetica Neue", Arial, sans-serif; } 
 .mu-team small { color: #7a6a52; font-size: 12px; }
 .mu-team span { font-size: 13px; font-weight: 600; }
 .mu-team.lead { background: #d9efd9; }
@@ -66,7 +66,7 @@
 .mu-who { display: grid; min-width: 0; }
 .mu-who b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mu-who small { font-size: 11px; color: #7a6a52; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mu-pts { font-family: "Pixelify Sans", "Segoe UI", sans-serif; font-size: 16px; font-weight: 600; }
+.mu-pts { font: 700 16px "Segoe UI", "Helvetica Neue", Arial, sans-serif; } 
 @media (max-width: 600px) {
   .mu-row { grid-template-columns: 1fr 34px 1fr; }
   .mu-side { grid-template-columns: 28px 1fr auto; padding: 3px 4px; gap: 4px; }

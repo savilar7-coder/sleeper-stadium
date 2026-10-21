@@ -1456,8 +1456,14 @@ ${t.points.toFixed(1)} pts`);
     };
     const standL = mineS ? shirts(mineS.side === 0 ? mineS : oppS) : null, standR = mineS ? shirts(mineS.side === 1 ? mineS : oppS) : null;
     const fx0 = (FIELD.x0 - 1) * T - 22, fx1 = (FIELD.x1 + 2) * T + 22;
+    const BW = MAP_W * T, BH = MAP_H * T, bi = 18, br = (BW - 2 * bi) / 2;
+    const inBowl = (x, y) => {
+      const cy = Phaser.Math.Clamp(y, bi + br, BH - bi - br);
+      return Math.hypot(x - BW / 2, y - cy) <= br;
+    };
     const seats = this.add.graphics().setDepth(-6);
     for (let y = (FIELD.y0 - 1) * T; y < (FIELD.y1 + 2) * T; y += 14) for (const x0 of [fx0 - 30, fx0 - 18, fx1 + 4, fx1 + 16]) {
+      if (!inBowl(x0, y) || !inBowl(x0, y - 40)) continue;
       const ravens = x0 < (FIELD.x0 + FIELD.x1) / 2 * T;
       seats.fillStyle(ravens ? 2365299 : 3818064, 1).fillRect(x0 - 6, y - 7, 12, 5).fillStyle(0, 0.3).fillRect(x0 - 6, y - 3, 12, 1);
       if (r() < 0.12) continue;
