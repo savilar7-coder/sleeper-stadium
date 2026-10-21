@@ -165,7 +165,8 @@ class StadiumScene extends World {
   }
   setZoom(z) {
     const W = MAP_W * TILE, H = MAP_H * TILE, fitAll = Math.min(this.scale.width / W, this.scale.height / H);
-    const least = window.innerWidth < 600 ? fitAll / DPR : Math.max(fitAll / DPR, this.fitZoom() * 0.75);
+    const allRows = window.innerHeight / ((ROW * Math.max(1, this.rows || 1) + 10) * TILE);
+    const least = window.innerWidth < 600 ? fitAll / DPR : Math.max(fitAll / DPR, Math.min(this.fitZoom() * 0.75, allRows));
     this.applyZoom(Phaser.Math.Clamp(z, Math.max(0.3, least), 2.5));
     if (this.zoomSettle) this.zoomSettle.remove();
     if (this.zoomTween) this.zoomTween.stop();
@@ -796,7 +797,7 @@ class StadiumScene extends World {
     const mid = (FIELD.x0 + FIELD.x1 + 1) / 2 * T, half = Math.min((FIELD.x1 - FIELD.x0 - 4) / 2, 7) * T, xs = [mid - half, mid + half];
     this.boards = [];
     const pct = (t) => (t.wins + t.ties / 2) / Math.max(1, t.wins + t.losses + t.ties);
-    const assBowl = pairs.filter((p) => p.length === 2).sort((a, b) => pct(a[0]) + pct(a[1]) - (pct(b[0]) + pct(b[1])) || a[0].fpts + a[1].fpts - (b[0].fpts + b[1].fpts))[0];
+    const assBowl = pairs.filter((p) => p.length === 2 && !L.preseason).sort((a, b) => pct(a[0]) + pct(a[1]) - (pct(b[0]) + pct(b[1])) || a[0].fpts + a[1].fpts - (b[0].fpts + b[1].fpts))[0];
     pairs.forEach((pair, row) => {
       const y = (FIELD.y0 + 7 + row * ROW) * T;
       pair.forEach((t, side) => {
@@ -814,7 +815,7 @@ class StadiumScene extends World {
         this.teamSprites.set(t.roster_id, { s, tag, t, side, key });
         this.doors.push({ x, y: y + 14, id: `team-${t.roster_id}`, name: t.name, verb: "Scout", open: () => window.__stadium ? window.__stadium.teamPanel(t.roster_id) : this.teamPanel(t.roster_id) });
       });
-      if (pair.length === 2) {
+      if (pair.length === 2 && !L.preseason) {
         const board = this.label(mid, y + 4, "", "#ffffff").setOrigin(0.5, 0).setFontSize(Math.round(19 * DPR));
         board.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", align: "center", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
         const bar = this.add.graphics().setDepth(1e5);
@@ -836,6 +837,10 @@ class StadiumScene extends World {
       }
     });
     this.rows = pairs.length;
+    if (L.preseason) {
+      const sign = this.label(mid, (FIELD.y0 + 7) * T + 4, "\u23F3 Live scores start in week 1", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(15 * DPR));
+      sign.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
+    }
     this.refreshScores();
   }
   refreshScores() {

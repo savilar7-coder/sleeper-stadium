@@ -45,7 +45,7 @@
   #st-hud { padding: 6px 8px; gap: 2px; }
   #st-score { font-size: 16px; }
   .st-btns { flex-wrap: nowrap; gap: 4px; }
-  .st-btns button { font-size: 12px; padding: 3px 6px; white-space: nowrap; }
+  .st-btns button { font-size: 12px; padding: 3px 6px; white-space: nowrap; min-height: 34px; } 
 }
 
 
@@ -64,7 +64,7 @@
 .mu-side.right .mu-face { order: 3; } .mu-side.right .mu-who { order: 2; } .mu-side.right .mu-pts { order: 1; }
 .mu-face { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #e9dcb8; display: block; }
 .mu-who { display: grid; min-width: 0; }
-.mu-who b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mu-who b { font-size: 13px; overflow-wrap: anywhere; line-height: 1.15; } 
 .mu-who small { font-size: 11px; color: #7a6a52; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mu-pts { font: 700 16px "Segoe UI", "Helvetica Neue", Arial, sans-serif; } 
 @media (max-width: 600px) {

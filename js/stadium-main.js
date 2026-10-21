@@ -166,6 +166,11 @@ async function load(leagueId) {
   for (const t of teams) t.gold = gold.has(t.roster_id);
   const groups = {};
   for (const t of teams) (groups[t.matchup_id || `bye-${t.roster_id}`] = groups[t.matchup_id || `bye-${t.roster_id}`] || []).push(t);
+  const preseason = teams.length > 1 && !teams.some((t) => t.matchup_id);
+  if (preseason) {
+    for (const k of Object.keys(groups)) delete groups[k];
+    teams.forEach((t, i) => (groups[`pre-${i >> 1}`] = groups[`pre-${i >> 1}`] || []).push(t));
+  }
   const slots = (lg.roster_positions || []).filter((p) => !["BN", "TAXI", "IR"].includes(p));
   const out = {
     id: leagueId,
@@ -176,6 +181,7 @@ async function load(leagueId) {
     rounds: lg.settings && lg.settings.draft_rounds || 3,
     teams,
     pairs: Object.values(groups),
+    preseason,
     players,
     proj,
     picks,
@@ -884,7 +890,7 @@ function count(what) {
   } catch {
   }
 }
-function askLeague() {
+function askLeague(note) {
   for (const id of ["jump-btn", "zoom-ctl", "play-btn"]) {
     const e = document.getElementById(id);
     if (e) e.style.display = "none";
@@ -904,7 +910,10 @@ function askLeague() {
   box.onsubmit = async (e) => {
     e.preventDefault();
     const raw = (document.getElementById("lg-id").value || "").trim().replace(/^@/, "");
-    if (!raw) return;
+    if (!raw) {
+      msg.textContent = "Type your Sleeper username (the @name on your profile) or a league ID.";
+      return;
+    }
     const link = raw.match(/leagues\/(\d+)/);
     if (link || /^\d+$/.test(raw)) {
       go(link ? link[1] : raw);
@@ -956,6 +965,11 @@ function askLeague() {
   const by = document.createElement("p");
   by.style.cssText = "margin:8px auto 0;font:13px system-ui,sans-serif;color:#5a4a33;max-width:320px;text-align:center";
   by.innerHTML = 'Built by <a href="https://lamaisonwebstudio.com/" target="_blank" rel="noopener">lamaisonwebstudio.com</a>. Podcast, Discord or business? <a href="https://lamaisonwebstudio.com/stadium/#custom" target="_blank" rel="noopener">Let&#39;s build yours.</a>';
+  if (note) {
+    msg.textContent = note;
+    msg.style.color = "#b23a2a";
+    msg.style.fontWeight = "600";
+  }
   $("st-proj").replaceChildren(box, msg, demo, look, by);
 }
 (async function main() {
@@ -972,7 +986,11 @@ function askLeague() {
   try {
     L = await load(leagueId);
   } catch (err) {
-    $("st-league").textContent = `Could not load the league from Sleeper (${err.message}). Try again in a minute.`;
+    try {
+      localStorage.removeItem("st-league-id");
+    } catch (x) {
+    }
+    askLeague(/^404/.test(err.message) || err instanceof TypeError ? "No Sleeper league with that ID. Check it, or type your Sleeper username." : `Could not reach Sleeper (${err.message}). Try again in a minute.`);
     return;
   }
   count("league");
