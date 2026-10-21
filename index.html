@@ -71,6 +71,7 @@
   <div id="stick" hidden><div id="stick-knob"></div></div>
   <div id="zoom-ctl"><button id="zoom-in" type="button" aria-label="Zoom in">＋</button><button id="zoom-out" type="button" aria-label="Zoom out">－</button></div>
   <button id="jump-btn" type="button" aria-label="Matchup" hidden>⚔️ Matchup</button> 
+  <button id="share-btn" type="button" aria-label="Share my matchup" hidden>📸 Share</button> 
   <button id="play-btn" type="button" hidden>🏈 Play</button> 
   <div id="mg-hud" hidden><div id="mg-score"></div><div id="mg-down"></div><div id="mg-msg"></div><div class="mg-btns"><button id="mg-again" type="button">↻ Again</button><button id="mg-exit" type="button">✕ Back to stadium</button></div></div>
   <div id="zoom-hint" hidden>🔍 Pinch out to fit</div>
@@ -87,7 +88,7 @@
   var b = document.getElementById('share-lg'), id = '';
   try { id = (new URLSearchParams(location.search).get('league') || localStorage.getItem('st-league-id') || '').replace(/[^0-9]/g, ''); } catch (e) {}
   if (!id || /[?&]sample=1/.test(location.search)) return;
-  setTimeout(function () { b.hidden = false; }, 8500);  // after the Star pill folds (8 s), so they never overlap
+  // Oct 21 2026: the pill stays hidden (the page's own 📸 Share button replaced it); the nudge still uses its link share
   var q = new URLSearchParams(location.search); q.set('league', id); q.delete('v'); q.delete('notitle');
   var url = location.origin + location.pathname + '?' + q.toString();  // keeps a League Pass's blimp + looks
   b.onclick = function () {
@@ -132,7 +133,7 @@
   }, 30000);
 })();
 </script>
-<a id="tip-pill" href="https://ko-fi.com/lamaisonstudio" target="_blank" rel="noopener" hidden style="position:fixed;right:96px;bottom:48px;z-index:50;font:600 13px system-ui,sans-serif;color:#1d140c;background:#ffd84a;border:1px solid #9e7c0c;border-radius:16px;padding:5px 10px;text-decoration:none;box-shadow:0 2px 6px #0006">&#127866; Tip</a>
+<a id="tip-pill" href="https://ko-fi.com/lamaisonstudio" target="_blank" rel="noopener" hidden style="position:fixed;right:76px;bottom:48px;z-index:50;font:600 13px system-ui,sans-serif;color:#1d140c;background:#ffd84a;border:1px solid #9e7c0c;border-radius:16px;padding:5px 10px;text-decoration:none;box-shadow:0 2px 6px #0006">&#127866; Tip</a>
 <script>
 (function () {
   setTimeout(function () { var t = document.getElementById('tip-pill'); if (t) t.hidden = false; }, 8000);

@@ -475,7 +475,7 @@ function playGame() {
   }
   const opp = L.teams.find((t) => t.matchup_id && t.matchup_id === me.matchup_id && t !== me) || L.teams.find((t) => t !== me);
   closePanel();
-  for (const id of ["st-hud", "zoom-ctl", "jump-btn", "play-btn", "prompt"]) $(id).style.display = "none";
+  for (const id of ["st-hud", "zoom-ctl", "jump-btn", "share-btn", "play-btn", "prompt"]) $(id).style.display = "none";
   game.scene.sleep("stadium");
   if (game.scene.getScene("minigame")) game.scene.stop("minigame");
   game.scene.start("minigame", { me, opp, league: L });
@@ -483,7 +483,7 @@ function playGame() {
 function exitGame() {
   game.scene.stop("minigame");
   $("mg-hud").hidden = true;
-  for (const id of ["st-hud", "zoom-ctl", "jump-btn", "play-btn"]) $(id).style.display = "";
+  for (const id of ["st-hud", "zoom-ctl", "jump-btn", "share-btn", "play-btn"]) $(id).style.display = "";
   game.scene.wake("stadium");
 }
 async function trophies() {
@@ -662,19 +662,53 @@ function shareOffer(me, partner, give, get_, a, b) {
   });
 }
 const stadiumLink = () => `${location.host}${location.pathname.replace(/index\.html$/, "")}${L.id && !/dynasty-stadium/.test(location.host) && !/[?&]sample=1/.test(location.search) ? `?league=${L.id}` : ""}`;
+function toast(text) {
+  const t = el("div", { class: "st-toast" }, text);
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
 function sharePicture(cv, name, title) {
   cv.toBlob(async (blob) => {
     const file = new File([blob], name, { type: "image/png" });
     try {
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title });
+        await navigator.share({ files: [file], title, text: `${title} \xB7 ${stadiumLink()}` });
         return;
       }
     } catch {
       return;
     }
     el("a", { href: URL.createObjectURL(blob), download: name }).click();
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(`https://${stadiumLink()}`);
+      copied = true;
+    } catch {
+    }
+    toast(`\u{1F4F8} Picture saved${copied ? " \xB7 link copied" : ""}. Paste it in your league chat!`);
   });
+}
+let shareAfterPick = false;
+function shareMine() {
+  count("share");
+  const m = mine();
+  if (!m) {
+    shareAfterPick = true;
+    whoAreYou();
+    return;
+  }
+  const opp = L.teams.find((t) => t.matchup_id && t.matchup_id === m.matchup_id && t !== m);
+  if (opp) {
+    matchupCard(m, opp);
+    return;
+  }
+  const url = `https://${stadiumLink()}`;
+  if (navigator.share) {
+    navigator.share({ title: L.name, url }).catch(() => {
+    });
+    return;
+  }
+  navigator.clipboard.writeText(url).then(() => toast("\u{1F517} Stadium link copied. Paste it in your league chat!"), () => prompt("Copy this link:", url));
 }
 function matchupCard(me, opp) {
   const W = 1080, H = 1080, cv = el("canvas", { width: W, height: H }), c = cv.getContext("2d"), font = 'system-ui, "Segoe UI", Arial, sans-serif';
@@ -835,6 +869,10 @@ function setMine(rid) {
   for (const t of L.teams) t.mine = t.roster_id === rid;
   hud();
   if (game) game.scene.getScene("stadium").scene.restart({ league: L });
+  if (shareAfterPick) {
+    shareAfterPick = false;
+    setTimeout(shareMine, 700);
+  }
 }
 const SCHEDULE = "https://api.sleeper.com/schedule/nfl/regular";
 function gamesOf(games, week) {
@@ -1045,6 +1083,8 @@ function askLeague(note) {
     if (m) matchup(m.roster_id);
     else whoAreYou();
   });
+  $("share-btn").hidden = false;
+  $("share-btn").addEventListener("click", shareMine);
   $("st-table").addEventListener("click", standings);
   $("st-news").addEventListener("click", news);
   $("st-recap").addEventListener("click", recap);
