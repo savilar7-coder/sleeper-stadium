@@ -37,6 +37,21 @@ const LOOKS = [
   "CamouflageGreen",
   "Eskimo"
 ];
+const FB_KITS = [
+  ["#c8102e", "#ffffff", "#c8102e", "#e8435a", "#8a0b20", "#ffffff", "#f4f1ea"],
+  ["#0b2265", "#a5acaf", "#0b2265", "#25408f", "#06153f", "#ffffff", "#a5acaf"],
+  ["#203731", "#ffb612", "#203731", "#2f5447", "#14231f", "#ffb612", "#f4f1ea"],
+  ["#fb4f14", "#ffffff", "#fb4f14", "#ff7a45", "#b8380c", "#ffffff", "#f4f1ea"],
+  ["#006778", "#101820", "#006778", "#14899e", "#004450", "#ffffff", "#f4f1ea"],
+  ["#0085ca", "#ffffff", "#0085ca", "#33a4dd", "#005b8a", "#ffffff", "#f4f1ea"],
+  ["#773141", "#ffb612", "#773141", "#9a4458", "#4f202b", "#ffb612", "#ffb612"],
+  ["#101820", "#a5acaf", "#101820", "#2a3440", "#05090d", "#a5acaf", "#a5acaf"],
+  ["#4f2683", "#ffc62f", "#4f2683", "#6b3fa8", "#33175a", "#ffc62f", "#f4f1ea"],
+  ["#69be28", "#002244", "#002244", "#123a63", "#00142a", "#69be28", "#a5acaf"],
+  ["#e31837", "#ffb81c", "#e31837", "#f04a63", "#9e0f25", "#ffb81c", "#f4f1ea"],
+  ["#002c5f", "#ff8200", "#002c5f", "#16467f", "#001a3a", "#ff8200", "#f4f1ea"]
+];
+;
 class StadiumScene extends World {
   constructor() {
     super("stadium");
@@ -80,6 +95,7 @@ class StadiumScene extends World {
     this.placeTeams();
     this.addLife();
     this.addProps();
+    this.nightLights(W, H);
     this.player = this.physics.add.sprite(((FIELD.x0 + FIELD.x1 + 1) / 2 + 3.2) * TILE, (FIELD.y0 + 10.2) * TILE, "playerup0").setOrigin(0.5, 1);
     this.player.body.setSize(14, 8).setOffset(9, 24);
     this.player.setScale(1.5);
@@ -111,6 +127,19 @@ class StadiumScene extends World {
       const door = this.doors.find((d) => Phaser.Math.Distance.Between(w.x, w.y, d.x, d.y - 30) < 60);
       this.route = this.pathTo(this.player, door ? { x: door.x, y: door.y, door } : { x: w.x, y: w.y });
       this.target = this.route.shift();
+    });
+    let lastTap = 0, lastXY = null;
+    this.input.on("pointerup", (p) => {
+      if (panelOpen || p.getDuration() > 300) return;
+      const now = this.time.now, near = lastXY && Math.hypot(p.x - lastXY.x, p.y - lastXY.y) < 40 * DPR;
+      if (now - lastTap < 320 && near) {
+        lastTap = 0;
+        const fit = window.innerWidth < 600 ? 0.86 : Math.min(1.4, window.innerHeight / 640);
+        this.setZoom(this.logicalZoom() < fit * 1.4 ? fit * 2 : fit);
+        return;
+      }
+      lastTap = now;
+      lastXY = { x: p.x, y: p.y };
     });
     this.grid = { mapW: MAP_W, mapH: MAP_H };
     this.buildWalkGrid();
@@ -737,9 +766,50 @@ class StadiumScene extends World {
     const q = this.tdQueue = this.tdQueue || [];
     q.push({ text: `\u{1F3C8} ${jump >= 5.5 ? "TOUCHDOWN" : "BIG PLAY"}`, who, sub: `+${jump.toFixed(1)} \xB7 ${t.name}`, mine: t.mine });
     const ts = this.teamSprites && this.teamSprites.get(t.roster_id);
-    this.tdCheer = { left: ts ? ts.side === 0 : true, until: this.time.now + 2600 };
+    this.tdCheer = { left: ts ? ts.side === 0 : true, y: ts ? ts.s.y : 0, start: this.time.now, until: this.time.now + 3600 };
+    if (ts) this.scoringMoment(ts, t);
     if (t.mine) window.dispatchEvent(new CustomEvent("stadium:mytd", { detail: { who, team: t.name } }));
     if (q.length === 1) this.nextTd();
+  }
+  scoringMoment(S, t) {
+    const now = this.time.now, opp = [...this.teamSprites.values()].find((o) => o !== S && o.t.matchup_id && o.t.matchup_id === t.matchup_id);
+    S.cel = now + 1500;
+    if (opp) {
+      opp.slump = now + 2600;
+      if (!opp.t.gold) {
+        opp.s.setTint(10134456);
+        this.time.delayedCall(2600, () => opp.s.clearTint());
+      }
+      this.pop(opp.s.x + (opp.side === 0 ? -30 : 30), opp.s.y - 40, "\u{1F629}", "#fff4d6");
+    }
+    const ball = this.add.image(S.s.x, S.s.y - 70, "football").setDepth(99990).setScale(1.4).setAlpha(0);
+    this.tweens.add({ targets: ball, alpha: 1, y: S.s.y - 4, delay: 650, duration: 240, ease: "Quad.easeIn", onComplete: () => {
+      this.tweens.add({ targets: ball, x: ball.x + (S.side === 0 ? 46 : -46), y: ball.y - 26, angle: 720, alpha: 0, duration: 700, ease: "Quad.easeOut", onComplete: () => ball.destroy() });
+    } });
+    this.nudgeCamera(S.s.x, S.s.y - 30, t.mine);
+  }
+  nudgeCamera(x, y, shake) {
+    const cam = this.cameras.main;
+    if (panelOpen || this.target || this.stick && this.stick.active || this.nudging) return;
+    this.nudging = true;
+    const off = () => this.spawnOffset ? 3.2 * TILE : 0;
+    this.endNudge = () => {
+      if (!this.nudging) return;
+      this.nudging = false;
+      cam.panEffect.reset();
+      cam.startFollow(this.player, true, 0.1, 0.1);
+      cam.setFollowOffset(off(), 0);
+    };
+    cam.stopFollow();
+    cam.pan(x, y, 450, "Sine.easeInOut", false, (c, k) => {
+      if (k < 1 || !this.nudging) return;
+      if (shake) cam.shake(220, 4e-3);
+      this.time.delayedCall(1300, () => {
+        if (this.nudging) cam.pan(this.player.x + off(), this.player.y, 450, "Sine.easeInOut", false, (c2, k2) => {
+          if (k2 === 1) this.endNudge();
+        });
+      });
+    });
   }
   nextTd() {
     const q = this.tdQueue || [], item = q[0];
@@ -795,21 +865,7 @@ class StadiumScene extends World {
   makeTeamFootballer(look) {
     const key = `a-ch-${look}`;
     if (this.textures.exists(key)) return;
-    const P = [
-      ["#c8102e", "#ffffff", "#c8102e", "#e8435a", "#8a0b20", "#ffffff", "#f4f1ea"],
-      ["#0b2265", "#a5acaf", "#0b2265", "#25408f", "#06153f", "#ffffff", "#a5acaf"],
-      ["#203731", "#ffb612", "#203731", "#2f5447", "#14231f", "#ffb612", "#f4f1ea"],
-      ["#fb4f14", "#ffffff", "#fb4f14", "#ff7a45", "#b8380c", "#ffffff", "#f4f1ea"],
-      ["#006778", "#101820", "#006778", "#14899e", "#004450", "#ffffff", "#f4f1ea"],
-      ["#0085ca", "#ffffff", "#0085ca", "#33a4dd", "#005b8a", "#ffffff", "#f4f1ea"],
-      ["#773141", "#ffb612", "#773141", "#9a4458", "#4f202b", "#ffb612", "#ffb612"],
-      ["#101820", "#a5acaf", "#101820", "#2a3440", "#05090d", "#a5acaf", "#a5acaf"],
-      ["#4f2683", "#ffc62f", "#4f2683", "#6b3fa8", "#33175a", "#ffc62f", "#f4f1ea"],
-      ["#69be28", "#002244", "#002244", "#123a63", "#00142a", "#69be28", "#a5acaf"],
-      ["#e31837", "#ffb81c", "#e31837", "#f04a63", "#9e0f25", "#ffb81c", "#f4f1ea"],
-      ["#002c5f", "#ff8200", "#002c5f", "#16467f", "#001a3a", "#ff8200", "#f4f1ea"]
-    ];
-    const [H, HS, J, JL, JD, N, PA] = P[(Number(look.slice(2)) || 0) % P.length];
+    const [H, HS, J, JL, JD, N, PA] = FB_KITS[(Number(look.slice(2)) || 0) % FB_KITS.length];
     const C = { K: H, KL: JL, GOLD: HS, GL: N, PUR: J, PL: JL, PD: JD, WH: PA, WD: PA === "#f4f1ea" ? "#cfcac0" : PA };
     const ct = this.textures.createCanvas(key, 64, 112), c = ct.getContext();
     const put = (ox, oy, grid) => grid.forEach((rw, y) => rw.forEach((col, x) => {
@@ -1243,6 +1299,25 @@ ${t.points.toFixed(1)} pts`);
       if (fire) m.txt.setScale((1 + Math.sin(time / 90 + id) * 0.08) / DPR);
     }
   }
+  nightLights(W, H) {
+    const h = (new Date()).getHours(), q = location.search;
+    if (!/[?&]night=1/.test(q) && (/[?&]night=0/.test(q) || h >= 6 && h < 18)) return;
+    const T = TILE;
+    this.add.rectangle(0, 0, W, H, 461862, 0.62).setOrigin(0).setDepth(-4.5);
+    for (let y = FIELD.y0 + 3; y < FIELD.y1; y += 7) {
+      this.add.image((FIELD.x0 + FIELD.x1 + 1) / 2 * T, y * T, "soft-glow").setScale(9, 5).setTint(16773320).setAlpha(0.32).setBlendMode(Phaser.BlendModes.ADD).setDepth(-4.4);
+    }
+    const towers = [];
+    for (let y = FIELD.y0 + 6; y < FIELD.y1; y += 12) towers.push([FIELD.x0 - 1.6, y], [FIELD.x1 + 2.6, y]);
+    for (const [tx, ty] of towers) {
+      const x = tx * T, y = ty * T, g = this.add.graphics().setDepth(y + 200);
+      g.fillStyle(3817287, 1).fillRect(x - 2, y - 70, 4, 70);
+      g.fillStyle(1908002, 1).fillRect(x - 13, y - 84, 26, 16);
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) g.fillStyle(16776166, 1).fillRect(x - 11 + i * 8, y - 82 + j * 7, 6, 5);
+      const glow = this.add.image(x, y - 76, "soft-glow").setScale(2.6, 1.6).setTint(16773824).setBlendMode(Phaser.BlendModes.ADD).setDepth(y + 201);
+      this.tweens.add({ targets: glow, alpha: 0.75, duration: 1400, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    }
+  }
   addLife() {
     const T = TILE, r = rng(77);
     if (!this.textures.exists("football")) {
@@ -1325,6 +1400,17 @@ ${t.points.toFixed(1)} pts`);
     const shirtsR = ["#241773", "#241773", "#2e1f8f", "#1d1d22", "#c9a227"], shirtsO = ["#e8a33d", "#3d6fb6", "#c94a4a", "#4f9a5a", "#f2e6c9", "#d9e1e8", "#ffb612"];
     const skinsL = ["#f1c6a4", "#e3b08a", "#c98d68", "#8d5a3b"], hairsL = ["#1d140c", "#3a2a1e", "#6b4423", "#c9a227"];
     this.fans = [];
+    const me = this.league.teams.find((t) => t.mine), mineS = me && this.teamSprites.get(me.roster_id);
+    const oppS = mineS && [...this.teamSprites.values()].find((o) => o !== mineS && o.t.matchup_id && o.t.matchup_id === me.matchup_id);
+    const kit = (S) => {
+      const m = S && /^FB(\d+)$/.exec(S.t.look);
+      return m ? FB_KITS[Number(m[1]) % FB_KITS.length] : null;
+    };
+    const shirts = (S) => {
+      const c = kit(S);
+      return c ? [c[2], c[2], c[3], c[4], c[5]] : null;
+    };
+    const standL = mineS ? shirts(mineS.side === 0 ? mineS : oppS) : null, standR = mineS ? shirts(mineS.side === 1 ? mineS : oppS) : null;
     const fx0 = (FIELD.x0 - 1) * T - 22, fx1 = (FIELD.x1 + 2) * T + 22;
     const seats = this.add.graphics().setDepth(-6);
     for (let y = (FIELD.y0 - 1) * T; y < (FIELD.y1 + 2) * T; y += 14) for (const x0 of [fx0 - 30, fx0 - 18, fx1 + 4, fx1 + 16]) {
@@ -1332,15 +1418,43 @@ ${t.points.toFixed(1)} pts`);
       seats.fillStyle(ravens ? 2365299 : 3818064, 1).fillRect(x0 - 6, y - 7, 12, 5).fillStyle(0, 0.3).fillRect(x0 - 6, y - 3, 12, 1);
       if (r() < 0.12) continue;
       const skin = skinsL[Math.floor(r() * skinsL.length)], hair = hairsL[Math.floor(r() * hairsL.length)];
-      const shirt = ravens ? shirtsR[Math.floor(r() * shirtsR.length)] : shirtsO[Math.floor(r() * shirtsO.length)];
+      const pool = ravens ? standL || shirtsR : standR || shirtsO, shirt = pool[Math.floor(r() * pool.length)];
       const roll = r(), extra = roll < 0.1 ? "finger" : roll < 0.16 ? "sign" : roll < 0.24 ? "drink" : roll < 0.29 ? "popcorn" : "";
-      const hr = r(), hat = hr < 0.18 ? "cap" : hr < 0.27 ? "beanie" : "", hatCol = ravens ? r() < 0.5 ? "#241773" : "#c9a227" : shirtsO[Math.floor(r() * shirtsO.length)];
+      const hr = r(), hat = hr < 0.18 ? "cap" : hr < 0.27 ? "beanie" : "", hatCol = ravens && !standL ? r() < 0.5 ? "#241773" : "#c9a227" : pool[Math.floor(r() * pool.length)];
       const stripe = r() < 0.3, keep = extra === "finger" || extra === "sign";
       const id = `fan-${skin}-${hair}-${shirt}-${extra}-${hat}-${hatCol}-${stripe}`;
       const down = fanTex(`${id}-d`, skin, hair, shirt, false, extra, hat, hatCol, stripe), up = fanTex(`${id}-u`, skin, hair, shirt, true, extra, hat, hatCol, stripe);
-      const s = this.add.image(x0, y, keep ? up : down).setOrigin(0.5, 1).setDepth(-5);
+      const front = x0 === fx0 - 18 || x0 === fx1 + 4;
+      const s = this.add.image(x0, y, keep ? up : down).setOrigin(0.5, 1).setDepth(-5).setScale(front ? 1.45 : 1);
       this.fans.push({ s, up, down, keep, y, ph: r() * 6.28 });
     }
+    if (mineS && kit(mineS)) {
+      const c = kit(mineS), nm = me.name.toUpperCase().slice(0, 18), left = mineS.side === 0;
+      this.add.text(left ? (FIELD.x0 - 0.5) * T : (FIELD.x1 + 1.5) * T, mineS.s.y - 30, ` GO ${nm}! `, { fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold", fontSize: "12px", color: c[5], backgroundColor: c[2], padding: { x: 3, y: 2 } }).setOrigin(0.5).setAngle(left ? -90 : 90).setDepth(-3);
+    }
+    this.time.addEvent({ delay: 1800, loop: true, callback: () => {
+      if (window.__calm) return;
+      const now = this.time.now, free = [...this.teamSprites.values()].filter((S2) => !(S2.cel > now) && !(S2.act > now));
+      const S = free[Math.floor(Math.random() * free.length)];
+      if (!S) return;
+      const b = (this.boards || []).find((o) => o.a === S.t || o.b === S.t), pa = b ? this.winChance(b.a, b.b) : 0.5, win = b ? b.a === S.t ? pa : 1 - pa : 0.5;
+      if (win > 0.8) {
+        S.act = now + 1400;
+        S.actType = "dance";
+      } else if (win < 0.2) {
+        S.act = S.slump = now + 2e3;
+        S.actType = "slump";
+      } else if (Math.random() < 0.5) {
+        S.act = now + 700;
+        S.actType = "stretch";
+        this.tweens.add({ targets: S.s, scaleY: 1.75, scaleX: 1.35, duration: 220, hold: 200, yoyo: true });
+      } else {
+        S.act = now + 1600;
+        S.actType = "juggle";
+        const ball = this.add.image(S.s.x, S.s.y - 46, "football").setDepth(99990);
+        this.tweens.add({ targets: ball, y: S.s.y - 92, angle: 360, duration: 380, yoyo: true, repeat: 1, ease: "Quad.easeOut", onComplete: () => ball.destroy() });
+      }
+    } });
     this.time.addEvent({ delay: 350, loop: true, callback: () => {
       if (window.__calm || !this.fans.length) return;
       const f = this.fans[Math.floor(Math.random() * this.fans.length)];
@@ -1430,11 +1544,16 @@ ${t.points.toFixed(1)} pts`);
       const pa = this.winChance(a, b), k = Math.abs(pa - 0.5) * 2, lead = pa > 0.5 ? A : pa < 0.5 ? B : null;
       const tug = Math.sin(now / 260 + a.roster_id) * 0.04;
       for (const [S, dir] of [[A, -1], [B, 1]]) {
+        if (S.cel > now) {
+          S.s.setRotation(-dir * Math.PI * 2 * Math.min(1, (1500 - (S.cel - now)) / 600));
+          continue;
+        }
         if (this.thrones && this.thrones.has(S.t.roster_id)) {
           S.s.setRotation(0);
           continue;
         }
-        const back = S === lead ? 0.1 + 0.14 * k : S === (lead === A ? B : A) ? -0.05 - 0.06 * k : 0.08;
+        let back = S === lead ? 0.1 + 0.14 * k : S === (lead === A ? B : A) ? -0.05 - 0.06 * k : 0.08;
+        if (S.slump > now) back = -0.3;
         S.s.setRotation(dir * (back + tug));
       }
       const hy = A.s.y - 20, x1 = A.s.x + 12, x2 = B.s.x - 12, len = x2 - x1;
@@ -1490,6 +1609,7 @@ ${t.points.toFixed(1)} pts`);
       this.spawnOffset = false;
       this.cameras.main.setFollowOffset(0, 0);
     }
+    if ((vx || vy) && this.nudging) this.endNudge();
     if (vx || vy || panelOpen) {
       this.target = null;
       this.route = null;
@@ -1505,11 +1625,13 @@ ${t.points.toFixed(1)} pts`);
       }
     }
     drivePlayer(this, vx, vy, SPEED, delta);
-    for (const { s, t, side, key: key2 } of this.teamSprites.values()) {
+    for (const S of this.teamSprites.values()) {
+      const { s, t, side, key: key2 } = S, dance = S.act > time && S.actType === "dance";
       const opp = this.league.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o.roster_id !== t.roster_id);
-      const hop = opp && t.points > opp.points ? 3 : 1.2;
-      s.setOrigin(0.5, 1 + Math.abs(Math.sin(time / 260 + t.roster_id)) * hop / 32);
-      s.setTexture(`${key2}${side === 0 ? "right" : "left"}${Math.floor(time / 300 + t.roster_id) % 2}`);
+      const hop = dance ? 7 : opp && t.points > opp.points ? 3 : 1.2;
+      s.setOrigin(0.5, 1 + Math.abs(Math.sin(time / (dance ? 120 : 260) + t.roster_id)) * hop / 32);
+      const face = dance ? Math.floor(time / 160) % 2 ? "left" : "right" : side === 0 ? "right" : "left";
+      s.setTexture(`${key2}${face}${Math.floor(time / 300 + t.roster_id) % 2}`);
       shadowFor(this, s);
     }
     shadowFor(this, this.player);
@@ -1521,7 +1643,11 @@ ${t.points.toFixed(1)} pts`);
     const midX = (FIELD.x0 + FIELD.x1 + 1) / 2 * TILE, ch = this.tdCheer && time < this.tdCheer.until ? this.tdCheer : null;
     for (const f of this.fans || []) {
       const wave = Math.max(0, Math.sin(time / 420 - f.y / 90)) ** 6 * 7, bob = Math.abs(Math.sin(time / 280 + f.ph)) * 1.5;
-      const jump = ch && f.s.x < midX === ch.left ? Math.abs(Math.sin(time / 95 + f.ph)) * 6 : 0;
+      let jump = ch && f.s.x < midX === ch.left ? Math.abs(Math.sin(time / 95 + f.ph)) * 4 : 0;
+      if (ch && f.s.x < midX === ch.left) {
+        const k2 = (time - ch.start - Math.abs(f.y - ch.y) * 1.4) / 450;
+        if (k2 > 0 && k2 < 1) jump += Math.sin(k2 * Math.PI) * 12;
+      }
       f.s.y = f.y + 12 - wave - bob - jump;
       if (!f.keep) f.s.setTexture(wave > 3.5 || jump > 0 ? f.up : f.down);
     }
