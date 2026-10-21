@@ -173,8 +173,8 @@ class StadiumScene extends World {
     this.applyUiScale();
   }
   applyUiScale() {
-    const normal = window.innerWidth < 600 ? 0.86 : Math.min(1.4, window.innerHeight / 640), z = this.logicalZoom();
-    this.uiScale = 1 / this.cameras.main.zoom * Math.min(1, Math.max(0.6, z / normal));
+    const fieldPx = (FIELD.x1 - FIELD.x0 + 3) * TILE * this.logicalZoom(), phonePx = (FIELD.x1 - FIELD.x0 + 3) * TILE * 0.86;
+    this.uiScale = 1 / this.cameras.main.zoom * Math.min(1, Math.max(0.6, fieldPx / phonePx));
     this.uiTexts = (this.uiTexts || []).filter((t) => t.active);
     for (const t of this.uiTexts) t.setScale(this.uiScale);
   }
