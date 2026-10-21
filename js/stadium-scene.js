@@ -80,16 +80,19 @@ class StadiumScene extends World {
     this.placeTeams();
     this.addLife();
     this.addProps();
-    this.player = this.physics.add.sprite(((FIELD.x0 + FIELD.x1 + 1) / 2 + 2.6) * TILE, (FIELD.y0 + 9.6) * TILE, "playerup0").setOrigin(0.5, 1);
+    this.player = this.physics.add.sprite(((FIELD.x0 + FIELD.x1 + 1) / 2 + 3.2) * TILE, (FIELD.y0 + 10.2) * TILE, "playerup0").setOrigin(0.5, 1);
     this.player.body.setSize(14, 8).setOffset(9, 24);
     this.player.setScale(1.5);
     this.youRing = this.add.ellipse(0, 0, 44, 16, 16767050, 0.35).setStrokeStyle(2, 16767050, 0.9);
     this.youTag = this.label(0, 0, "\u25C0 YOU", "#1d140c").setStyle({ backgroundColor: "#ffd84a" }).setFontSize(Math.round(15 * DPR));
+    const picked = this.league.teams.some((t) => t.mine);
+    this.youRing.setVisible(picked);
+    this.youTag.setVisible(picked).setDepth(99990);
     this.facing = "up";
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.blockers);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setFollowOffset(2.6 * TILE, 0);
+    this.cameras.main.setFollowOffset(3.2 * TILE, 0);
     this.spawnOffset = true;
     const fitZoom = () => this.setZoom(villageZoom || (window.innerWidth < 600 ? 0.86 : Math.min(1.4, window.innerHeight / 640)));
     fitZoom();
@@ -133,7 +136,9 @@ class StadiumScene extends World {
     const cam = this.cameras.main, W = MAP_W * TILE, H = MAP_H * TILE;
     setVillageZoom(z);
     cam.setZoom(z * DPR);
-    const vw = this.scale.width / cam.zoom, vh = this.scale.height / cam.zoom;
+    const inset = window.innerWidth < 600 ? Math.round(100 * DPR) : 0;
+    cam.setViewport(0, 0, this.scale.width, this.scale.height - inset);
+    const vw = this.scale.width / cam.zoom, vh = (this.scale.height - inset) / cam.zoom;
     cam.setBounds(Math.min(0, (W - vw) / 2), Math.min(0, (H - vh) / 2), Math.max(W, vw), Math.max(H, vh));
     this.applyUiScale();
   }
@@ -677,7 +682,8 @@ class StadiumScene extends World {
           this.add.image(x.s.x + d * 12, y + 6, this.throneTex()).setOrigin(0.5, 1).setFlipX(x.side === 1).setDepth(y - 1);
         }
         if (pair === assBowl) {
-          const sign = this.label(mid, y - 76, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 1).setFontSize(Math.round(16 * DPR));
+          const sign = this.label(mid, y + 60, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(16 * DPR));
+          this.boards[this.boards.length - 1].sign = sign;
           sign.setStyle({ backgroundColor: "rgba(92,52,20,0.95)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
           this.tweens.add({ targets: sign, angle: { from: -3, to: 3 }, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
         }
@@ -1100,7 +1106,7 @@ class StadiumScene extends World {
     if (shame) {
       const bx = shame.s.x;
       this.bench.setPosition(bx, shame.s.y + 24).setDepth(shame.s.y + 24);
-      this.benchTag.setPosition(bx, shame.s.y + 26).setText(`\u{1FA91} ${shame.b.toFixed(1)} on the bench`);
+      this.benchTag.setOrigin(0.5, 1).setPosition(bx, shame.s.y - 80).setText(`\u{1FA91} ${shame.b.toFixed(1)} on the bench`);
     }
     for (const r of this.refs) {
       r.ref.destroy();
@@ -1459,6 +1465,10 @@ ${t.points.toFixed(1)} pts`);
       for (const g of [A.s, B.s, board, bar, o.pct, projTxt]) if (g && g.alpha !== dim) g.setAlpha(dim);
       const r = board.getBounds();
       projTxt.setPosition(r.centerX, r.bottom + 1).setDepth(board.depth);
+      if (o.sign) {
+        const pr = projTxt.getBounds();
+        o.sign.setPosition(pr.centerX, pr.bottom + 4);
+      }
     }
   }
   update(time, delta) {

@@ -190,7 +190,7 @@ const mine = () => L.teams.find((t) => t.mine);
 function hud() {
   const m = mine(), opp = m && L.teams.find((t) => t.matchup_id && t.matchup_id === m.matchup_id && t !== m);
   $("st-league").textContent = `${L.name} \xB7 week ${L.week}`;
-  $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : 'Tap "Who are you?" to pick your team';
+  $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : "Tap \u{1F451} My team to pick your team";
   $("st-score").className = m && opp ? m.points >= opp.points ? "up" : "down" : "";
   $("st-proj").textContent = m && opp ? `projected ${fmt(m.proj)} \u2013 ${fmt(opp.proj)}` : "";
 }
@@ -848,14 +848,55 @@ function askLeague() {
     if (e) e.style.display = "none";
   }
   $("st-league").textContent = "Sleeper Stadium";
-  $("st-score").textContent = "Paste your Sleeper league ID to open your stadium";
+  $("st-score").textContent = "Type your Sleeper username to open your stadium";
+  const btns = document.querySelector(".st-btns");
+  if (btns) btns.style.display = "none";
   const box = document.createElement("form");
   box.style.cssText = "display:flex;gap:6px;justify-content:center;margin-top:6px";
-  box.innerHTML = '<input id="lg-id" inputmode="numeric" placeholder="League ID" style="font:16px sans-serif;padding:6px 8px;width:220px"><button type="submit" style="font:16px sans-serif;padding:6px 12px">Open</button>';
-  box.onsubmit = (e) => {
+  box.innerHTML = '<input id="lg-id" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Sleeper username or league ID" style="font:16px sans-serif;padding:6px 8px;width:240px"><button type="submit" style="font:16px sans-serif;padding:6px 12px">Open</button>';
+  const msg = document.createElement("div");
+  msg.style.cssText = "margin:6px auto 0;font:14px system-ui,sans-serif;color:#5a4a33;max-width:340px;text-align:center";
+  const go = (id) => {
+    location.search = `?league=${id}`;
+  };
+  box.onsubmit = async (e) => {
     e.preventDefault();
-    const v = (document.getElementById("lg-id").value || "").replace(/[^0-9]/g, "");
-    if (v) location.search = `?league=${v}`;
+    const raw = (document.getElementById("lg-id").value || "").trim().replace(/^@/, "");
+    if (!raw) return;
+    const link = raw.match(/leagues\/(\d+)/);
+    if (link || /^\d+$/.test(raw)) {
+      go(link ? link[1] : raw);
+      return;
+    }
+    msg.textContent = "Looking up your leagues\u2026";
+    try {
+      const u = await get(`${API}/user/${encodeURIComponent(raw)}`);
+      if (!u || !u.user_id) {
+        msg.textContent = `No Sleeper user "${raw}". It's the @name on your Sleeper profile.`;
+        return;
+      }
+      store("st-user-id", u.user_id);
+      const st = await get(`${API}/state/nfl`);
+      const lgs = await get(`${API}/user/${u.user_id}/leagues/nfl/${st.league_season || st.season}`) || [];
+      if (!lgs.length) {
+        msg.textContent = `${u.display_name || raw} has no leagues this season.`;
+        return;
+      }
+      if (lgs.length === 1) {
+        go(lgs[0].league_id);
+        return;
+      }
+      msg.replaceChildren(Object.assign(document.createElement("div"), { textContent: "Pick your league:" }), ...lgs.map((l) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = l.name;
+        b.onclick = () => go(l.league_id);
+        b.style.cssText = "display:block;width:100%;margin:6px 0 0;font:600 15px sans-serif;padding:8px 10px;background:#fff8e6;border:1px solid #9e7c0c;border-radius:8px;text-align:left";
+        return b;
+      }));
+    } catch (err) {
+      msg.textContent = "Could not reach Sleeper. Try again in a minute.";
+    }
   };
   const demo = document.createElement("button");
   demo.type = "button";
@@ -873,7 +914,7 @@ function askLeague() {
   const by = document.createElement("p");
   by.style.cssText = "margin:8px auto 0;font:13px system-ui,sans-serif;color:#5a4a33;max-width:320px;text-align:center";
   by.innerHTML = 'Built by <a href="https://lamaisonwebstudio.com/" target="_blank" rel="noopener">lamaisonwebstudio.com</a>. Podcast, Discord or business? <a href="https://lamaisonwebstudio.com/stadium/#custom" target="_blank" rel="noopener">Let&#39;s build yours.</a>';
-  $("st-proj").replaceChildren(box, demo, look, by);
+  $("st-proj").replaceChildren(box, msg, demo, look, by);
 }
 (async function main() {
   count("open");
@@ -890,7 +931,12 @@ function askLeague() {
     return;
   }
   count("league");
-  const saved = Number(store(`st-me-${L.id}`));
+  let saved = Number(store(`st-me-${L.id}`));
+  const me = !saved && store("st-user-id") && L.teams.find((t) => t.owner_id === store("st-user-id"));
+  if (me) {
+    saved = me.roster_id;
+    store(`st-me-${L.id}`, String(saved));
+  }
   for (const t of L.teams) t.mine = t.roster_id === saved;
   try {
     await Promise.race([document.fonts.load('13px "Pixelify Sans"'), new Promise((r) => setTimeout(r, 2500))]);
