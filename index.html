@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://api.sleeper.app" crossorigin>
   <link rel="preload" href="vendor/phaser.min.js" as="script">
   <link rel="modulepreload" href="js/stadium.bundle.js">
-  <link rel="preload" href="sleeper-players.json" as="fetch" crossorigin="anonymous">
+  <script>window.__players = fetch('sleeper-players.json').then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });</script>
   <meta name="description" content="Your Sleeper fantasy league as a live pixel stadium.">
   <meta property="og:title" content="Sleeper Stadium">
   <meta property="og:image" content="https://stadium.lamaisonwebstudio.com/og.png">

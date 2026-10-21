@@ -99,7 +99,10 @@ async function load(leagueId) {
     get(`${API}/league/${leagueId}/traded_picks`).catch(() => []),
     get(`${API}/league/${leagueId}/transactions/${week}`).catch(() => []),
     get(`${API}/league/${leagueId}/transactions/${Math.max(1, week - 1)}`).catch(() => []),
-    get("sleeper-players.json").catch(() => get("/api/sleeper/players")).catch(() => ({})),
+    (window.__players || fetch("sleeper-players.json").then((r) => {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    })).catch(() => get("/api/sleeper/players")).catch(() => ({})),
     weekProjections(season, week),
     champions(lg),
     get("stadium-avatars.json").catch(() => ({})),

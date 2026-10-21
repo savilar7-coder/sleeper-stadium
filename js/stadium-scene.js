@@ -13,6 +13,7 @@ const sweatActive = (L) => {
 };
 const RAVENS = ["#241773", "#241773", "#2e1f8f", "#000000", "#9e7c0c", "#c9a227"];
 const MAP_W = 22;
+const TEAM_END_ZONES = true;
 let MAP_H = 49;
 const FIELD = { x0: 4, x1: 17, y0: 4, y1: 44 };
 const LOOKS = [
@@ -65,7 +66,7 @@ class StadiumScene extends World {
   }
   preload() {
     preloadArt(this, true);
-    preloadDecor(this);
+    preloadDecor(this, true);
     for (const t of this.league.teams) if (!["Dumpster", "Steeler", "Raven", "Shorty"].includes(t.look) && !/^FB\d+$/.test(t.look) && !this.textures.exists(`a-ch-${t.look}`)) this.load.image(`a-ch-${t.look}`, `assets/chars/${t.look}.png`);
   }
   create() {
@@ -272,15 +273,46 @@ class StadiumScene extends World {
     g.save();
     rr(fx, fy, fw, fh, fw / 2.6);
     g.clip();
-    for (let y = 0; y < fh; y += T) {
-      g.fillStyle = y / T % 2 ? "#3f8a3a" : "#4a9a43";
-      g.fillRect(fx, fy + y, fw, T);
+    const ez = 2 * T, band = (fh - 2 * ez) / 20;
+    for (let i = -2; i * band < fh; i++) {
+      g.fillStyle = (i + 20) % 2 ? "#3f8a3a" : "#4b9c44";
+      g.fillRect(fx, fy + ez + i * band, fw, Math.ceil(band));
     }
-    const ez = 2 * T;
-    g.fillStyle = "#241773";
-    g.fillRect(fx, fy, fw, ez);
-    g.fillStyle = "#b8402f";
-    g.fillRect(fx, fy + fh - ez, fw, ez);
+    for (let x = 0; x < fw; x += 2 * T) {
+      g.fillStyle = "rgba(255,255,255,0.035)";
+      g.fillRect(fx + x, fy, T, fh);
+    }
+    for (let i = 0; i < fw * fh / 90; i++) {
+      g.fillStyle = r() < 0.5 ? "rgba(20,60,20,0.22)" : "rgba(170,230,140,0.12)";
+      g.fillRect(fx + Math.floor(r() * fw / 2) * 2, fy + Math.floor(r() * fh / 2) * 2, 2, 2);
+    }
+    const kitOf = (t) => {
+      const m = t && /^FB(\d+)$/.exec(t.look || "");
+      return m ? FB_KITS[Number(m[1]) % FB_KITS.length] : null;
+    };
+    const table = [...this.league.teams || []].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
+    const k1 = TEAM_END_ZONES ? kitOf(table[0]) : null, k2 = TEAM_END_ZONES ? kitOf(table[1]) : null;
+    const endZone = (y, kit, fallback) => {
+      g.fillStyle = kit ? kit[2] : fallback;
+      g.fillRect(fx, y, fw, ez);
+      if (!kit) return;
+      g.save();
+      g.beginPath();
+      g.rect(fx, y, fw, ez);
+      g.clip();
+      g.strokeStyle = kit[3];
+      g.globalAlpha = 0.45;
+      g.lineWidth = 6;
+      for (let x = fx - ez; x < fx + fw + ez; x += 22) {
+        g.beginPath();
+        g.moveTo(x, y + ez);
+        g.lineTo(x + ez, y);
+        g.stroke();
+      }
+      g.restore();
+    };
+    endZone(fy, k1, "#241773");
+    endZone(fy + fh - ez, k2, "#b8402f");
     const sh = g.createLinearGradient(fx, 0, fx + 46, 0);
     sh.addColorStop(0, "rgba(0,0,0,0.32)");
     sh.addColorStop(1, "rgba(0,0,0,0)");
@@ -307,8 +339,12 @@ class StadiumScene extends World {
     for (let i = 1; i <= 9; i++) {
       const y = fy + ez + (fh - 2 * ez) * i / 10;
       g.fillRect(fx + 4, y - 1, fw - 8, 3);
-      g.fillStyle = "rgba(255,255,255,0.55)";
-      g.fillText(String(i <= 5 ? i * 10 : (10 - i) * 10), fx + 8, y - 6);
+      g.font = '600 22px "Pixelify Sans", sans-serif';
+      const num = String(i <= 5 ? i * 10 : (10 - i) * 10);
+      g.fillStyle = "rgba(0,0,0,0.35)";
+      g.fillText(num, fx + 10, y - 4);
+      g.fillStyle = "rgba(255,255,255,0.85)";
+      g.fillText(num, fx + 8, y - 6);
       g.fillStyle = "rgba(255,255,255,0.35)";
     }
     {
@@ -323,21 +359,29 @@ class StadiumScene extends World {
       g.fillRect(fx + 4, top, 3, len);
       g.fillRect(fx + fw - 7, top, 3, len);
       const cy = top + len / 2, cx = fx + fw / 2;
-      g.globalAlpha = 0.22;
-      g.fillStyle = "#241773";
+      const ini = (this.league.name || "").replace(/[^A-Za-z0-9 ]/g, "").split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 3).toUpperCase();
+      g.globalAlpha = k1 ? 0.5 : 0.22;
+      g.fillStyle = k1 ? k1[2] : "#241773";
       g.beginPath();
       g.arc(cx, cy, 70, 0, Math.PI * 2);
       g.fill();
-      g.strokeStyle = "#c9a227";
+      g.strokeStyle = k1 ? k1[5] : "#c9a227";
       g.lineWidth = 6;
       g.beginPath();
       g.arc(cx, cy, 64, 0, Math.PI * 2);
       g.stroke();
-      g.globalAlpha = 0.3;
-      g.fillStyle = "#ffd84a";
-      g.font = '600 46px "Pixelify Sans", sans-serif';
+      if (k1) {
+        g.strokeStyle = "rgba(255,255,255,0.7)";
+        g.lineWidth = 2;
+        g.beginPath();
+        g.arc(cx, cy, 72, 0, Math.PI * 2);
+        g.stroke();
+      }
+      g.globalAlpha = k1 ? 0.75 : 0.3;
+      g.fillStyle = k1 ? k1[5] : "#ffd84a";
       g.textAlign = "center";
-      g.fillText("D", cx, cy + 16);
+      g.font = `600 ${k1 && ini.length > 2 ? 38 : 46}px "Pixelify Sans", sans-serif`;
+      g.fillText(k1 ? ini || "FF" : "D", cx, cy + 16);
       g.globalAlpha = 1;
     }
     for (const y of [fy + 6, fy + fh - 12]) {
@@ -349,7 +393,7 @@ class StadiumScene extends World {
     const name = (this.league.name || "").replace(/[^A-Za-z0-9 ]/g, "").split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 3).toUpperCase();
     g.font = '600 34px "Pixelify Sans", sans-serif';
     g.textAlign = "center";
-    g.fillStyle = "#c9a227";
+    g.fillStyle = k1 ? k1[5] : "#c9a227";
     {
       const nm = (this.league.name || "STADIUM").toUpperCase().slice(0, 30);
       let fs = 34;

@@ -22,16 +22,16 @@ const ANIMALS = ["Cat", "Chicken", "Pig", "Cow", "Horse", "Donkey", "Dog", "Frog
 const FOLK = ["OldMan", "OldMan2", "OldMan3", "Villager6", "ManGreen", "Sultan", "Knight"];
 const HOUSE_POOL = ["orange", "beige", "orange2", "clay", "wood", "brown"];
 function preloadArt(scene, lite = false) {
-  scene.load.image("a-floor", "assets/TilesetFloor.png");
-  scene.load.image("a-nature", "assets/TilesetNature.png");
   if (!lite) {
+    scene.load.image("a-floor", "assets/TilesetFloor.png");
+    scene.load.image("a-nature", "assets/TilesetNature.png");
+    scene.load.image("a-int", "assets/interior/Element.png");
     scene.load.spritesheet("pk-mill", "assets/park/mill.png", { frameWidth: 64, frameHeight: 64 });
     scene.load.spritesheet("pk-boat", "assets/park/boat.png", { frameWidth: 40, frameHeight: 32 });
     scene.load.image("a-house", "assets/TilesetHouse.png");
     for (const a of ANIMALS) scene.load.image(`a-an-${a}`, `assets/animals/${a}.png`);
   }
-  for (const c of new Set([...Object.values(CHAR), ...CHAR_POOL, ...lite ? [] : FOLK])) scene.load.image(`a-ch-${c}`, `assets/chars/${c}.png`);
-  scene.load.image("a-int", "assets/interior/Element.png");
+  if (!lite) for (const c of new Set([...Object.values(CHAR), ...CHAR_POOL, ...FOLK])) scene.load.image(`a-ch-${c}`, `assets/chars/${c}.png`);
   scene.load.spritesheet("a-smoke", "assets/fx/Smoke.png", { frameWidth: 32, frameHeight: 32 });
 }
 function makeTextures(scene) {

@@ -1,12 +1,13 @@
 import { TILE } from "./core.js";
 import { halloween, season, seasonizeTexture } from "./sectors.js";
-function preloadDecor(scene) {
-  scene.load.image("a-detail", "assets/TilesetFloorDetail.png");
-  scene.load.image("a-water", "assets/TilesetWater.png");
+function preloadDecor(scene, lite = false) {
   const sheet = (key, file, w, h) => scene.load.spritesheet(key, `assets/anim/${file}`, { frameWidth: w, frameHeight: h });
-  sheet("a-ripple", "ripple.png", 16, 16);
   sheet("a-flag-red", "flag-red.png", 16, 16);
   sheet("a-flag-blue", "flag-blue.png", 16, 16);
+  if (lite) return;
+  scene.load.image("a-detail", "assets/TilesetFloorDetail.png");
+  scene.load.image("a-water", "assets/TilesetWater.png");
+  sheet("a-ripple", "ripple.png", 16, 16);
   sheet("a-plant", "plant.png", 16, 16);
   sheet("a-leaf", "leaf.png", 6, 7);
   sheet("a-leaf-pink", "leaf-pink.png", 6, 7);
@@ -14,7 +15,7 @@ function preloadDecor(scene) {
 }
 function makeDecorTextures(scene) {
   const cut = (key, src, sx, sy, sw, sh) => {
-    if (scene.textures.exists(key)) return;
+    if (scene.textures.exists(key) || !scene.textures.exists(src)) return;
     const ct = scene.textures.createCanvas(key, sw * 2, sh * 2), c = ct.getContext();
     c.imageSmoothingEnabled = false;
     c.drawImage(scene.textures.get(src).getSourceImage(), sx, sy, sw, sh, 0, 0, sw * 2, sh * 2);
@@ -22,7 +23,7 @@ function makeDecorTextures(scene) {
   };
   [[160, 144], [64, 176], [80, 176], [64, 224]].forEach(([x, y], i) => cut(`d-bush${i}`, "a-nature", x, y, 16, 16));
   const st = { autumn: [144, 288, 48, 48], spring: [0, 288, 48, 48], winter: [96, 288, 48, 48] }[season()];
-  if (st && !scene.textures.exists("d-smalltree")) {
+  if (st && !scene.textures.exists("d-smalltree") && scene.textures.exists("a-nature")) {
     const ct = scene.textures.createCanvas("d-smalltree", 68, 68), c = ct.getContext();
     c.imageSmoothingEnabled = false;
     c.drawImage(scene.textures.get("a-nature").getSourceImage(), st[0], st[1], st[2], st[3], 0, 0, 68, 68);
@@ -39,9 +40,9 @@ function makeDecorTextures(scene) {
   cut("d-line", "a-int", 224, 32, 32, 32);
   cut("d-pond", "a-water", 0, 96, 48, 48);
   cut("d-lily", "a-water", 176, 48, 16, 16);
-  for (const k of ["d-pond", "d-lily", "d-bush0", "d-bush1", "d-bush2", "d-bush3"]) seasonizeTexture(scene, k);
+  for (const k of ["d-pond", "d-lily", "d-bush0", "d-bush1", "d-bush2", "d-bush3"]) if (scene.textures.exists(k)) seasonizeTexture(scene, k);
   for (const [key, frames, rate] of [["a-ripple", 4, 5], ["a-flag-red", 4, 6], ["a-flag-blue", 4, 6], ["a-plant", 4, 3]]) {
-    if (!scene.anims.exists(`${key}-go`)) scene.anims.create({ key: `${key}-go`, frames: scene.anims.generateFrameNumbers(key, { start: 0, end: frames - 1 }), frameRate: rate, repeat: -1 });
+    if (!scene.anims.exists(`${key}-go`) && scene.textures.exists(key)) scene.anims.create({ key: `${key}-go`, frames: scene.anims.generateFrameNumbers(key, { start: 0, end: frames - 1 }), frameRate: rate, repeat: -1 });
   }
   const lighten = (hex) => {
     const n = parseInt(hex.slice(1), 16);
