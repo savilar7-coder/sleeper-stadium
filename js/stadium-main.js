@@ -1,12 +1,32 @@
 import { $, DPR } from "./core.js";
 import { closePanel, el, openPanel } from "./panel.js";
 import { sfx } from "./sfx.js";
-import { LOOKS, StadiumScene } from "./stadium-scene.js";
-import { MiniGameScene } from "./minigame-scene.js";
+const phaserReady = new Promise((ok, no) => {
+  if (window.Phaser) {
+    ok();
+    return;
+  }
+  const tag = document.getElementById("phaser-js");
+  if (!tag) {
+    no(new Error("Phaser missing"));
+    return;
+  }
+  tag.addEventListener("load", ok);
+  tag.addEventListener("error", () => no(new Error("Phaser did not load")));
+});
+const scenes = phaserReady.then(() => Promise.all([import("./stadium-scene.js"), import("./minigame-scene.js")]));
+scenes.catch(() => {
+});
+let LOOKS = [];
 const API = "https://api.sleeper.app/v1";
 const POS = ["QB", "RB", "WR", "TE", "K", "DEF"];
+const early = (url) => {
+  const e = window.__early, p = e && e[url];
+  if (p) delete e[url];
+  return p;
+};
 const get = async (url) => {
-  const r = await fetch(url, { cache: "no-store" });
+  const r = await (early(url) || fetch(url, { cache: "no-store" }));
   if (!r.ok) throw new Error(`${r.status} ${url}`);
   return r.json();
 };
@@ -92,7 +112,8 @@ async function load(leagueId) {
     } catch {
     }
   }
-  const [users, rosters, matchups, picks, tx1, tx2, players, proj, champs, picked, blimpFile] = await Promise.all([
+  const champsP = champions(lg);
+  const [users, rosters, matchups, picks, tx1, tx2, players, proj, sched, picked, blimpFile] = await Promise.all([
     get(`${API}/league/${leagueId}/users`),
     get(`${API}/league/${leagueId}/rosters`),
     get(`${API}/league/${leagueId}/matchups/${week}`),
@@ -104,10 +125,12 @@ async function load(leagueId) {
       return r.json();
     })).catch(() => get("/api/sleeper/players")).catch(() => ({})),
     weekProjections(season, week),
-    champions(lg),
+    get(`${SCHEDULE}/${season}`).catch(() => null),
     get("stadium-avatars.json").catch(() => ({})),
     get("stadium-blimp.json").catch(() => null)
   ]);
+  const champs = await Promise.race([champsP, new Promise((r) => setTimeout(r, 0, null))]);
+  LOOKS = (await scenes)[0].LOOKS;
   const byUser = Object.fromEntries(users.map((u) => [u.user_id, u]));
   const byRoster = Object.fromEntries(matchups.map((m) => [m.roster_id, m]));
   const teams = rosters.map((r) => {
@@ -144,7 +167,7 @@ async function load(leagueId) {
   const groups = {};
   for (const t of teams) (groups[t.matchup_id || `bye-${t.roster_id}`] = groups[t.matchup_id || `bye-${t.roster_id}`] || []).push(t);
   const slots = (lg.roster_positions || []).filter((p) => !["BN", "TAXI", "IR"].includes(p));
-  return {
+  const out = {
     id: leagueId,
     name: lg.name,
     season,
@@ -157,9 +180,21 @@ async function load(leagueId) {
     proj,
     picks,
     news: [...tx1, ...tx2].filter((x) => x.status === "complete").sort((a, b) => b.status_updated - a.status_updated),
-    champs,
+    champs: champs || [],
+    games: gamesOf(sched, week),
     blimp: (new URLSearchParams(location.search).get("blimp") || (blimpFile || {}).message || "").slice(0, 60)
   };
+  if (!champs) champsP.then((c) => {
+    out.champs = c;
+    fillChamps();
+  });
+  return out;
+}
+function fillChamps() {
+  const s = game && game.scene.getScene("stadium"), c = L && L.champs.slice(0, 3);
+  if (!s || !s.children || !c || !c.length) return;
+  const t = s.children.list.find((o) => o.type === "Text" && /^🏆 Champions: first title/.test(o.text));
+  if (t) t.setText(c.map((x) => `\u{1F3C6} ${x.season}  ${x.team}`).join("\n"));
 }
 function playerValue(pid) {
   const p = L.players[pid];
@@ -795,14 +830,18 @@ function setMine(rid) {
   hud();
   if (game) game.scene.getScene("stadium").scene.restart({ league: L });
 }
+const SCHEDULE = "https://api.sleeper.com/schedule/nfl/regular";
+function gamesOf(games, week) {
+  const map = {};
+  for (const g of games || []) if (String(g.week) === String(week)) {
+    map[g.home] = g.status;
+    map[g.away] = g.status;
+  }
+  return map;
+}
 async function gameStatus() {
   try {
-    const games = await get(`https://api.sleeper.com/schedule/nfl/regular/${L.season}`), map = {};
-    for (const g of games || []) if (String(g.week) === String(L.week)) {
-      map[g.home] = g.status;
-      map[g.away] = g.status;
-    }
-    L.games = map;
+    L.games = gamesOf(await get(`${SCHEDULE}/${L.season}`), L.week);
   } catch {
   }
 }
@@ -921,6 +960,9 @@ function askLeague() {
 }
 (async function main() {
   count("open");
+  const fontReady = Promise.race([document.fonts.load('13px "Pixelify Sans"'), new Promise((r) => setTimeout(r, 2500))]);
+  fontReady.catch(() => {
+  });
   const leagueId = (q.get("league") || store("st-league-id") || "").replace(/[^0-9]/g, "");
   if (!leagueId) {
     askLeague();
@@ -942,10 +984,9 @@ function askLeague() {
   }
   for (const t of L.teams) t.mine = t.roster_id === saved;
   try {
-    await Promise.race([document.fonts.load('13px "Pixelify Sans"'), new Promise((r) => setTimeout(r, 2500))]);
+    await fontReady;
   } catch {
   }
-  await gameStatus();
   updateProj();
   hud();
   setTimeout(recapReady, 4e3);
@@ -956,8 +997,10 @@ function askLeague() {
     roundPixels: true,
     backgroundColor: "#20262e",
     scale: { mode: Phaser.Scale.NONE, width: Math.round(window.innerWidth * DPR), height: Math.round(window.innerHeight * DPR), zoom: 1 / DPR },
-    physics: { default: "arcade", arcade: { debug: false } }
+    physics: { default: "arcade", arcade: { debug: false } },
+    audio: { noAudio: true }
   });
+  const [{ StadiumScene }, { MiniGameScene }] = await scenes;
   game.scene.add("stadium", StadiumScene, true, { league: L });
   game.scene.add("minigame", MiniGameScene, false);
   window.__village = game;

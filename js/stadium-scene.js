@@ -12,7 +12,7 @@ const sweatActive = (L) => {
   return st.length > 0 && left > 0 && left <= 2;
 };
 const RAVENS = ["#241773", "#241773", "#2e1f8f", "#000000", "#9e7c0c", "#c9a227"];
-const MAP_W = 22;
+let MAP_W = 22;
 const TEAM_END_ZONES = true;
 let MAP_H = 49;
 const FIELD = { x0: 4, x1: 17, y0: 4, y1: 44 };
@@ -53,6 +53,10 @@ const FB_KITS = [
   ["#002c5f", "#ff8200", "#002c5f", "#16467f", "#001a3a", "#ff8200", "#f4f1ea"]
 ];
 ;
+const shade = (hex, f) => "#" + [1, 3, 5].map((i) => {
+  const v = parseInt(hex.slice(i, i + 2), 16), t = f > 0 ? 255 : 0;
+  return Math.round(v + (t - v) * Math.abs(f)).toString(16).padStart(2, "0");
+}).join("");
 class StadiumScene extends World {
   constructor() {
     super("stadium");
@@ -60,7 +64,10 @@ class StadiumScene extends World {
   init(data) {
     this.league = data.league;
     const rows = (this.league.pairs || []).length || 6;
-    ROW = sweatActive(this.league) ? 6 : 5;
+    ROW = sweatActive(this.league) ? 7 : 6;
+    const wide = window.innerWidth >= 600 && !/[?&]wide=0/.test(location.search);
+    MAP_W = wide ? Phaser.Math.Clamp(Math.round(27 * window.innerWidth / window.innerHeight), 22, 30) : 22;
+    FIELD.x1 = MAP_W - 5;
     FIELD.y1 = Math.max(44, FIELD.y0 + 7 + (rows - 1) * ROW + 8);
     MAP_H = FIELD.y1 + 5;
   }
@@ -109,9 +116,10 @@ class StadiumScene extends World {
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.blockers);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setFollowOffset(3.2 * TILE, 0);
+    this.spawnOffY = window.innerWidth < 600 ? 0 : 40;
+    this.cameras.main.setFollowOffset(3.2 * TILE, this.spawnOffY);
     this.spawnOffset = true;
-    const fitZoom = () => this.setZoom(villageZoom || (window.innerWidth < 600 ? 0.86 : Math.min(1.4, window.innerHeight / 640)));
+    const fitZoom = () => this.setZoom(villageZoom || this.fitZoom());
     fitZoom();
     this.scale.on("resize", fitZoom);
     this.events.once("shutdown", () => this.scale.off("resize", fitZoom));
@@ -135,7 +143,7 @@ class StadiumScene extends World {
       const now = this.time.now, near = lastXY && Math.hypot(p.x - lastXY.x, p.y - lastXY.y) < 40 * DPR;
       if (now - lastTap < 320 && near) {
         lastTap = 0;
-        const fit = window.innerWidth < 600 ? 0.86 : Math.min(1.4, window.innerHeight / 640);
+        const fit = this.fitZoom();
         this.setZoom(this.logicalZoom() < fit * 1.4 ? fit * 2 : fit);
         return;
       }
@@ -151,9 +159,14 @@ class StadiumScene extends World {
   pathTo(from, goal) {
     return this.findPath(from, goal) || [goal];
   }
+  fitZoom() {
+    if (window.innerWidth < 600) return 0.86;
+    return Math.min(window.innerWidth / (MAP_W * TILE), window.innerHeight / (19 * TILE));
+  }
   setZoom(z) {
     const W = MAP_W * TILE, H = MAP_H * TILE, fitAll = Math.min(this.scale.width / W, this.scale.height / H);
-    this.applyZoom(Phaser.Math.Clamp(z, Math.max(0.3, fitAll / DPR), 2.5));
+    const least = window.innerWidth < 600 ? fitAll / DPR : Math.max(fitAll / DPR, this.fitZoom() * 0.75);
+    this.applyZoom(Phaser.Math.Clamp(z, Math.max(0.3, least), 2.5));
     if (this.zoomSettle) this.zoomSettle.remove();
     if (this.zoomTween) this.zoomTween.stop();
     this.zoomSettle = this.time.delayedCall(160, () => {
@@ -173,7 +186,7 @@ class StadiumScene extends World {
     this.applyUiScale();
   }
   applyUiScale() {
-    const fieldPx = (FIELD.x1 - FIELD.x0 + 3) * TILE * this.logicalZoom(), phonePx = (FIELD.x1 - FIELD.x0 + 3) * TILE * 0.86;
+    const fieldPx = (FIELD.x1 - FIELD.x0 + 3) * TILE * this.logicalZoom(), phonePx = 17 * TILE * 0.86;
     this.uiScale = 1 / this.cameras.main.zoom * Math.min(1, Math.max(0.6, fieldPx / phonePx));
     this.uiTexts = (this.uiTexts || []).filter((t) => t.active);
     for (const t of this.uiTexts) t.setScale(this.uiScale);
@@ -190,13 +203,17 @@ class StadiumScene extends World {
     g.fillRect(0, 0, W, H);
     const tiers = 9, outer = 6, inner = fx - 14;
     for (let k = 0; k <= tiers; k++) {
-      const inset = outer + (inner - outer) * k / tiers, shade = 0.55 + 0.45 * (k / tiers);
-      const c = Math.round(64 * shade), c2 = Math.round(72 * shade), c3 = Math.round(84 * shade);
+      const inset = outer + (inner - outer) * k / tiers, shade2 = 0.55 + 0.45 * (k / tiers);
+      const c = Math.round(64 * shade2), c2 = Math.round(72 * shade2), c3 = Math.round(84 * shade2);
       g.fillStyle = `rgb(${c},${c2},${c3})`;
       rr(inset, inset, W - inset * 2, H - inset * 2, (W - inset * 2) / 2);
       g.fill();
       g.strokeStyle = "rgba(0,0,0,0.35)";
       g.lineWidth = 2;
+      g.stroke();
+      g.strokeStyle = "rgba(255,255,255,0.07)";
+      g.lineWidth = 1;
+      rr(inset + 3, inset + 3, W - inset * 2 - 6, H - inset * 2 - 6, (W - inset * 2 - 6) / 2);
       g.stroke();
     }
     g.fillStyle = "#14181d";
@@ -264,6 +281,46 @@ class StadiumScene extends World {
       g.fillStyle = "#fff6c8";
       for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) g.fillRect(lx + 2 + i * 6, ly + 2 + j * 6, 4, 4);
     }
+    {
+      const kitOf0 = (t) => {
+        const m = t && /^FB(\d+)$/.exec(t.look || "");
+        return m ? FB_KITS[Number(m[1]) % FB_KITS.length] : null;
+      };
+      const top2 = [...this.league.teams || []].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts).slice(0, 2).map(kitOf0);
+      const cols = TEAM_END_ZONES && top2[0] && top2[1] ? [top2[0][2], top2[0][5], top2[1][2], top2[1][5]] : ["#241773", "#c9a227", "#241773", "#e8e2d0"];
+      const ring = (d) => {
+        g.roundRect(fx - d, fy - d, fw + 2 * d, fh + 2 * d, (fw + 2 * d) / 2.6);
+      };
+      g.save();
+      g.beginPath();
+      ring(26);
+      ring(15);
+      g.clip("evenodd");
+      g.fillStyle = "#0d0f13";
+      g.fillRect(fx - 30, fy - 30, fw + 60, fh + 60);
+      g.beginPath();
+      ring(24);
+      ring(17);
+      g.clip("evenodd");
+      for (let y = fy - 30, i = 0; y < fy + fh + 30; y += 56, i++) {
+        g.fillStyle = cols[i % 4];
+        g.fillRect(fx - 30, y, fw + 60, 54);
+      }
+      for (let y = fy - 30; y < fy + fh + 30; y += 2) {
+        g.fillStyle = "rgba(0,0,0,0.28)";
+        g.fillRect(fx - 30, y, fw + 60, 1);
+      }
+      for (let x = fx - 30; x < fx + fw + 30; x += 2) {
+        g.fillStyle = "rgba(0,0,0,0.18)";
+        g.fillRect(x, fy - 30, 1, fh + 60);
+      }
+      g.restore();
+      g.strokeStyle = "rgba(255,255,255,0.18)";
+      g.lineWidth = 1;
+      g.beginPath();
+      ring(26);
+      g.stroke();
+    }
     g.fillStyle = "#5a3424";
     rr(fx - 14, fy - 14, fw + 28, fh + 28, (fw + 28) / 2.6);
     g.fill();
@@ -301,7 +358,7 @@ class StadiumScene extends World {
       g.rect(fx, y, fw, ez);
       g.clip();
       g.strokeStyle = kit[3];
-      g.globalAlpha = 0.45;
+      g.globalAlpha = 0.7;
       g.lineWidth = 6;
       for (let x = fx - ez; x < fx + fw + ez; x += 22) {
         g.beginPath();
@@ -393,6 +450,18 @@ class StadiumScene extends World {
     const name = (this.league.name || "").replace(/[^A-Za-z0-9 ]/g, "").split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 3).toUpperCase();
     g.font = '600 34px "Pixelify Sans", sans-serif';
     g.textAlign = "center";
+    const fillPlain = g.fillText;
+    g.lineJoin = "round";
+    g.shadowColor = "rgba(0,0,0,0.55)";
+    g.shadowOffsetY = 3;
+    g.fillText = (t, x, y) => {
+      g.strokeStyle = k1 ? k1[4] : "#0d0a24";
+      g.lineWidth = 6;
+      g.strokeText(t, x, y);
+      g.shadowColor = "transparent";
+      fillPlain.call(g, t, x, y);
+      g.shadowColor = "rgba(0,0,0,0.55)";
+    };
     g.fillStyle = k1 ? k1[5] : "#c9a227";
     {
       const nm = (this.league.name || "STADIUM").toUpperCase().slice(0, 30);
@@ -404,8 +473,11 @@ class StadiumScene extends World {
       g.fillText(nm, fx + fw / 2, fy + 58);
       g.font = '600 34px "Pixelify Sans", sans-serif';
     }
-    g.fillStyle = "rgba(255,255,255,0.85)";
+    g.fillStyle = "rgba(255,255,255,0.92)";
     g.fillText(`${name || "FF"} \xB7 WEEK ${this.league.week}`, fx + fw / 2, fy + fh - 22);
+    delete g.fillText;
+    g.shadowColor = "transparent";
+    g.shadowOffsetY = 0;
     ct.refresh();
     this.add.image(0, 0, "ground").setOrigin(0).setDepth(-10);
   }
@@ -721,7 +793,7 @@ class StadiumScene extends World {
     this.makeShorty();
     for (const t of this.league.teams) if (/^FB\d+$/.test(t.look)) this.makeTeamFootballer(t.look);
     const L = this.league, T = TILE, pairs = [...L.pairs].sort((a, b) => (b.some((t) => t.mine) ? 1 : 0) - (a.some((t) => t.mine) ? 1 : 0));
-    const xs = [(FIELD.x0 + 2.5) * T, (FIELD.x1 - 1.5) * T], mid = (FIELD.x0 + FIELD.x1 + 1) / 2 * T;
+    const mid = (FIELD.x0 + FIELD.x1 + 1) / 2 * T, half = Math.min((FIELD.x1 - FIELD.x0 - 4) / 2, 7) * T, xs = [mid - half, mid + half];
     this.boards = [];
     const pct = (t) => (t.wins + t.ties / 2) / Math.max(1, t.wins + t.losses + t.ties);
     const assBowl = pairs.filter((p) => p.length === 2).sort((a, b) => pct(a[0]) + pct(a[1]) - (pct(b[0]) + pct(b[1])) || a[0].fpts + a[1].fpts - (b[0].fpts + b[1].fpts))[0];
@@ -842,7 +914,7 @@ class StadiumScene extends World {
       this.nudging = false;
       cam.panEffect.reset();
       cam.startFollow(this.player, true, 0.1, 0.1);
-      cam.setFollowOffset(off(), 0);
+      cam.setFollowOffset(off(), this.spawnOffset ? this.spawnOffY : 0);
     };
     cam.stopFollow();
     cam.pan(x, y, 450, "Sine.easeInOut", false, (c, k) => {
@@ -953,6 +1025,14 @@ class StadiumScene extends World {
       rect(side ? 5 : 3, jy, side ? 6 : 10, jh, PUR);
       rect(side ? 5 : 3, jy, side ? 6 : 10, 1, PL);
       rect(side ? 10 : 12, jy + 1, 1, jh - 1, PD);
+      if (side) {
+        px(6 + step, 12, PUR);
+        px(8 - step, 12, PD);
+      } else {
+        px(5, 12, PUR);
+        px(10, 12, PD);
+      }
+      rect(side ? 5 : 4, jy + jh - 1, side ? 5 : 8, 1, PD);
       if (!side) {
         rect(3, jy, 2, 1, GOLD);
         rect(11, jy, 2, 1, GOLD);
@@ -989,6 +1069,20 @@ class StadiumScene extends World {
       px(4, hy, null);
       px(11, hy, null);
       rect(7, hy, 2, side ? 4 : dir === "up" ? 7 : 3, GOLD);
+      px(5, hy + 1, shade(K, 0.65));
+      px(5, hy + 2, shade(K, 0.35));
+      px(6, hy + 1, shade(K, 0.35));
+      if (side) rect(4, hy + 6, 5, 1, shade(K, -0.4));
+      else {
+        rect(11, hy + 1, 1, 5, shade(K, -0.35));
+        px(4, hy + 6, shade(K, -0.35));
+        px(11, hy + 6, shade(K, -0.35));
+      }
+      if (dir === "up") {
+        rect(4, hy + 6, 8, 1, shade(K, -0.35));
+        px(7, hy + 6, GOLD);
+        px(8, hy + 6, GOLD);
+      }
       if (dir === "down") {
         rect(5, hy + 3, 6, 3, SK);
         px(6, hy + 4, CLEAT);
@@ -1175,7 +1269,7 @@ class StadiumScene extends World {
     });
     cheer("cheer-u", true);
     cheer("cheer-d", false);
-    const cy = (F.y1 + 0.85) * T;
+    const cy = (F.y1 + 0.35) * T;
     this.cheer = [0, 1, 2, 3].map((i) => this.add.image(mid - 120 + i * 80, cy, "cheer-d").setOrigin(0.5, 1).setScale(1.3).setDepth(cy));
     this.time.addEvent({ delay: 380, loop: true, callback: () => {
       if (window.__calm) return;
