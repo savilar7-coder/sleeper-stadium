@@ -1045,6 +1045,11 @@ function askLeague(note) {
   $("st-proj").replaceChildren(box, msg, demo, look, by);
 }
 (async function main() {
+  {
+    const day = (new Date()).toISOString().slice(0, 10), before = store("ev-demo-open"), first = store("st-first-day") || (before && before < day ? before : day);
+    store("st-first-day", first);
+    if (first < day) count("back");
+  }
   count("open");
   const fontReady = Promise.race([document.fonts.load('13px "Pixelify Sans"'), new Promise((r) => setTimeout(r, 2500))]);
   fontReady.catch(() => {
@@ -1066,6 +1071,7 @@ function askLeague(note) {
     return;
   }
   count("league");
+  if (L.espn) count("espn");
   let saved = Number(store(`st-me-${L.id}`));
   const me = !saved && store("st-user-id") && L.teams.find((t) => t.owner_id === store("st-user-id"));
   if (me) {
