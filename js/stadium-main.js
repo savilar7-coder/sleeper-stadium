@@ -1,6 +1,7 @@
 import { $, DPR } from "./core.js";
 import { closePanel, el, openPanel } from "./panel.js";
 import { sfx } from "./sfx.js";
+import { espnLeague, isEspn } from "./stadium-espn.js";
 const phaserReady = new Promise((ok, no) => {
   if (window.Phaser) {
     ok();
@@ -85,7 +86,33 @@ async function champions(lg) {
   if (out.length) store(key, JSON.stringify(out));
   return out;
 }
+async function loadEspn(leagueId) {
+  const state = await get(`${API}/state/nfl`), season = state.league_season || state.season;
+  const [lg, sched, blimpFile] = await Promise.all([espnLeague(leagueId, season), get(`${SCHEDULE}/${season}`).catch(() => null), get("stadium-blimp.json").catch(() => null)]);
+  LOOKS = (await scenes)[0].LOOKS;
+  const local = JSON.parse(store("st-looks") || "{}");
+  for (const t of lg.teams) {
+    t.projPre = t.proj = t.starters.reduce((n, pid) => n + (lg.proj[pid] || 0), 0);
+    t.look = local[t.roster_id] || guessLook(t);
+  }
+  const groups = {};
+  for (const t of lg.teams) (groups[t.matchup_id || `bye-${t.roster_id}`] = groups[t.matchup_id || `bye-${t.roster_id}`] || []).push(t);
+  return {
+    id: leagueId,
+    ...lg,
+    rounds: 3,
+    pairs: Object.values(groups),
+    preseason: false,
+    picks: [],
+    news: [],
+    champs: [],
+    games: gamesOf(sched, lg.week),
+    blimp: (blimpFile || {}).message || "",
+    espn: true
+  };
+}
 async function load(leagueId) {
+  if (isEspn(leagueId)) return loadEspn(leagueId);
   let [state, lg] = await Promise.all([get(`${API}/state/nfl`), get(`${API}/league/${leagueId}`)]);
   const season = state.league_season || state.season, week = Math.max(1, state.display_week || state.week || 1);
   if (lg && String(lg.season) !== String(season)) {
@@ -313,7 +340,8 @@ function teamPanel(rid) {
 }
 const face = (pid) => {
   const p = L.players[pid];
-  const src = p && p[1] === "DEF" ? `https://sleepercdn.com/images/team_logos/nfl/${String(pid).toLowerCase()}.png` : `https://sleepercdn.com/content/nfl/players/thumb/${pid}.jpg`;
+  const espnId = /^e-?\d+$/.test(String(pid)) && String(pid).slice(1);
+  const src = espnId ? p && p[1] === "DEF" ? `https://a.espncdn.com/i/teamlogos/nfl/500/${(p[2] === "WAS" ? "wsh" : p[2]).toLowerCase()}.png` : `https://a.espncdn.com/combiner/i?img=/i/headshots/nfl/players/full/${espnId}.png&w=96&h=70&cb=1` : p && p[1] === "DEF" ? `https://sleepercdn.com/images/team_logos/nfl/${String(pid).toLowerCase()}.png` : `https://sleepercdn.com/content/nfl/players/thumb/${pid}.jpg`;
   const img = el("img", { class: "mu-face", src, alt: "", loading: "lazy" });
   img.onerror = () => {
     img.style.visibility = "hidden";
@@ -354,7 +382,7 @@ function matchup(rid) {
       b.onclick = () => matchupCard(me, opp);
       return b;
     })(),
-    el("p", { class: "small" }, `Week ${L.week} \xB7 points refresh every minute during games \xB7 projections from Sleeper (half PPR).`)
+    el("p", { class: "small" }, `Week ${L.week} \xB7 points refresh every minute during games \xB7 projections from ${L.espn ? "ESPN (your league's scoring)" : "Sleeper (half PPR)"}.`)
   ], true);
 }
 const NAME_LOOKS = [
@@ -490,7 +518,7 @@ async function trophies() {
   if (L.trophies) return L.trophies;
   const weeks = [];
   for (let w = 1; w < Number(L.week); w++) weeks.push(w);
-  const all = await Promise.all(weeks.map((w) => get(`${API}/league/${L.id}/matchups/${w}`).catch(() => [])));
+  const all = L.espn ? weeks.map((w) => L.past[w] || []) : await Promise.all(weeks.map((w) => get(`${API}/league/${L.id}/matchups/${w}`).catch(() => [])));
   const name = (rid) => (L.teams.find((t) => t.roster_id === rid) || {}).name || `Team ${rid}`;
   let hi = null;
   const lows = {}, run = {}, best = {};
@@ -611,7 +639,7 @@ function tradeMaker(partnerId) {
         el("div", {}, el("h3", {}, `You get (${partner.name})`), side(partner, get_))
       ),
       share,
-      el("p", { class: "small" }, "Values are a rough guide: this season's projection (half PPR) adjusted for age, picks by round and year. Not advice. Send real offers in the Sleeper app.")
+      el("p", { class: "small" }, `Values are a rough guide: this season's projection (half PPR) adjusted for age, picks by round and year. Not advice. Send real offers in the ${L.espn ? "ESPN" : "Sleeper"} app.`)
     );
   }
   openPanel("\u{1F501} Trade maker", async () => [el("div", {}, "Loading\u2026")], true);
@@ -905,7 +933,8 @@ function updateProj() {
 async function refreshPoints() {
   if (!L || document.hidden) return;
   try {
-    for (const x of await get(`${API}/league/${L.id}/matchups/${L.week}`)) {
+    const fresh = L.espn ? (await espnLeague(L.id, L.season)).teams : await get(`${API}/league/${L.id}/matchups/${L.week}`);
+    for (const x of fresh) {
       const t = L.teams.find((y) => y.roster_id === x.roster_id);
       if (t) Object.assign(t, { points: x.points || 0, starters_points: x.starters_points || [], players_points: x.players_points || {} });
     }
@@ -934,12 +963,12 @@ function askLeague(note) {
     if (e) e.style.display = "none";
   }
   $("st-league").textContent = "Sleeper Stadium";
-  $("st-score").textContent = "Type your Sleeper username to open your stadium";
+  $("st-score").textContent = "Type your Sleeper username (or paste an ESPN league link) to open your stadium";
   const btns = document.querySelector(".st-btns");
   if (btns) btns.style.display = "none";
   const box = document.createElement("form");
   box.style.cssText = "display:flex;gap:6px;justify-content:center;margin-top:6px";
-  box.innerHTML = '<input id="lg-id" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Sleeper username or league ID" style="font:16px sans-serif;padding:6px 8px;width:240px"><button type="submit" style="font:16px sans-serif;padding:6px 12px">Open</button>';
+  box.innerHTML = '<input id="lg-id" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Sleeper username, league ID or ESPN link" style="font:16px sans-serif;padding:6px 8px;width:240px"><button type="submit" style="font:16px sans-serif;padding:6px 12px">Open</button>';
   const msg = document.createElement("div");
   msg.style.cssText = "margin:6px auto 0;font:14px system-ui,sans-serif;color:#5a4a33;max-width:340px;text-align:center";
   const go = (id) => {
@@ -950,6 +979,11 @@ function askLeague(note) {
     const raw = (document.getElementById("lg-id").value || "").trim().replace(/^@/, "");
     if (!raw) {
       msg.textContent = "Type your Sleeper username (the @name on your profile) or a league ID.";
+      return;
+    }
+    const espn = raw.match(/espn\.com\/.*leagueId=(\d+)/i) || raw.match(/^espn[\s:-]*(\d+)$/i);
+    if (espn) {
+      go(`espn-${espn[1]}`);
       return;
     }
     const link = raw.match(/leagues\/(\d+)/);
@@ -1015,7 +1049,7 @@ function askLeague(note) {
   const fontReady = Promise.race([document.fonts.load('13px "Pixelify Sans"'), new Promise((r) => setTimeout(r, 2500))]);
   fontReady.catch(() => {
   });
-  const leagueId = (q.get("league") || store("st-league-id") || "").replace(/[^0-9]/g, "");
+  const rawId = q.get("league") || store("st-league-id") || "", leagueId = /^espn-\d+$/.test(rawId) ? rawId : rawId.replace(/[^0-9]/g, "");
   if (!leagueId) {
     askLeague();
     return;
@@ -1028,7 +1062,7 @@ function askLeague(note) {
       localStorage.removeItem("st-league-id");
     } catch (x) {
     }
-    askLeague(/^404/.test(err.message) || err instanceof TypeError ? "No Sleeper league with that ID. Check it, or type your Sleeper username." : `Could not reach Sleeper (${err.message}). Try again in a minute.`);
+    askLeague(err.message === "private" ? "That ESPN league is private. The commissioner can open it: ESPN League Settings > Basic Settings > Make league viewable to public." : /ESPN/.test(err.message) ? "No ESPN league with that ID. Paste the link from your ESPN league page." : /^404/.test(err.message) || err instanceof TypeError ? "No Sleeper league with that ID. Check it, or type your Sleeper username." : `Could not reach Sleeper (${err.message}). Try again in a minute.`);
     return;
   }
   count("league");

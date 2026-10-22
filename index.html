@@ -49,7 +49,9 @@
 <script>
 (function () {
   try {
-    var id = (new URLSearchParams(location.search).get('league') || localStorage.getItem('st-league-id') || '').replace(/[^0-9]/g, '');
+    var id = (new URLSearchParams(location.search).get('league') || localStorage.getItem('st-league-id') || '');
+    if (/^espn-/.test(id)) return;
+    id = id.replace(/[^0-9]/g, '');
     if (!id) return;
     var api = 'https://api.sleeper.app/v1', e = window.__early = {};
     [api + '/state/nfl', api + '/league/' + id].forEach(function (u) { e[u] = fetch(u, { cache: 'no-store' }); e[u].catch(function () {}); });
@@ -86,7 +88,7 @@
 <script>
 (function () {
   var b = document.getElementById('share-lg'), id = '';
-  try { id = (new URLSearchParams(location.search).get('league') || localStorage.getItem('st-league-id') || '').replace(/[^0-9]/g, ''); } catch (e) {}
+  try { id = new URLSearchParams(location.search).get('league') || localStorage.getItem('st-league-id') || ''; if (!/^espn-\d+$/.test(id)) id = id.replace(/[^0-9]/g, ''); } catch (e) {}
   if (!id || /[?&]sample=1/.test(location.search)) return;
   // Oct 21 2026: the pill stays hidden (the page's own 📸 Share button replaced it); the nudge still uses its link share
   var q = new URLSearchParams(location.search); q.set('league', id); q.delete('v'); q.delete('notitle');
