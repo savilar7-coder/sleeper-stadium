@@ -300,5 +300,22 @@
 </script>
 <a id="gh-star" class="star-a" href="https://github.com/savilar7-coder/sleeper-stadium" target="_blank" rel="noopener" style="position:fixed;right:10px;bottom:48px;z-index:50;font:600 13px system-ui,sans-serif;color:#fff;background:#24292f;border:1px solid #57606a;border-radius:16px;padding:6px 11px;text-decoration:none;box-shadow:0 2px 6px #0006">&#11088; Star on GitHub &middot; free &amp; open source</a>
 <script>document.addEventListener('click', function (e) { if (!e.target.closest || !e.target.closest('.star-a')) return; try { var day = new Date().toISOString().slice(0, 10); if (localStorage.getItem('ev-demo-star') !== day) { localStorage.setItem('ev-demo-star', day); navigator.sendBeacon('https://philosophers-trail.pages.dev/e?k=demo-star'); } } catch (x) {} }, true);</script>
+<div id="pass-foot" style="position:fixed;left:0;right:0;bottom:calc(30px + env(safe-area-inset-bottom));z-index:3;height:18px;display:none;justify-content:center;align-items:center;gap:4px;padding:0 12px;font:11px/18px system-ui,sans-serif;color:#b9b0a0;white-space:nowrap;pointer-events:none"><span style="overflow:hidden;text-overflow:ellipsis;min-width:0">Made for <b id="pass-foot-n" style="color:#fff4d6;font-weight:600"></b></span><span>&middot;</span><a id="pass-foot-a" href="https://lamaisonwebstudio.com/stadium/make/" target="_blank" rel="noopener" style="flex:none;color:#ffd84a;pointer-events:auto">get one for your league</a></div>
+<script>
+(function () {
+  if (!/[?&](blimp|looks|gold)=/.test(location.search) || /[?&]sample=1/.test(location.search)) return;
+  var f = document.getElementById('pass-foot');
+  var wait = setInterval(function () {
+    var L = window.__league; if (!L || !L.name) return;
+    clearInterval(wait);
+    document.getElementById('pass-foot-n').textContent = L.name;
+    if (!document.body.classList.contains('calm')) { f.style.opacity = '0'; f.style.transition = 'opacity .6s'; setTimeout(function () { f.style.opacity = '1'; }, 50); }
+    if (!document.body.classList.contains('tv')) f.style.display = 'flex'; // TV mode (?tv=1) keeps the screen clean
+    var star = document.getElementById('gh-star'); // the drill and TV mode hide the bottom buttons: the line goes with them
+    if (star) new MutationObserver(function () { f.style.visibility = star.style.visibility; }).observe(star, { attributes: true, attributeFilter: ['style'] });
+  }, 500);
+  document.getElementById('pass-foot-a').addEventListener('click', function () { try { var day = new Date().toISOString().slice(0, 10); if (localStorage.getItem('ev-demo-passfoot') !== day) { localStorage.setItem('ev-demo-passfoot', day); navigator.sendBeacon('https://philosophers-trail.pages.dev/e?k=demo-passfoot'); } } catch (x) {} });
+})();
+</script>
 </body>
 </html>
