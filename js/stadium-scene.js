@@ -2248,7 +2248,7 @@ ${r1(t.points)} pts`);
     const goal = atSpot ? S.home : { x: P.x, y: P.y };
     s.x += (goal.x - s.x) * 0.3;
     s.y += (goal.y - s.y) * 0.3;
-    s.setOrigin(0.5, 1).setDepth(s.y);
+    s.setOrigin(0.5, 1).setDepth(atSpot ? s.y : 99500);
     const f = moving ? `${G.shown || this.facing}${Math.floor((this.walkTimer || 0) / 115) % 4}` : atSpot ? `${S.side === 0 ? "right" : "left"}0` : `${this.facing}0`;
     if (s.frame.name !== f && s.texture.has(f)) s.setFrame(f);
     if (atSpot && Math.hypot(goal.x - s.x, goal.y - s.y) < 1) {
@@ -2259,7 +2259,7 @@ ${r1(t.points)} pts`);
     }
     if (!this.target && !atSpot && !moving) {
       this.idleAt = this.idleAt || time;
-      if (time - this.idleAt > 4e3) {
+      if (time - this.idleAt > 1500) {
         this.route = this.pathTo(P, this.walkSpot);
         this.target = this.route.shift();
         this.idleAt = 0;
@@ -2350,7 +2350,7 @@ ${r1(t.points)} pts`);
       }
     }
     this.near = best;
-    const key = best && !panelOpen && !this.spawnOffset ? best.name : "";
+    const key = best && !panelOpen && !this.spawnOffset && !this.homeTS ? best.name : "";
     if (key !== this.promptKey) {
       this.promptKey = key;
       const p = $("prompt");
