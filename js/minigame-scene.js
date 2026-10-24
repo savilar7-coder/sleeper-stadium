@@ -195,7 +195,13 @@ class MiniGameScene extends Phaser.Scene {
   }
   ptsOf(team, i, pid) {
     const got = (team.starters_points || [])[i] || 0, r = (x) => Math.round(x * 10) / 10;
-    return got ? { pts: r(got), proj: false } : (team.points || 0) > 0 ? { pts: 0, proj: false } : { pts: r((this.L.proj || {})[pid] || 0), proj: true };
+    return got ? { pts: r(got), proj: false } : this.played(team, pid) ? { pts: 0, proj: false } : { pts: r((this.L.proj || {})[pid] || 0), proj: true };
+  }
+  played(team, pid) {
+    const G = this.L.games || {}, P = this.L.players || {};
+    if (!Object.keys(G).length) return (team.points || 0) > 0;
+    const st = G[P[pid] ? P[pid][2] : pid];
+    return st === "in_game" || st === "complete";
   }
   names(team) {
     const P = this.L.players, out = [];
@@ -242,7 +248,7 @@ class MiniGameScene extends Phaser.Scene {
     const routes = this.hail ? ROUTES.map(() => [[0, 100 - this.los + 6]]) : Phaser.Utils.Array.Shuffle(ROUTES.slice());
     const who = this.names(off), hot = Math.max(...who.map((n) => n.pts));
     this.recv = who.map((n, i) => {
-      const r = make(off, xs[i], y0, `${n.name}${n.pid ? ` ${n.proj && this.W >= 400 ? "proj " : ""}${n.pts.toFixed(1)}` : ""}${hot > 0 && n.pts === hot ? " \u{1F525}" : ""}`, "up");
+      const r = make(off, xs[i], y0, `${n.name}${n.pid ? ` ${n.proj ? this.W >= 400 ? "proj " : "~" : ""}${n.pts.toFixed(1)}` : ""}${hot > 0 && n.pts === hot ? " \u{1F525}" : ""}`, "up");
       r.name = n.name;
       r.pts = n.pts;
       r.tagUp = i % 2 ? 15 : 0;

@@ -1337,7 +1337,11 @@ function awardsList() {
     return !pid || pid === "0" || !st || st === "complete";
   }) && Object.keys(L.games || {}).length;
   const lead = (p) => p[0].points >= p[1].points ? p : [p[1], p[0]], decided = pairs.filter((p) => gap(p) > 0.05 && over(p[0]) && over(p[1])).map(lead);
-  const ass = [...pairs].sort((a, b) => pct(a[0]) + pct(a[1]) - (pct(b[0]) + pct(b[1])) || a[0].fpts + a[1].fpts - (b[0].fpts + b[1].fpts))[0];
+  const all2 = Object.values(L.teams.reduce((m, t) => {
+    if (t.matchup_id) (m[t.matchup_id] = m[t.matchup_id] || []).push(t);
+    return m;
+  }, {})).filter((p) => p.length === 2);
+  const ass = [...all2].sort((a, b) => pct(a[0]) + pct(a[1]) - (pct(b[0]) + pct(b[1])) || a[0].fpts + a[1].fpts - (b[0].fpts + b[1].fpts))[0];
   const bench = (t) => Object.entries(t.players_points || {}).filter(([pid]) => !(t.starters || []).includes(pid)).reduce((n, [, v]) => n + (v || 0), 0);
   const shame = [...live].sort((a, b) => bench(b) - bench(a))[0];
   let mvp = null;
@@ -1354,7 +1358,7 @@ function awardsList() {
     ["\u{1F62C} Closest game", `${lead(close)[0].name} over ${lead(close)[1].name}`, `by ${fmt(gap(close))}`],
     unlucky ? ["\u{1F494} Unluckiest", unlucky[1].name, `lost \xB7 ${fmt(unlucky[1].points)}`] : null,
     lucky && !lucky.includes(lead(blow)[0]) ? ["\u{1F340} Luckiest win", lucky[0].name, `won \xB7 ${fmt(lucky[0].points)}`] : null,
-    ["\u{1F6BD} ASS Bowl", `${lead(ass)[0].name} vs ${lead(ass)[1].name}`, `${fmt(lead(ass)[0].points)} \u2013 ${fmt(lead(ass)[1].points)}`],
+    ass && (ass[0].points || ass[1].points) ? ["\u{1F6BD} ASS Bowl", `${lead(ass)[0].name} vs ${lead(ass)[1].name}`, `${fmt(lead(ass)[0].points)} \u2013 ${fmt(lead(ass)[1].points)}`] : null,
     ["\u{1FA91} Bench of shame", shame.name, `${fmt(bench(shame))} on the bench`],
     ["\u{1F327}\uFE0F Lowest score", low.name, fmt(low.points)]
   ].filter(Boolean);
