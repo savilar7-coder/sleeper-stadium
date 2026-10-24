@@ -66,9 +66,36 @@ async function espnLeague(id, season) {
     playoff_teams: ((d.settings || {}).scheduleSettings || {}).playoffTeamCount,
     playoff_week_start: (((d.settings || {}).scheduleSettings || {}).matchupPeriodCount || 14) + 1
     /* round 13 */
-  }, name: (d.settings || {}).name || "ESPN League", season: String(d.seasonId || season), week, teams, players, proj, slots, past };
+  }, name: (d.settings || {}).name || "ESPN League", season: String(d.seasonId || season), week, teams, players, proj, slots, past, lineupCounts: counts };
+}
+async function espnLive(id, season, counts) {
+  const n = String(id).replace(/^espn-/, "");
+  const r = await fetch(`${BASE}/${season}/segments/0/leagues/${n}?view=mBoxscore&view=mMatchupScore&view=mStatus`, { cache: "no-store" });
+  if (!r.ok) throw new Error(`${r.status} ESPN`);
+  const d = await r.json();
+  const week = d.scoringPeriodId || (d.status || {}).latestScoringPeriod || 1, period = (d.status || {}).currentMatchupPeriod || week;
+  const stat = (p, source, split, sp) => ((p.stats || []).find((s) => s.statSourceId === source && s.statSplitTypeId === split && s.scoringPeriodId === sp) || {}).appliedTotal;
+  const players = {}, proj = {}, teams = [];
+  for (const m of (d.schedule || []).filter((x) => x.matchupPeriodId === period)) for (const side of ["home", "away"]) {
+    const h = m[side];
+    if (!h) continue;
+    const entries = (h.rosterForCurrentScoringPeriod || {}).entries || [], pts = {};
+    for (const e of entries) {
+      const p = (e.playerPoolEntry || {}).player || {}, pid = `e${e.playerId}`;
+      if (p.fullName) players[pid] = [p.fullName, POS[p.defaultPositionId] || "", PRO[p.proTeamId] || "", null, 0];
+      proj[pid] = stat(p, 1, 1, week) || 0;
+      pts[pid] = stat(p, 0, 1, week) || 0;
+    }
+    const starters = orderOf(counts || {}).flatMap((k) => {
+      const got = entries.filter((e) => e.lineupSlotId === k).map((e) => `e${e.playerId}`);
+      return Array.from({ length: (counts || {})[k] || 0 }, (_, i) => got[i] || "0");
+    });
+    teams.push({ roster_id: h.teamId, points: h.totalPointsLive ?? h.totalPoints ?? 0, starters, starters_points: starters.map((pid) => pts[pid] || 0), players_points: pts });
+  }
+  return { teams, players, proj };
 }
 export {
   espnLeague,
+  espnLive,
   isEspn
 };

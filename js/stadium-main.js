@@ -1,7 +1,7 @@
 import { $, DPR } from "./core.js";
 import { closePanel, el, openPanel } from "./panel.js";
 import { sfx } from "./sfx.js";
-import { espnLeague, isEspn } from "./stadium-espn.js";
+import { espnLeague, espnLive, isEspn } from "./stadium-espn.js";
 import { MASCOT_LOOKS, isMascot, mascotFace } from "./stadium-mascots.js";
 window.__calm = /[?&]calm=1/.test(location.search) || !/[?&]calm=0/.test(location.search) && matchMedia("(prefers-reduced-motion: reduce)").matches;
 if (window.__calm) document.body.classList.add("calm");
@@ -1188,10 +1188,10 @@ function matchupCard(me, opp) {
   c.fillText(`${L.name} \xB7 WEEK ${L.week}`.toUpperCase().slice(0, 44), W / 2, 104);
   const sc = game && game.scene.getScene("stadium");
   [[me, 280, "right"], [opp, W - 280, "left"]].forEach(([t, x, dir]) => {
-    const tex = sc && sc.textures.exists(`team-${t.roster_id}-${dir}0`) ? sc.textures.get(`team-${t.roster_id}-${dir}0`).getSourceImage() : null;
-    if (tex) {
+    const fr = sc && sc.textures.exists(`team-${t.roster_id}-`) ? sc.textures.getFrame(`team-${t.roster_id}-`, `${dir}0`) : null;
+    if (fr) {
       c.imageSmoothingEnabled = false;
-      c.drawImage(tex, x - 96, 130, 192, 192);
+      c.drawImage(fr.source.image, fr.cutX, fr.cutY, fr.cutWidth, fr.cutHeight, x - 96, 130, 192, 192);
     }
     c.fillStyle = "#fff4d6";
     c.fillText(fit(t.name, 42, 470), x, 370);
@@ -1551,10 +1551,13 @@ async function refreshPoints() {
   if (!L || document.hidden && !window.__tv) return;
   const n = ++refreshN;
   try {
-    const r = L.espn ? await espnLeague(L.id, L.season) : null, fresh = r ? r.teams : await get(`${API}/league/${L.id}/matchups/${L.week}`);
+    const full = L.espn && (!L.lineupCounts || n % 10 === 0);
+    const r = L.espn ? await (full ? espnLeague(L.id, L.season) : espnLive(L.id, L.season, L.lineupCounts)) : null, fresh = r ? r.teams : await get(`${API}/league/${L.id}/matchups/${L.week}`);
+    if (r && r.lineupCounts) L.lineupCounts = r.lineupCounts;
     if (n !== refreshN) return;
     if (r) {
-      Object.assign(L.players, r.players);
+      if (full) Object.assign(L.players, r.players);
+      else for (const [k, v] of Object.entries(r.players)) if (!L.players[k]) L.players[k] = v;
       Object.assign(L.proj, r.proj);
     }
     for (const x of fresh) {

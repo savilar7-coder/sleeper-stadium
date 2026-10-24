@@ -849,8 +849,8 @@ class StadiumScene extends World {
           for (const k of this.textures.getTextureKeys()) if (k.startsWith(key)) this.textures.remove(k);
           CUT_SHEETS.set(t.roster_id, sheet);
         }
-        this.makeChar(key, sheet);
-        const s = this.add.sprite(x, y, `${key}${side === 0 ? "right" : "left"}0`).setOrigin(0.5, 1).setDepth(y).setScale(2);
+        this.makeTeamSheet(key, sheet);
+        const s = this.add.sprite(x, y, key, `${side === 0 ? "right" : "left"}0`).setOrigin(0.5, 1).setDepth(y).setScale(2);
         this.add.ellipse(x, y - 1, 34, 10, 663304, 0.55).setDepth(y - 4);
         if (t.gold) {
           s.setTint(16769126, 16769126, 16756736, 16756736);
@@ -861,7 +861,6 @@ class StadiumScene extends World {
         const tag = this.label(x, y - 62, "", t.mine ? "#ffe08a" : "#fff4d6").setFontSize(Math.round(18 * DPR));
         this.addBlocker(x - 7, y - 8, 14, 8);
         this.teamSprites.set(t.roster_id, { s, tag, t, side, key });
-        if (!window.__calm) this.tweens.add({ targets: s, originY: 1.035, duration: 380 + t.roster_id % 5 * 45, delay: t.roster_id * 137 % 600, yoyo: true, repeat: -1, ease: "Sine.easeInOut", onUpdate: () => s.updateDisplayOrigin() });
         this.doors.push({ x, y: y + 14, id: `team-${t.roster_id}`, name: t.name, verb: "Scout", open: () => window.__stadium ? window.__stadium.teamPanel(t.roster_id) : this.teamPanel(t.roster_id) });
       });
       if (pair.length === 2 && !L.preseason) {
@@ -1176,6 +1175,22 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     put("player0", draw("down", 0));
     put("player1", draw("down", 2));
     put("playeritem", draw("down", 0, "item"));
+  }
+  makeTeamSheet(key, who) {
+    const src = `a-ch-${who}`;
+    if (this.textures.exists(key) || !this.textures.exists(src)) return;
+    const ct = this.textures.createCanvas(key, 128, 224), c = ct.getContext();
+    c.imageSmoothingEnabled = false;
+    c.drawImage(this.textures.get(src).getSourceImage(), 0, 0, 64, 112, 0, 0, 128, 224);
+    const add = (name, col, row) => ct.add(name, 0, col * 32, row * 32, 32, 32);
+    ["down", "up", "left", "right"].forEach((dir, col) => {
+      for (let row = 0; row < 4; row++) add(`${dir}${row}`, col, row);
+      add(`${dir}G`, col, 4);
+    });
+    add("0", 0, 0);
+    add("1", 0, 1);
+    add("item", 1, 6);
+    ct.refresh();
   }
   makeTeamFootballer(look, mascot) {
     const name = mascot ? `${mascot}-${look}` : look, key = `a-ch-${name}`;
@@ -1533,7 +1548,11 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     if (shame) {
       const bx = shame.s.x;
       this.bench.setPosition(bx, shame.s.y + 24).setDepth(shame.s.y + 24);
-      this.benchTag.setOrigin(0.5, 1).setPosition(bx, shame.s.y - 80).setText(`\u{1FA91} ${shame.b.toFixed(1)} on the bench`);
+      this.benchTag.setOrigin(0.5, 1).setPosition(
+        bx,
+        shame.s.y - 92
+        /* round 52: the 2x players moved the name tag up to y-62; at -80 the name covered this tag */
+      ).setText(`\u{1FA91} ${shame.b.toFixed(1)} on the bench`);
     }
     for (const r of this.refs) {
       r.ref.destroy();
@@ -1732,12 +1751,20 @@ ${r1(t.points)} pts`);
       c.fillRect(10, 3, 1, 3);
       ct.refresh();
     }
+    const COLS = 64, ROWS = 32, atlas = this.textures.exists("fans-atlas") ? this.textures.get("fans-atlas") : this.textures.createCanvas("fans-atlas", COLS * 12, ROWS * 18);
+    atlas.nextCell = atlas.nextCell || 0;
     const fanTex = (key, skin, hair, shirt, up, extra, hat = "", hatCol = shirt, stripe = false) => {
-      if (this.textures.exists(key)) return key;
-      const ct = this.textures.createCanvas(key, 12, 18), c = ct.getContext(), p = (col, x, y, w = 1, h = 1) => {
+      if (atlas.has(key)) return key;
+      if (atlas.nextCell >= COLS * ROWS) return atlas.has("__BASE") ? "__BASE" : key;
+      const cell = atlas.nextCell++, ox = cell % COLS * 12, oy = Math.floor(cell / COLS) * 18;
+      const c = atlas.getContext(), p = (col, x, y, w = 1, h = 1) => {
         c.fillStyle = col;
-        c.fillRect(x, y, w, h);
+        c.fillRect(ox + x, oy + y, w, h);
       };
+      c.save();
+      c.beginPath();
+      c.rect(ox, oy, 12, 18);
+      c.clip();
       if (extra === "sign" && up) {
         p("#f4f1ea", 0, 0, 12, 5);
         p("#c84a3a", 2, 1, 3, 1);
@@ -1791,7 +1818,8 @@ ${r1(t.points)} pts`);
       }
       p("#1d1d22", 4, 16, 1, 2);
       p("#1d1d22", 7, 16, 1, 2);
-      ct.refresh();
+      c.restore();
+      atlas.add(key, 0, ox, oy, 12, 18);
       return key;
     };
     const shirtsR = ["#241773", "#241773", "#2e1f8f", "#1d1d22", "#c9a227"], shirtsO = ["#e8a33d", "#3d6fb6", "#c94a4a", "#4f9a5a", "#f2e6c9", "#d9e1e8", "#ffb612"];
@@ -1825,9 +1853,10 @@ ${r1(t.points)} pts`);
       const id = `fan-${skin}-${hair}-${shirt}-${extra}-${hat}-${hatCol}-${stripe}`;
       const down = fanTex(`${id}-d`, skin, hair, shirt, false, extra, hat, hatCol, stripe), up = fanTex(`${id}-u`, skin, hair, shirt, true, extra, hat, hatCol, stripe);
       const front = x0 === fx0 - 18 || x0 === fx1 + 4;
-      const s = this.add.image(x0, y, keep ? up : down).setOrigin(0.5, 1).setDepth(-5).setScale(front ? 1.45 : 1);
+      const s = this.add.image(x0, y, "fans-atlas", keep ? up : down).setOrigin(0.5, 1).setDepth(-5).setScale(front ? 1.45 : 1);
       this.fans.push({ s, up, down, keep, y, ph: r() * 6.28 });
     }
+    atlas.refresh();
     if (mineS && kit(mineS)) {
       const c = kit(mineS), nm = me.name.toUpperCase().slice(0, 18), left = mineS.side === 0;
       this.add.text(left ? (FIELD.x0 - 1.3) * T : (FIELD.x1 + 2.3) * T, mineS.s.y - 30, ` GO ${nm}! `, { fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold", fontSize: "12px", color: c[5], backgroundColor: c[2], padding: { x: 3, y: 2 } }).setOrigin(0.5).setAngle(left ? -90 : 90).setDepth(-3);
@@ -2065,8 +2094,8 @@ ${r1(t.points)} pts`);
       const hop = dance ? 7 : opp && t.points > opp.points ? 3 : 1.2;
       s.setOrigin(0.5, 1 + Math.abs(Math.sin(time / (dance ? 120 : 260) + t.roster_id)) * hop / 32);
       const face = dance ? Math.floor(time / 160) % 2 ? "left" : "right" : side === 0 ? "right" : "left";
-      const tk = `${key2}${face}${Math.floor(time / 300 + t.roster_id) % 2}`;
-      if (s.texture.key !== tk) s.setTexture(tk);
+      const tk = `${face}${Math.floor(time / 300 + t.roster_id) % 2}`;
+      if (s.frame.name !== tk) s.setFrame(tk);
       shadowFor(this, s);
     }
     shadowFor(this, this.player);
@@ -2088,7 +2117,7 @@ ${r1(t.points)} pts`);
       f.s.y = f.y + 12 - wave - bob - jump;
       if (!f.keep) {
         const fk = wave > 3.5 || jump > 0 ? f.up : f.down;
-        if (f.s.texture.key !== fk) f.s.setTexture(fk);
+        if (f.s.frame.name !== fk) f.s.setFrame(fk);
       }
       ;
     }

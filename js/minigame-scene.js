@@ -228,7 +228,7 @@ class MiniGameScene extends Phaser.Scene {
     const W = this.W, y0 = -this.los * YPX, xs = [0.14, 0.38, 0.62, 0.86].map((f) => Phaser.Math.Clamp(f * W, EDGE, W - EDGE));
     const glow = this.sys.renderer && this.sys.renderer.type === Phaser.WEBGL;
     const make = (team, x, y, label, facing) => {
-      const s = this.add.sprite(x, y, `team-${team.roster_id}-${facing}0`).setOrigin(0.5, 1).setScale(1.3).setDepth(1e3 + y);
+      const s = this.add.sprite(x, y, `team-${team.roster_id}-`, `${facing}0`).setOrigin(0.5, 1).setScale(1.3).setDepth(1e3 + y);
       if (team === this.opp) {
         if (glow) {
           try {
@@ -606,7 +606,7 @@ class MiniGameScene extends Phaser.Scene {
         o.vy = 0;
       }
       const dir = Math.abs(dx) > Math.abs(dy) ? dx < 0 ? "left" : "right" : dy < 0 ? "up" : "down";
-      o.s.setTexture(`team-${o.team.roster_id}-${d > 1 ? dir : o === this.qb || this.recv.includes(o) ? "up" : "down"}${d > 1 ? Math.floor(time / 120) % 4 : 0}`).setDepth(1e3 + o.s.y);
+      o.s.setTexture(`team-${o.team.roster_id}-`, `${d > 1 ? dir : o === this.qb || this.recv.includes(o) ? "up" : "down"}${d > 1 ? Math.floor(time / 120) % 4 : 0}`).setDepth(1e3 + o.s.y);
       o.t.setPosition(Phaser.Math.Clamp(o.s.x, o.t.width / 2 + 2, this.W - o.t.width / 2 - 2), o.s.y - 44 - (o.tagUp || 0));
     };
     for (const r of this.recv) {
