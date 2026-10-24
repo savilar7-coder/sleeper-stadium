@@ -63,6 +63,7 @@ const lum = (hex) => {
   const n = parseInt(hex.slice(1), 16);
   return 0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255);
 };
+const CELL = typeof location !== "undefined" && /[?&]art24=0/.test(location.search) ? 16 : 24;
 const shade = (hex, f) => "#" + [1, 3, 5].map((i) => {
   const v = parseInt(hex.slice(i, i + 2), 16), t = f > 0 ? 255 : 0;
   return Math.round(v + (t - v) * Math.abs(f)).toString(16).padStart(2, "0");
@@ -126,8 +127,8 @@ class StadiumScene extends World {
     this.spawnOffX = sx - (x0 - 3.2 * TILE);
     this.spawnDY = sy - y0;
     this.player = this.physics.add.sprite(sx, sy, "playerup0").setOrigin(0.5, 1);
-    this.player.body.setSize(14, 8).setOffset(9, 24);
-    this.player.setScale(2);
+    this.player.body.setSize(14 * CELL / 16, 8 * CELL / 16).setOffset(9 * CELL / 16, 24 * CELL / 16);
+    this.player.setScale(32 / CELL);
     this.youRing = this.add.ellipse(0, 0, 44, 16, 16767050, 0.35).setStrokeStyle(2, 16767050, 0.9);
     this.youTag = this.label(0, 0, "\u25C0 YOU", "#1d140c").setStyle({ backgroundColor: "#ffd84a" }).setFontSize(Math.round(15 * DPR));
     const picked = this.league.teams.some((t) => t.mine);
@@ -852,7 +853,8 @@ class StadiumScene extends World {
           CUT_SHEETS.set(t.roster_id, sheet);
         }
         this.makeTeamSheet(key, sheet);
-        const s = this.add.sprite(x, y, key, `${side === 0 ? "right" : "left"}0`).setOrigin(0.5, 1).setDepth(y).setScale(2);
+        const s = this.add.sprite(x, y, key, `${side === 0 ? "right" : "left"}0`).setOrigin(0.5, 1).setDepth(y);
+        s.setScale(s.base = 64 / s.frame.width);
         this.add.ellipse(x, y - 1, 34, 10, 663304, 0.55).setDepth(y - 4);
         if (t.gold) {
           s.setTint(16769126, 16769126, 16756736, 16756736);
@@ -1158,10 +1160,10 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
   makeFootballer() {
     const me = this.league.teams.find((t) => t.mine), kit = kitOf(me);
     const C = kit ? { K: kit[0], KL: kit[3], GOLD: kit[1], GL: kit[5], PUR: kit[2], PL: kit[3], PD: kit[4], WH: kit[6], WD: kit[6] === "#f4f1ea" ? "#cfcac0" : kit[6] } : {};
-    const draw = (dir, f, pose) => this.footballerGrid(dir, f, pose, C);
+    const draw = (dir, f, pose) => CELL === 24 ? this.footballerGrid24(dir, f, pose, C) : this.footballerGrid(dir, f, pose, C);
     const put = (key, grid) => {
       if (this.textures.exists(key)) this.textures.remove(key);
-      const ct = this.textures.createCanvas(key, 32, 32), c = ct.getContext();
+      const ct = this.textures.createCanvas(key, CELL * 2, CELL * 2), c = ct.getContext();
       grid.forEach((rw, y) => rw.forEach((col, x) => {
         if (col) {
           c.fillStyle = col;
@@ -1181,10 +1183,11 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
   makeTeamSheet(key, who) {
     const src = `a-ch-${who}`;
     if (this.textures.exists(key) || !this.textures.exists(src)) return;
-    const ct = this.textures.createCanvas(key, 128, 224), c = ct.getContext();
+    const img = this.textures.get(src).getSourceImage(), u = img.width / 4, d = u * 2;
+    const ct = this.textures.createCanvas(key, d * 4, d * 7), c = ct.getContext();
     c.imageSmoothingEnabled = false;
-    c.drawImage(this.textures.get(src).getSourceImage(), 0, 0, 64, 112, 0, 0, 128, 224);
-    const add = (name, col, row) => ct.add(name, 0, col * 32, row * 32, 32, 32);
+    c.drawImage(img, 0, 0, u * 4, u * 7, 0, 0, d * 4, d * 7);
+    const add = (name, col, row) => ct.add(name, 0, col * d, row * d, d, d);
     ["down", "up", "left", "right"].forEach((dir, col) => {
       for (let row = 0; row < 4; row++) add(`${dir}${row}`, col, row);
       add(`${dir}G`, col, 4);
@@ -1212,20 +1215,166 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
       big: (Number(look.slice(2)) || 0) % 3 === 1,
       SKIN: ["#e8b48f", "#c98d68", "#9c6440", "#6f4428"][(Number(look.slice(2)) || 0) % 4]
     };
-    const ct = this.textures.createCanvas(key, 64, 112), c = ct.getContext();
-    const put = (ox, oy, grid) => grid.forEach((rw, y) => rw.forEach((col, x) => {
+    const U = CELL, ct = this.textures.createCanvas(key, U * 4, U * 7), c = ct.getContext(), grid = (d, r, p) => U === 24 ? this.footballerGrid24(d, r, p, C) : this.footballerGrid(d, r, p, C);
+    const put = (ox, oy, gr) => gr.forEach((rw, y) => rw.forEach((col, x) => {
       if (col) {
         c.fillStyle = col;
         c.fillRect(ox + x, oy + y, 1, 1);
       }
     }));
     ["down", "up", "left", "right"].forEach((dir, col) => {
-      for (let row = 0; row < 4; row++) put(col * 16, row * 16, this.footballerGrid(dir, row, null, C));
-      put(col * 16, 64, this.footballerGrid(dir, 0, "G", C));
+      for (let row = 0; row < 4; row++) put(col * U, row * U, grid(dir, row, null));
+      put(col * U, 4 * U, grid(dir, 0, "G"));
     });
-    put(16, 96, this.footballerGrid("down", 0, "item", C));
+    put(U, 6 * U, grid("down", 0, "item"));
     ct.refresh();
     return name;
+  }
+  footballerGrid24(dir, f, pose, C) {
+    const { K = "#141018", GOLD = "#c9a227", GL = "#ffd84a", PUR = "#3b2390", PL = "#5a3dbd", PD = "#241773", WH = "#f4f1ea", WD = "#cfcac0", head, big } = C, tw = big ? 1 : 0;
+    const ARM = lum(PUR) < 60 ? GL : PL, SK = head ? mascotFur(head) : C.SKIN || "#c98d68", MASK = Math.abs(lum(GOLD) - lum(K)) > 50 ? GOLD : "#9aa1aa";
+    const BALL = "#8a4a22", CLEAT = "#141018", E = "#141018", KD = shade(K, -0.35), N = 24;
+    const g = [...Array(N)].map(() => Array(N).fill(null)), px = (x, y, col) => {
+      if (x >= 0 && x < N && y >= 0 && y < N) g[y][x] = col;
+    };
+    const rect = (x, y, w, h, col) => {
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) px(x + i, y + j, col);
+    };
+    const side = dir === "right" || dir === "left", step = [0, 1, 0, -1][f] || 0, bob = f % 2, ly = 17, jy = 10 + bob, jh = 6 - bob, hy = 1 + bob;
+    if (side) {
+      const a = 12 + step, b = 7 - step;
+      rect(7, ly, 9, 1, WH);
+      rect(b, ly + 1, 3, 2, WD);
+      rect(b, ly + 3, 3, 2, PD);
+      rect(b - 1, ly + 5, 4, 1, CLEAT);
+      rect(a, ly + 1, 3, 2, WH);
+      rect(a, ly + 3, 3, 2, PUR);
+      rect(a, ly + 5, 4, 1, CLEAT);
+    } else {
+      const l = step > 0 ? 1 : 0, r = step < 0 ? 1 : 0;
+      rect(7, ly, 5, 2, WH);
+      rect(12, ly, 5, 2, WD);
+      rect(7, ly + 2, 4, 1 - l, WH);
+      rect(13, ly + 2, 4, 1 - r, WD);
+      rect(7, ly + 3 - l, 4, 2, PUR);
+      rect(13, ly + 3 - r, 4, 2, PD);
+      rect(6, ly + 5 - l, 5, 1, CLEAT);
+      rect(13, ly + 5 - r, 5, 1, CLEAT);
+    }
+    if (side) {
+      rect(5 - tw, jy + 1, 11 + 2 * tw, jh - 1, PUR);
+      rect(4 - tw, jy, 13 + 2 * tw, 2, PL);
+      rect(5 - tw, jy + 2, 1, jh - 2, PD);
+      rect(6 - tw, jy + jh, 10 + 2 * tw, 1, PD);
+      rect(8, jy + 2, 3, 3, GL);
+      px(9, jy + 3, PUR);
+    } else {
+      rect(5 - tw, jy + 1, 14 + 2 * tw, jh - 1, PUR);
+      rect(3 - tw, jy, 18 + 2 * tw, 2, PL);
+      rect(17 + tw, jy + 2, 2, jh - 2, PD);
+      rect(3 - tw, jy, 3, 1, GOLD);
+      rect(18 + tw, jy, 3, 1, GOLD);
+      rect(6 - tw, jy + jh, 12 + 2 * tw, 1, PD);
+      if (dir === "down") {
+        rect(10, jy + 2, 4, 4 - bob, GL);
+        rect(11, jy + 3, 2, 2 - bob, PUR);
+      } else {
+        rect(9, jy + 2, 6, 4 - bob, GL);
+        rect(11, jy + 3, 2, 2 - bob, PUR);
+      }
+    }
+    if (pose === "G") {
+      if (side) {
+        rect(12, jy + 1, 6, 2, ARM);
+        rect(18, jy + 1, 1, 2, SK);
+      } else {
+        rect(0, jy + 1, 3, 2, ARM);
+        rect(21, jy + 1, 3, 2, ARM);
+        px(0, jy + 3, SK);
+        px(23, jy + 3, SK);
+      }
+    } else if (pose === "item") {
+      rect(3, jy - 5, 2, 6, ARM);
+      rect(19, jy - 5, 2, 6, ARM);
+      rect(3, jy - 6, 2, 1, SK);
+      rect(19, jy - 6, 2, 1, SK);
+      rect(18, jy - 9, 4, 3, BALL);
+      px(19, jy - 8, WH);
+      px(20, jy - 8, WH);
+    } else if (side) {
+      rect(16, jy + 2, 2, 1, BALL);
+      rect(15, jy + 3, 4, 1, BALL);
+      rect(16, jy + 4, 3, 1, BALL);
+      px(17, jy + 3, WH);
+      rect(12 - step, jy + 1, 3, 3, ARM);
+      px(14 - step, jy + 4, SK);
+    } else {
+      rect(1 - tw, jy + 2 + Math.max(0, step), 2, 4, ARM);
+      rect(21 + tw, jy + 2 + Math.max(0, -step), 2, 4, ARM);
+      rect(1 - tw, jy + 6 + Math.max(0, step), 2, 1, SK);
+      rect(21 + tw, jy + 6 + Math.max(0, -step), 2, 1, SK);
+      if (dir === "down") {
+        rect(19 + tw, jy + 4, 3, 2, BALL);
+        px(20 + tw, jy + 4, WH);
+      }
+    }
+    if (head) {
+      const mh = mascotHead(head, dir, K, GOLD);
+      for (let y = 0; y < 10; y++) for (let x = 0; x < 16; x++) {
+        const col = mh[Math.floor(y * 8 / 10)][Math.floor(x * 12 / 16)];
+        if (col) px((side ? 5 : 4) + x, hy - 1 + y, col);
+      }
+    } else if (side) {
+      rect(8, hy, 6, 1, K);
+      rect(6, hy + 1, 10, 1, K);
+      rect(5, hy + 2, 12, 1, K);
+      rect(4, hy + 3, 13, 4, K);
+      rect(5, hy + 7, 9, 1, KD);
+      rect(6, hy + 8, 7, 1, KD);
+      rect(8, hy, 6, 1, GOLD);
+      rect(6, hy + 1, 2, 1, GOLD);
+      px(5, hy + 2, GOLD);
+      px(10, hy + 2, shade(K, 0.6));
+      px(11, hy + 2, shade(K, 0.6));
+      px(9, hy + 3, shade(K, 0.35));
+      px(12, hy + 5, KD);
+      rect(7, hy + 4, 3, 2, GL);
+      px(7, hy + 4, shade(GL, 0.45));
+      px(9, hy + 5, shade(GL, -0.3));
+      rect(14, hy + 3, 3, 4, SK);
+      rect(14, hy + 7, 3, 1, shade(SK, -0.25));
+      rect(15, hy + 4, 1, 2, E);
+      rect(17, hy + 3, 1, 5, MASK);
+      rect(19, hy + 4, 1, 4, MASK);
+      rect(17, hy + 5, 3, 1, MASK);
+      rect(17, hy + 7, 3, 1, MASK);
+    } else {
+      rect(8, hy, 8, 1, K);
+      rect(6, hy + 1, 12, 7, K);
+      rect(7, hy + 8, 10, 1, KD);
+      rect(17, hy + 2, 1, 5, shade(K, -0.35));
+      if (dir === "up") {
+        rect(11, hy, 2, 9, GOLD);
+        px(8, hy + 2, shade(K, 0.6));
+        px(9, hy + 2, shade(K, 0.35));
+        rect(6, hy + 7, 12, 1, KD);
+        px(11, hy + 8, GOLD);
+        px(12, hy + 8, GOLD);
+      } else {
+        rect(11, hy, 2, 3, GOLD);
+        px(8, hy + 2, shade(K, 0.6));
+        px(9, hy + 2, shade(K, 0.35));
+        rect(8, hy + 3, 8, 4, SK);
+        rect(9, hy + 4, 1, 2, E);
+        rect(14, hy + 4, 1, 2, E);
+        rect(11, hy + 3, 2, 5, MASK);
+        rect(8, hy + 6, 8, 1, MASK);
+        rect(9, hy + 7, 6, 1, MASK);
+      }
+    }
+    const out = g.map((rw) => rw.slice());
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (!g[y][x] && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => g[y + dy] && g[y + dy][x + dx] && g[y + dy][x + dx] !== "#1d140c")) out[y][x] = "#1d140c";
+    return dir === "left" ? out.map((rw) => rw.slice().reverse()) : out;
   }
   footballerGrid(dir, f, pose, C) {
     const { K = "#141018", KL = "#33293f", GOLD = "#c9a227", GL = "#ffd84a", PUR = "#3b2390", PL = "#5a3dbd", PD = "#241773", WH = "#f4f1ea", WD = "#cfcac0", head, big } = C, tw = big ? 1 : 0;
@@ -1878,7 +2027,7 @@ ${r1(t.points)} pts`);
       } else if (Math.random() < 0.5) {
         S.act = now + 700;
         S.actType = "stretch";
-        this.tweens.add({ targets: S.s, scaleY: 2.33, scaleX: 1.8, duration: 220, hold: 200, yoyo: true });
+        this.tweens.add({ targets: S.s, scaleY: S.s.base * 1.165, scaleX: S.s.base * 0.9, duration: 220, hold: 200, yoyo: true });
       } else {
         S.act = now + 1600;
         S.actType = "juggle";
@@ -1922,7 +2071,7 @@ ${r1(t.points)} pts`);
           onComplete: () => {
             ball.destroy();
             shadow.destroy();
-            this.tweens.add({ targets: to, scaleX: 3.07, scaleY: 2.33, duration: 90, yoyo: true, ease: "Quad.easeOut" });
+            this.tweens.add({ targets: to, scaleX: (to.base || 2) * 1.535, scaleY: (to.base || 2) * 1.165, duration: 90, yoyo: true, ease: "Quad.easeOut" });
           }
         });
       }

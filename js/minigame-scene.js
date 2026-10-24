@@ -235,7 +235,8 @@ class MiniGameScene extends Phaser.Scene {
     const W = this.W, y0 = -this.los * YPX, xs = [0.14, 0.38, 0.62, 0.86].map((f) => Phaser.Math.Clamp(f * W, EDGE, W - EDGE));
     const glow = this.sys.renderer && this.sys.renderer.type === Phaser.WEBGL;
     const make = (team, x, y, label, facing) => {
-      const s = this.add.sprite(x, y, `team-${team.roster_id}-`, `${facing}0`).setOrigin(0.5, 1).setScale(1.3).setDepth(1e3 + y);
+      const s = this.add.sprite(x, y, `team-${team.roster_id}-`, `${facing}0`).setOrigin(0.5, 1).setDepth(1e3 + y);
+      s.setScale(1.3 * 32 / s.frame.width);
       if (team === this.opp) {
         if (glow) {
           try {
