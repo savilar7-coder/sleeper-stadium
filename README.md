@@ -8,28 +8,36 @@ if you like it, a ⭐ helps a lot
 
 [![Sleeper Stadium: a live league on one field](stadium.gif)](https://stadium.lamaisonwebstudio.com/)
 
-**What's on the field**
-- 📺 **Live scores and projections** for every matchup, straight from Sleeper's public API
-- 📊 **Score bars**: the outline is the projected total, the fill is live points
-- 🔥 **Fire** on the top 2 scores, 🌧️ **rain** on the bottom 2
-- 🏈 **Touchdown alerts**: a banner with the player who scored when a team jumps 4+ points
-- 🔦 **Top scorer spotlight** on the week's highest scorer
-- 🚽 **The ASS Bowl**: the two worst records sit on toilet thrones under their own sign; the top matchup stands on Greek podiums
-- 🪑 **Bench of shame** for whoever left the most points on the bench
-- 🦓 A **referee** who throws a yellow flag at negative scores
-- 📺 A **jumbotron** (standings, biggest blowout, closest game), a **trophy case** of past champions,
-  a **blimp** with your own banner, cheerleaders, a tailgate, and a stadium full of fans doing the wave
-- 👑 **Rosters, picks, standings, league news** and a simple **trade maker** in the menus
-- Pick your team and walk the field as a little football player
-- 📰 A **news ticker** along the bottom, and a **🔗 Share** button that sends your league's own link to the group chat
+**On game day**
+- 📺 **Live scores every minute** for every matchup, with projections, players still to play and **win odds** on a
+  tug-of-war rope (yours says **YOU 57%**)
+- 🏈 **Touchdown banners** with the player who scored, a **BIG SWING** line when a game flips, and a live feed of the
+  biggest plays along the bottom
+- 🔥 / 🌧️ fire on the hot teams, rain on the cold ones, 🚽 the **ASS Bowl** on toilet thrones, 🪑 the **bench of shame**
+- ⚠️ A lineup alert if you're starting someone on bye or an empty slot
+
+**All week**
+- 🏅 **Weekly awards**: MVP, biggest blowout, closest game, unluckiest loss, luckiest win, all in one shareable picture
+- 🏆 **Table** with the league's real playoff line, **playoff odds** (2,000 simulated seasons, with how they moved since
+  last week), points against, and **all-play records** that show who's actually good and who's just lucky
+- 💰 A **waiver board**: the biggest FAAB bids and who lost out on them
+- ⚔️ **Matchup** view slot by slot, this season's head-to-head and the **all-time rivalry** record
+- 🎮 **The 2-Minute Drill**: play your matchup as a little Retro Bowl-style game, your real starters against theirs,
+  playing like their real week. Share the result as a challenge link
+- 📅 A short catch-up when you open it in a new week: your record, rank and playoff odds since your last visit
+
+**Also**
+- Works with **Sleeper** (type your username, it finds your leagues) and **public ESPN leagues** (paste the link)
+- 📺 **TV mode** (`?tv=1`) for a TV or a stream: no buttons, the camera tours the matchups by itself
+- Rosters, picks, news, a simple trade maker, past champions, and a stadium full of fans doing the wave
+- Reduced-motion friendly, keyboard friendly, fast on phones
 
 ## Use it
 
-1. Find your Sleeper league ID: in the Sleeper app, **League → Settings → General → League ID** (or the long number in
-   your league's web address).
-2. Open the page and paste it, or link straight to `https://<your-site>/?league=<LEAGUE_ID>`.
+Open **[stadium.lamaisonwebstudio.com](https://stadium.lamaisonwebstudio.com/)**, type your Sleeper username (or paste an
+ESPN league link) and pick your league. Then share your league's own link in the group chat.
 
-That's it: no accounts, no keys, no server. Everything is read-only and comes from Sleeper's public API in the browser.
+No accounts, no keys, no server. Everything is read-only and comes from Sleeper's (or ESPN's) public API in your browser.
 
 ## Host your own copy (free)
 
@@ -48,7 +56,7 @@ Mascots can go in the link too: `&looks=<roster_id>.<Look>,...` (look names are 
 python -m http.server 8080
 ```
 
-Then open `http://localhost:8080/?league=<LEAGUE_ID>`.
+Then open `http://localhost:8080/` and type a Sleeper username, or go straight to `http://localhost:8080/?league=<LEAGUE_ID>`.
 
 ## Notes
 
