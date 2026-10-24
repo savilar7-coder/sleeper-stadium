@@ -839,7 +839,7 @@ function standings() {
             el("td", { class: "num" }, t.fpts_against != null ? fmt(t.fpts_against) : "\u2013"),
             pod ? el("td", { class: "num" }, oddsCell(t)) : null
           ),
-          i + 1 === po && i + 1 < rows.length ? el("tr", {}, el("td", { colspan: pod ? "6" : "5", style: "padding:1px 0;border-top:3px dashed #c9a227;font-size:11px;color:#9e7c0c;text-align:center" }, "\u2014 playoff line \u2014")) : null
+          i + 1 === po && i + 1 < rows.length ? el("tr", {}, el("td", { colspan: pod ? "6" : "5", style: "padding:1px 0;border-top:3px dashed #c9a227;font-size:11px;color:#7a5f08;text-align:center" }, "\u2014 playoff line \u2014")) : null
         ])
       ),
       el("p", { class: "small" }, `Top ${po} make the playoffs (from week ${poWeek}). PF / PA = points for / against.${pod && rows.some((t, i) => i >= po && rows.slice(0, po).some((u) => (pod[t.roster_id] || 0) > (pod[u.roster_id] || 0))) ? " A team below the line can have better odds: they weigh points scored and the schedule left, not only W-L." : ""}${pod ? " Playoffs = 2,000 simulated rest-of-seasons from this season's scores (\u25B2\u25BC vs last week)." : ""}`),
@@ -861,6 +861,33 @@ function standings() {
       tr.length ? [el("h3", {}, "Season trophies"), el("div", { class: "chips" }, tr.map((x) => el("span", { class: "chip" }, x)))] : null,
       L.champs.length ? [el("h3", {}, "Champions"), el("div", { class: "chips" }, L.champs.map((c) => el("span", { class: "chip gold" }, `\u{1F3C6} ${c.season}: ${c.team}`)))] : null
     ];
+  });
+}
+async function tradeLedger() {
+  const weeks = [];
+  for (let w = 1; w <= Number(L.week); w++) weeks.push(w);
+  const tx = (await Promise.all(weeks.map((w) => get(`${API}/league/${L.id}/transactions/${w}`).catch(() => [])))).flat().filter((x) => x.type === "trade" && x.status === "complete");
+  const { all } = await pastWeeks(), byWeek = {};
+  all.forEach((ms, i) => {
+    const m = byWeek[i + 1] = {};
+    for (const t of ms || []) Object.assign(m, t.players_points || {});
+  });
+  const cur = byWeek[Number(L.week)] = {};
+  for (const t of L.teams) Object.assign(cur, t.players_points || {});
+  const since = (pid, w0) => Object.entries(byWeek).reduce((n, [w, m]) => n + (Number(w) >= w0 ? m[pid] || 0 : 0), 0);
+  const name = (rid) => (L.teams.find((t) => t.roster_id === rid) || {}).name || `Team ${rid}`;
+  return tx.sort((a, b) => b.status_updated - a.status_updated).map((x) => {
+    const w0 = x.leg || 1, sides = (x.roster_ids || []).map((rid) => {
+      const got = Object.entries(x.adds || {}).filter(([, r]) => r === rid).map(([pid]) => pid);
+      const picks = (x.draft_picks || []).filter((pk) => pk.owner_id === rid).map((pk) => `${pk.season} R${pk.round}`);
+      return { rid, got, picks, pts: got.reduce((n, pid) => n + since(pid, w0), 0) };
+    }).sort((a, b) => b.pts - a.pts);
+    return el(
+      "div",
+      { class: "need" },
+      el("b", {}, `Week ${w0}: ${sides.map((sd) => `${name(sd.rid)} +${fmt(sd.pts)}`).join(" \xB7 ")}`),
+      el("span", {}, sides.map((sd) => `${name(sd.rid)} got ${[...sd.got.map(pname), ...sd.picks].join(", ") || "nothing"}`).join(" | "))
+    );
   });
 }
 function news() {
@@ -907,7 +934,27 @@ function news() {
     b.onclick = () => b.replaceWith(el("div", { class: "needs" }, more));
     return b;
   })() : null;
-  openPanel("\u{1F4F0} League news", async () => [waiverBoard, L.news.length ? el("p", { class: "small" }, `${trades.length} trade${trades.length === 1 ? "" : "s"} \xB7 ${moves.length} waiver / free-agent move${moves.length === 1 ? "" : "s"} (last 2 weeks)`) : null, rows.length ? el("div", { class: "needs" }, rows) : el("div", { class: "empty" }, L.espn ? "ESPN trades and waivers aren\u2019t shown here yet." : "Quiet week."), moreBtn]);
+  const ledgerBtn = L.espn ? null : (() => {
+    const b = el("button", { type: "button", style: "display:block;margin:8px auto;border:1px dashed #9e7c0c;background:none;border-radius:8px;padding:4px 10px;font-weight:600;cursor:pointer;min-height:44px" }, "\u{1F4D2} Season trade ledger");
+    b.onclick = async () => {
+      b.disabled = true;
+      b.textContent = "Adding up every trade\u2026";
+      try {
+        const rows2 = await tradeLedger();
+        b.replaceWith(el(
+          "div",
+          {},
+          el("h3", {}, "\u{1F4D2} Trade ledger"),
+          rows2.length ? el("div", { class: "needs" }, rows2) : el("div", { class: "empty" }, "No trades yet this season."),
+          el("p", { class: "small" }, "Real fantasy points scored for each side since the week of the trade (players only; picks count once they become players).")
+        ));
+      } catch {
+        b.textContent = "Could not add them up right now";
+      }
+    };
+    return b;
+  })();
+  openPanel("\u{1F4F0} League news", async () => [waiverBoard, ledgerBtn, L.news.length ? el("p", { class: "small" }, `${trades.length} trade${trades.length === 1 ? "" : "s"} \xB7 ${moves.length} waiver / free-agent move${moves.length === 1 ? "" : "s"} (last 2 weeks)`) : null, rows.length ? el("div", { class: "needs" }, rows) : el("div", { class: "empty" }, L.espn ? "ESPN trades and waivers aren\u2019t shown here yet." : "Quiet week."), moreBtn]);
 }
 function tradeMaker(partnerId) {
   const me = mine();
@@ -1138,8 +1185,9 @@ function drillTeaser() {
     playGame();
   };
   b.querySelector(".dt-x").onclick = () => b.remove();
+  b.setAttribute("role", "status");
   document.body.appendChild(b);
-  setTimeout(() => b.remove(), 12e3);
+  if (!window.__calm) setTimeout(() => b.remove(), 12e3);
 }
 async function weekDigest() {
   const me = mine();
@@ -1171,8 +1219,9 @@ async function weekDigest() {
     el("button", { type: "button", class: "rr-x", "aria-label": "Close", style: "margin-left:4px;border:0;background:none;color:#fff4d6;font-size:16px" }, "\xD7")
   );
   b.querySelector(".rr-x").onclick = () => b.remove();
+  b.setAttribute("role", "status");
   document.body.appendChild(b);
-  setTimeout(() => b.remove(), 12e3);
+  if (!window.__calm) setTimeout(() => b.remove(), 12e3);
 }
 function recapReady() {
   if (window.__tv) return;
@@ -1193,9 +1242,16 @@ function recapReady() {
     recap();
   };
   b.querySelector(".rr-x").onclick = () => b.remove();
+  b.setAttribute("role", "status");
   document.body.appendChild(b);
-  setTimeout(() => b.remove(), 15e3);
+  if (!window.__calm) setTimeout(() => b.remove(), 15e3);
 }
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") for (const id of ["recap-ready", "drill-tease"]) {
+    const n = document.getElementById(id);
+    if (n) n.remove();
+  }
+});
 function awardsList() {
   const pct = (t) => {
     const g = t.wins + t.losses + t.ties;
@@ -1358,13 +1414,33 @@ async function gameStatus() {
   } catch {
   }
 }
+const koSeen = {};
+function leftShare(team) {
+  const k = `st-ko-${L.season}-${L.week}`;
+  if (!koSeen[k]) {
+    try {
+      koSeen[k] = JSON.parse(store(k) || "{}");
+    } catch {
+      koSeen[k] = {};
+    }
+  }
+  const m = koSeen[k];
+  if (!m[team]) {
+    m[team] = Date.now();
+    try {
+      store(k, JSON.stringify(m));
+    } catch {
+    }
+  }
+  return Math.max(0.05, 1 - (Date.now() - m[team]) / (3 * 36e5));
+}
 function liveProj(t) {
   const G = L.games || {};
   return (t.starters || []).reduce((n, pid, i) => {
     const pre = L.proj[pid] || 0, got = (t.starters_points || [])[i] || 0;
     const team = L.players[pid] ? L.players[pid][2] : pid, st = G[team];
     if (st === "complete") return n + got;
-    if (st === "in_game") return n + got + Math.max(0, pre - got) * 0.5;
+    if (st === "in_game") return n + got + Math.max(0, pre - got) * leftShare(team);
     return n + (got || pre);
   }, 0);
 }

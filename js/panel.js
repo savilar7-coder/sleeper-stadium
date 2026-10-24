@@ -9,7 +9,9 @@ function el(tag, attrs = {}, ...kids) {
   return e;
 }
 let closing = null;
+let opener = null;
 function openPanel(title, build, wide = false) {
+  if (!panelOpen) opener = document.activeElement;
   document.querySelectorAll(".st-toast").forEach((x) => x.remove());
   clearTimeout(closing);
   $("panel").classList.remove("closing");
@@ -19,12 +21,15 @@ function openPanel(title, build, wide = false) {
   const body = $("panel-body");
   body.replaceChildren(el("div", { class: "empty" }, "Loading\u2026"));
   $("panel").hidden = false;
+  $("panel-close").focus({ preventScroll: true });
   build().then((nodes) => body.replaceChildren(...[nodes].flat(Infinity).filter((n) => n != null))).catch((err) => body.replaceChildren(el("div", { class: "empty" }, `Could not load: ${err.message}`)));
 }
 function closePanel() {
   setPanelOpen(false);
   const p = $("panel");
   if (p.hidden) return;
+  if (opener && opener.focus && document.contains(opener)) opener.focus({ preventScroll: true });
+  opener = null;
   if (window.__calm) {
     p.hidden = true;
     return;
@@ -39,6 +44,19 @@ function closePanel() {
 $("panel-close").addEventListener("click", closePanel);
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && panelOpen) closePanel();
+});
+window.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab" || !panelOpen) return;
+  const f = [...$("panel").querySelectorAll('button, a[href], input, select, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled && x.offsetParent);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
 });
 export {
   closePanel,

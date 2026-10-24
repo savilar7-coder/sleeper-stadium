@@ -127,6 +127,10 @@ class MiniGameScene extends Phaser.Scene {
     this.ballShadow = this.add.ellipse(0, 0, 14, 6, 0, 0.3).setDepth(900).setVisible(false);
     this.aimG = this.add.graphics().setDepth(4e3);
     this.input.on("pointerdown", (p) => this.tap(this.cameras.main.getWorldPoint(p.x, p.y)));
+    this.input.keyboard && this.input.keyboard.on("keydown-ESC", () => {
+      const x = $(this.state === "end" ? "mg-end-exit" : "mg-exit");
+      if (x) x.click();
+    });
     this.nextDrive();
   }
   drawField() {
@@ -501,6 +505,11 @@ class MiniGameScene extends Phaser.Scene {
   banner(txt, color) {
     const v = this.view(), cy = v.y - this.H * 0.12;
     const b = this.add.text(v.x, cy - this.H * 0.4, txt, { fontFamily: "Pixelify Sans", fontSize: "40px", fontStyle: "bold", color, stroke: "#2b1d12", strokeThickness: 6 }).setOrigin(0.5).setResolution(DPR).setDepth(9900);
+    if (calm()) {
+      b.y = cy;
+      this.time.delayedCall(1450, () => b.destroy());
+      return;
+    }
     this.tweens.add({ targets: b, y: cy, duration: 400, ease: "Back.easeOut", onComplete: () => this.tweens.add({ targets: b, alpha: 0, delay: 1200, duration: 250, onComplete: () => b.destroy() }) });
   }
   touchdown() {
@@ -550,6 +559,8 @@ class MiniGameScene extends Phaser.Scene {
     this.msg.hidden = true;
     $("mg-exit").hidden = true;
     $("mg-end").hidden = false;
+    const again = $("mg-again");
+    if (again) again.focus({ preventScroll: true });
     this.hud.classList.add("mg-over");
     $("mg-share").dataset.text = `${$("mg-end-title").textContent.replace(" \u2014 run it back", "")}${top ? ` \xB7 ${$("mg-end-stat").textContent}` : ""} \xB7 ${ats} \xB7 beat that in the 2-Minute Drill \u{1F3C8}`;
     if (win) sfx.cheer && sfx.cheer();

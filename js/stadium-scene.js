@@ -909,9 +909,8 @@ class StadiumScene extends World {
         const was = prevSP[t.roster_id] || [], P = this.league.players || {};
         (t.starters_points || []).forEach((pts, i) => {
           const up = pts - (was[i] || 0), pid = (t.starters || [])[i];
-          if (up > 0.05 && pid) (this.league.feed = this.league.feed || []).unshift(`${P[pid] ? String(P[pid][0]).replace(/^(\S)\S*\s+/, "$1. ") : pid} +${up.toFixed(1)} \u2192 ${t.name.length > 16 ? `${t.name.slice(0, 15)}\u2026` : t.name}`);
+          if (up > 0.05 && pid) (this.feedNew = this.feedNew || []).push({ up, text: `${P[pid] ? P[pid][1] === "DEF" ? String(P[pid][0]) : String(P[pid][0]).replace(/^(\S)\S*\s+/, "$1. ") : pid} +${up.toFixed(1)} \u2192 ${t.name.length > 16 ? `${t.name.slice(0, 15)}\u2026` : t.name}` });
         });
-        if (this.league.feed) this.league.feed.length = Math.min(this.league.feed.length, 4);
       }
       prev[t.roster_id] = t.points;
       prevSP[t.roster_id] = (t.starters_points || []).slice();
@@ -919,6 +918,10 @@ class StadiumScene extends World {
     this.prevPts = prev;
     this.prevSP = prevSP;
     this.lastScoreAt = nowMs;
+    if (this.feedNew && this.feedNew.length) {
+      this.league.feed = [...this.feedNew.sort((x, y) => y.up - x.up).map((x) => x.text), ...this.league.feed || []].slice(0, 4);
+      this.feedNew = [];
+    }
     const odds = this.prevOdds = this.prevOdds || {};
     for (const { a, b } of this.boards || []) {
       const k = `${a.roster_id}-${b.roster_id}`, pa = this.winChance(a, b), was = odds[k];
@@ -1039,7 +1042,7 @@ ${fav.name} now ${now}% (was ${before}%)`;
     this.spawnOffset = false;
     const hud = document.getElementById("st-hud"), hudH = hud ? hud.getBoundingClientRect().bottom : 0;
     cam.stopFollow();
-    cam.pan((FIELD.x0 + FIELD.x1 + 1) / 2 * TILE, B.board.y - 10 - hudH * this.scale.height / window.innerHeight / 2 / cam.zoom, 1200, "Sine.easeInOut", true);
+    cam.pan((FIELD.x0 + FIELD.x1 + 1) / 2 * TILE, B.board.y - 10 - hudH * this.scale.height / window.innerHeight / 2 / cam.zoom, window.__calm ? 0 : 1200, "Sine.easeInOut", true);
   }
   nudgeCamera(x, y, shake) {
     const cam = this.cameras.main;
@@ -1090,6 +1093,7 @@ ${fav.name} now ${now}% (was ${before}%)`;
     this.lastBannerAt = Date.now();
     const el2 = document.createElement("div");
     el2.className = "td-banner" + (item.mine ? " mine" : "") + (window.__calm ? " calm" : "");
+    el2.setAttribute("role", "status");
     el2.innerHTML = `<b></b><i></i><span></span>`;
     el2.querySelector("b").textContent = item.text;
     el2.querySelector("i").textContent = item.who || "";
@@ -1500,7 +1504,8 @@ ${fav.name} now ${now}% (was ${before}%)`;
     const live = pairs.filter((p) => p.a.points > 0 && p.b.points > 0);
     const name = (t) => t.name.length > 16 ? `${t.name.slice(0, 15)}\u2026` : t.name;
     const pages = [];
-    if ((L.feed || []).length) pages.push(`\u{1F3C8} LIVE
+    const allDone = Object.keys(L.games || {}).length && Object.values(L.games).every((x) => x === "complete");
+    if ((L.feed || []).length) pages.push(`${allDone ? "\u{1F3C1} LAST PLAYS" : "\u{1F3C8} LIVE"}
 ${L.feed.join("\n")}`);
     else {
       const P = L.players || {}, best = [];

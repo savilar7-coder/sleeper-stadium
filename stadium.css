@@ -202,3 +202,12 @@ body.tv .td-banner { zoom: 1.5; }
 #mg-end-line { font: 600 14px "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #2b1d12; } 
 
 .td-banner span { white-space: pre-line; } 
+.td-banner b { font-size: clamp(18px, 6vw, 26px); } 
+
+
+#panel-body button, .mu-share, #mg-exit, #gh-star { min-height: 44px; }
+#recap-ready .rr-x, #drill-tease .dt-x { min-width: 44px; min-height: 44px; }
+#drill-tease .dt-go, #recap-ready .rr-go { min-height: 36px; }
+#mg-again { background: #b0561c; }
+.mu-team small { color: #5a4a33; }
+#gh-star { display: inline-flex; align-items: center; justify-content: center; } 
