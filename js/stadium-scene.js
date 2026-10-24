@@ -79,6 +79,11 @@ class StadiumScene extends World {
   create() {
     this.uiTexts = [];
     this.uiScale = 1;
+    this.moods = new Map();
+    this.podiums = new Map();
+    this.thrones = new Set();
+    this.tdQueue = [];
+    this.nudging = false;
     makeTextures(this);
     makeDecorTextures(this);
     this.makeFootballer();
@@ -104,7 +109,11 @@ class StadiumScene extends World {
     this.addLife();
     this.addProps();
     this.nightLights(W, H);
-    this.player = this.physics.add.sprite(((FIELD.x0 + FIELD.x1 + 1) / 2 + 3.2) * TILE, (FIELD.y0 + 10.2) * TILE, "playerup0").setOrigin(0.5, 1);
+    const mineTS = [...this.teamSprites.values()].find((x) => x.t.mine), x0 = ((FIELD.x0 + FIELD.x1 + 1) / 2 + 3.2) * TILE, y0 = (FIELD.y0 + 10.2) * TILE;
+    const sx = mineTS ? mineTS.s.x + (mineTS.side === 0 ? 0.7 : -0.7) * TILE : x0, sy = mineTS ? mineTS.s.y + 1.6 * TILE : y0;
+    this.spawnOffX = sx - (x0 - 3.2 * TILE);
+    this.spawnDY = sy - y0;
+    this.player = this.physics.add.sprite(sx, sy, "playerup0").setOrigin(0.5, 1);
     this.player.body.setSize(14, 8).setOffset(9, 24);
     this.player.setScale(1.5);
     this.youRing = this.add.ellipse(0, 0, 44, 16, 16767050, 0.35).setStrokeStyle(2, 16767050, 0.9);
@@ -116,8 +125,8 @@ class StadiumScene extends World {
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.blockers);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.spawnOffY = window.innerWidth < 600 ? 0 : 40;
-    this.cameras.main.setFollowOffset(3.2 * TILE, this.spawnOffY);
+    this.spawnOffY = (window.innerWidth < 600 ? 0 : 40) + this.spawnDY;
+    this.cameras.main.setFollowOffset(this.spawnOffX, this.spawnOffY);
     this.spawnOffset = true;
     const fitZoom = () => this.setZoom(villageZoom || this.fitZoom());
     fitZoom();
@@ -161,7 +170,9 @@ class StadiumScene extends World {
   }
   fitZoom() {
     if (window.innerWidth < 600) return 0.86;
-    return Math.min(window.innerWidth / (MAP_W * TILE), window.innerHeight / (19 * TILE));
+    const fit = Math.min(window.innerWidth / (MAP_W * TILE), window.innerHeight / (19 * TILE));
+    const rows = (this.league.pairs || []).length || 6, all = window.innerHeight / ((ROW * rows + 10) * TILE);
+    return Math.min(fit, Math.max(all, fit * 0.7));
   }
   setZoom(z) {
     const W = MAP_W * TILE, H = MAP_H * TILE, fitAll = Math.min(this.scale.width / W, this.scale.height / H);
@@ -183,7 +194,11 @@ class StadiumScene extends World {
     const inset = window.innerWidth < 600 ? Math.round(100 * DPR) : 0;
     cam.setViewport(0, 0, this.scale.width, this.scale.height - inset);
     const vw = this.scale.width / cam.zoom, vh = (this.scale.height - inset) / cam.zoom;
-    cam.setBounds(Math.min(0, (W - vw) / 2), Math.min(0, (H - vh) / 2), Math.max(W, vw), Math.max(H, vh));
+    const hud = document.getElementById("st-hud"), top = hud && hud.getClientRects().length ? (
+      /* fixed: offsetParent is always null */
+      hud.getBoundingClientRect().bottom * this.scale.height / window.innerHeight / cam.zoom
+    ) : 0;
+    cam.setBounds(Math.min(0, (W - vw) / 2), Math.min(0, (H - vh) / 2) - top, Math.max(W, vw), Math.max(H, vh) + top);
     this.applyUiScale();
   }
   applyUiScale() {
@@ -897,6 +912,17 @@ class StadiumScene extends World {
   }
   tickBoard(B) {
     const cur = B.cur || (B.cur = { a: B.a.points, b: B.b.points });
+    const ko = this.kickoffText(B.a, B.b);
+    if (ko) {
+      if (B.tick) {
+        B.tick.stop();
+        B.tick = null;
+      }
+      cur.a = B.a.points;
+      cur.b = B.b.points;
+      B.board.setText(ko);
+      return;
+    }
     const put = () => B.board.setText(`${cur.a.toFixed(1)}  :  ${cur.b.toFixed(1)}`);
     if (B.tick) {
       B.tick.stop();
@@ -912,6 +938,15 @@ class StadiumScene extends World {
       B.tick = null;
       put();
     } });
+  }
+  kickoffText(a, b) {
+    if (a.points || b.points) return null;
+    const G = this.league.games || {}, D = this.league.gameDates || {}, P = this.league.players || {};
+    const teams = [...a.starters || [], ...b.starters || []].filter((p) => p && p !== "0").map((p) => P[p] ? P[p][2] : p);
+    if (!teams.length || teams.some((tm) => G[tm] && G[tm] !== "pre_game")) return null;
+    const ds = teams.map((tm) => D[tm]).filter(Boolean).sort();
+    if (!ds.length) return null;
+    return `KICKOFF ${(new Date(`${ds[0]}T12:00:00`)).toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}`;
   }
   touchdown(t, jump, who) {
     const q = this.tdQueue = this.tdQueue || [];
@@ -942,8 +977,12 @@ class StadiumScene extends World {
   nudgeCamera(x, y, shake) {
     const cam = this.cameras.main;
     if (panelOpen || this.target || this.stick && this.stick.active || this.nudging || window.__calm) return;
+    if (cam.worldView.contains(x, y)) {
+      if (shake) cam.shake(220, 4e-3);
+      return;
+    }
     this.nudging = true;
-    const off = () => this.spawnOffset ? 3.2 * TILE : 0;
+    const off = () => this.spawnOffset ? this.spawnOffX : 0;
     this.endNudge = () => {
       if (!this.nudging) return;
       this.nudging = false;
@@ -956,9 +995,17 @@ class StadiumScene extends World {
       if (k < 1 || !this.nudging) return;
       if (shake) cam.shake(220, 4e-3);
       this.time.delayedCall(1300, () => {
-        if (this.nudging) cam.pan(this.player.x + off(), this.player.y, 450, "Sine.easeInOut", false, (c2, k2) => {
-          if (k2 === 1) this.endNudge();
-        });
+        if (this.nudging) cam.pan(
+          this.player.x - off(),
+          this.player.y - (this.spawnOffset ? this.spawnOffY : 0),
+          450,
+          /* Phaser subtracts the follow offset (Oct 23 2026) */
+          "Sine.easeInOut",
+          false,
+          (c2, k2) => {
+            if (k2 === 1) this.endNudge();
+          }
+        );
       });
     });
   }
@@ -989,7 +1036,7 @@ class StadiumScene extends World {
         b.popping = false;
       } });
     }
-    this.pop(s.x, s.y - 70, `+${(t.points - (this.prevPts[t.roster_id] || 0)).toFixed(1)}`, "#b9f5a8");
+    this.pop(s.x, s.y - 100, `+${(t.points - (this.prevPts[t.roster_id] || 0)).toFixed(1)}`, "#b9f5a8");
     if (window.__calm) return;
     this.tweens.add({ targets: s, y: s.y - 26, duration: 180, yoyo: true, repeat: 2, ease: "Quad.easeOut" });
     for (let i = 0; i < 26; i++) {
@@ -1000,7 +1047,9 @@ class StadiumScene extends World {
     }
   }
   makeFootballer() {
-    const draw = (dir, f, pose) => this.footballerGrid(dir, f, pose, {});
+    const me = this.league.teams.find((t) => t.mine), kit = me && /^FB\d+$/.test(me.look) ? FB_KITS[(Number(me.look.slice(2)) || 0) % FB_KITS.length] : null;
+    const C = kit ? { K: kit[0], KL: kit[3], GOLD: kit[1], GL: kit[5], PUR: kit[2], PL: kit[3], PD: kit[4], WH: kit[6], WD: kit[6] === "#f4f1ea" ? "#cfcac0" : kit[6] } : {};
+    const draw = (dir, f, pose) => this.footballerGrid(dir, f, pose, C);
     const put = (key, grid) => {
       if (this.textures.exists(key)) this.textures.remove(key);
       const ct = this.textures.createCanvas(key, 32, 32), c = ct.getContext();
@@ -1616,7 +1665,7 @@ ${t.points.toFixed(1)} pts`);
     }
     if (mineS && kit(mineS)) {
       const c = kit(mineS), nm = me.name.toUpperCase().slice(0, 18), left = mineS.side === 0;
-      this.add.text(left ? (FIELD.x0 - 0.5) * T : (FIELD.x1 + 1.5) * T, mineS.s.y - 30, ` GO ${nm}! `, { fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold", fontSize: "12px", color: c[5], backgroundColor: c[2], padding: { x: 3, y: 2 } }).setOrigin(0.5).setAngle(left ? -90 : 90).setDepth(-3);
+      this.add.text(left ? (FIELD.x0 - 1.3) * T : (FIELD.x1 + 2.3) * T, mineS.s.y - 30, ` GO ${nm}! `, { fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold", fontSize: "12px", color: c[5], backgroundColor: c[2], padding: { x: 3, y: 2 } }).setOrigin(0.5).setAngle(left ? -90 : 90).setDepth(-3);
     }
     this.time.addEvent({ delay: 1800, loop: true, callback: () => {
       if (window.__calm) return;
@@ -1755,7 +1804,7 @@ ${t.points.toFixed(1)} pts`);
       bar.fillStyle(16747146, 1).fillRect(kx - 4, hy - 4, 3, 3);
       bar.setDepth(Math.min(A.s.depth, B.s.depth) - 1);
       if (!o.pct) o.pct = this.add.text(0, 0, "", { fontFamily: 'system-ui, "Segoe UI", Arial, sans-serif', fontStyle: "bold", color: "#9dff7a", stroke: "#0f141a" }).setOrigin(0.5, 0).setResolution(1);
-      const pct = Math.round(Math.max(pa, 1 - pa) * 100), t = lead ? `${pct}%` : "50 / 50";
+      const pct = Math.round(Math.max(pa, 1 - pa) * 100), t = a.mine || b.mine ? `YOU ${Math.round((a.mine ? pa : 1 - pa) * 100)}%` : lead ? lead === A ? `\u25C0 ${pct}%` : `${pct}% \u25B6` : "50 / 50";
       if (o.pct.text !== t) o.pct.setText(t);
       const fs = Math.round(15 * DPR / Math.max(0.5, this.cameras.main.zoom / DPR));
       o.pct.setFontSize(Math.round(14 * DPR)).setStroke("#0f141a", Math.round(5 * DPR)).setScale(board.scaleX).setOrigin(0.5, 1).setPosition(kx, hy - 8).setDepth(board.depth + 1);
@@ -1838,7 +1887,9 @@ ${t.points.toFixed(1)} pts`);
     if (this.youRing) {
       const P = this.player, t = this.time.now;
       this.youRing.setPosition(P.x, P.y - 2).setDepth(P.y - 3).setScale(1 + Math.sin(t / 300) * 0.08);
-      this.youTag.setOrigin(0, 0.5).setPosition(P.x + 20 + Math.abs(Math.sin(t / 260)) * 4, P.y - 30);
+      const out = P.x < (FIELD.x0 + FIELD.x1 + 1) / 2 * TILE, txt = out ? "YOU \u25B6" : "\u25C0 YOU";
+      if (this.youTag.text !== txt) this.youTag.setText(txt);
+      this.youTag.setOrigin(out ? 1 : 0, 0.5).setPosition(P.x + (out ? -1 : 1) * (20 + Math.abs(Math.sin(t / 260)) * 4), P.y - 30);
     }
     const midX = (FIELD.x0 + FIELD.x1 + 1) / 2 * TILE, ch = this.tdCheer && time < this.tdCheer.until ? this.tdCheer : null;
     for (const f of this.fans || []) {
@@ -1860,13 +1911,17 @@ ${t.points.toFixed(1)} pts`);
       }
     }
     this.near = best;
-    const key = best && !panelOpen ? best.name : "";
+    const key = best && !panelOpen && !this.spawnOffset ? best.name : "";
     if (key !== this.promptKey) {
       this.promptKey = key;
       const p = $("prompt");
       const touch = (navigator.maxTouchPoints || 0) > 0;
       if (key) {
-        p.replaceChildren(touch ? "\u{1F446} Tap: " : el("kbd", {}, "E"), `${best.verb} ${key}`);
+        p.replaceChildren(
+          touch ? "\u{1F446} " : el("kbd", {}, "E"),
+          /* one line on phones (round 4) */
+          `${best.verb} ${key}`
+        );
         p.hidden = false;
         p.onclick = () => {
           if (this.near) this.near.open();

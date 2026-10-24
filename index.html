@@ -39,6 +39,54 @@
     var key = url.replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '_').slice(0, 150) + '.json';
     return real('sample/' + key).then(function (r) { return r.ok ? r : new Response('[]', { headers: { 'Content-Type': 'application/json' } }); });
   };
+  // Oct 23 2026 (demo review: no way from the sample to MY league; sharing a made-up league is a dead end): in the sample
+  // the Share button becomes "Load MY league" and goes back to the box
+  // Oct 23 2026 (round 2): open on a team (Bench Warmers, roster 2: the closest game) so the top bar shows a live matchup,
+  // and ~5 s in, Bench Warmers score a touchdown (+6.6, flips the game) so the banner, the crowd and the count-up play once
+  try { if (!localStorage.getItem('st-me-1')) localStorage.setItem('st-me-1', '2'); } catch (x) {}
+  var tdAt = Date.now() + 5000; var tdDone = false;
+  var bump = function (t, live) { t.points = Math.round(((t.points || 0) + 6.6) * 100) / 100; if (live) t.proj = (t.proj || 0) + 6.6; var sp = t.starters_points || []; if (sp.length) sp[1] = Math.round(((sp[1] || 0) + 6.6) * 100) / 100; };
+  var realFetch = window.fetch;
+  window.fetch = function (u, o) {
+    var url = typeof u === 'string' ? u : (u && u.url) || '';
+    if (!/\/league\/1\/matchups\/\d+$/.test(url) || !tdDone) return realFetch(u, o);
+    return realFetch(u, o).then(function (r) { return r.json(); }).then(function (j) { // later refreshes keep the touchdown
+      (j || []).forEach(function (m) { if (m.roster_id === 2) bump(m); });
+      return new Response(JSON.stringify(j), { headers: { 'Content-Type': 'application/json' } });
+    });
+  };
+  var td = setInterval(function () {
+    var g = window.__village, L = window.__league, sc = g && g.scene && g.scene.getScene('stadium');
+    if (!sc || !sc.boards || !L || Date.now() < tdAt) return;
+    clearInterval(td);
+    // only as the first impression: not once the visitor is already zooming or walking (it shook the view under them)
+    var lz = sc.logicalZoom(), fz = sc.fitZoom(), D = sc.cameras.main.zoom / lz, snap = Math.max(0.5, Math.round(fz * D * 2)) / (2 * D); // the zoom snaps to whole pixels
+    if (document.hidden || !sc.spawnOffset || (Math.abs(lz - fz) > 0.02 && Math.abs(lz - snap) > 0.02)) return;
+    tdDone = true;
+    var t = (L.teams || []).find(function (x) { return x.roster_id === 2; });
+    if (t) { bump(t, true); sc.refreshScores(); if (window.__hud) window.__hud(); } // the top bar too: score colour, odds, to play
+  }, 250);
+  // sample wording: the top line says it's a demo, the matchup card says the week is made up and shares nothing
+  var words = function () {
+    var lg = document.getElementById('st-league');
+    var hs = document.getElementById('st-score'); if (hs && hs.textContent && !/^DEMO/.test(hs.textContent)) hs.textContent = 'DEMO · ' + hs.textContent; // the folded phone bar shows only this line (round 4)
+    if (lg && /^(Sample|Demo) League/.test(lg.textContent)) lg.textContent = 'Demo league · yours looks like this, live';
+    document.querySelectorAll('.mu-share').forEach(function (b) { if (!b.dataset.demo) { b.dataset.demo = '1'; b.textContent = String.fromCodePoint(0x1F3C8) + ' See YOUR matchup like this'; } });
+    document.querySelectorAll('#panel p.small').forEach(function (q) { if (/points refresh every minute/.test(q.textContent)) q.textContent = 'A made-up sample week. Your own league updates live every minute during games.'; });
+  };
+  new MutationObserver(words).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('#share-btn, .mu-share');
+    if (!b) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    try { localStorage.removeItem('st-league-id'); } catch (x) {}
+    location.href = location.pathname;
+  }, true);
+  document.addEventListener('DOMContentLoaded', function () {
+    var b = document.getElementById('share-btn');
+    if (b) { b.textContent = String.fromCodePoint(0x1F3C8) + ' Load MY league'; b.setAttribute('aria-label', 'Load my league'); }
+    var st = document.createElement('style'); st.textContent = '#tip-pill{display:none!important}'; document.head.appendChild(st); // no tips on a made-up league; the button needs the room
+  });
 })();
 </script>
   <link rel="manifest" href="manifest.webmanifest">

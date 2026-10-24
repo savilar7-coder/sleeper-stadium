@@ -143,3 +143,16 @@
 .mu-share { display: block; margin: 12px auto 4px; font: 600 15px system-ui, sans-serif; padding: 8px 14px; background: #ffd84a; color: #1d140c; border: 1px solid #9e7c0c; border-radius: 10px; cursor: pointer; }
 
 @media (max-width: 400px) { .st-btns { gap: 3px; } .st-btns button { font-size: 11px; padding: 3px 4px; } }
+
+
+.st-btns button { min-height: 44px; }
+#st-fold { min-width: 44px; min-height: 44px; }
+#share-btn, #jump-btn { min-height: 44px; }
+#panel-close { min-width: 44px; min-height: 44px; }
+#prompt { bottom: calc(108px + env(safe-area-inset-bottom)); }
+@media (min-width: 521px) { #prompt { white-space: nowrap; } } 
+.mu-who small { color: #5a4a33; }
+@media (max-width: 599px) { .mu-who small, .mu-slot { font-size: 11px; } }
+@media (prefers-reduced-motion: reduce) { #st-ticker span { animation: none; padding-left: 12px; } }
+body.calm #st-ticker span { animation: none; padding-left: 12px; }
+#st-hud.mini #st-score { padding-right: 40px; } 

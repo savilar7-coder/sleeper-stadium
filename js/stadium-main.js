@@ -3,6 +3,7 @@ import { closePanel, el, openPanel } from "./panel.js";
 import { sfx } from "./sfx.js";
 import { espnLeague, isEspn } from "./stadium-espn.js";
 window.__calm = /[?&]calm=1/.test(location.search) || !/[?&]calm=0/.test(location.search) && matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (window.__calm) document.body.classList.add("calm");
 const phaserReady = new Promise((ok, no) => {
   if (window.Phaser) {
     ok();
@@ -108,6 +109,7 @@ async function loadEspn(leagueId) {
     news: [],
     champs: [],
     games: gamesOf(sched, lg.week),
+    gameDates: datesOf(sched, lg.week),
     blimp: (blimpFile || {}).message || "",
     espn: true
   };
@@ -216,6 +218,7 @@ async function load(leagueId) {
     news: [...tx1, ...tx2].filter((x) => x.status === "complete").sort((a, b) => b.status_updated - a.status_updated),
     champs: champs || [],
     games: gamesOf(sched, week),
+    gameDates: datesOf(sched, week),
     blimp: (new URLSearchParams(location.search).get("blimp") || (blimpFile || {}).message || "").slice(0, 60)
   };
   if (!champs) champsP.then((c) => {
@@ -259,12 +262,33 @@ function picksOf(rid) {
   return out;
 }
 const mine = () => L.teams.find((t) => t.mine);
+const toPlay = (t) => (t.starters || []).filter((pid) => pid && pid !== "0" && (L.games || {})[L.players[pid] ? L.players[pid][2] : pid] !== "complete").length;
+let sinceTxt;
 function hud() {
   const m = mine(), opp = m && L.teams.find((t) => t.matchup_id && t.matchup_id === m.matchup_id && t !== m);
   $("st-league").textContent = `${L.name} \xB7 week ${L.week}`;
   $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : "Tap \u{1F451} My team to pick your team";
   $("st-score").className = m && opp ? m.points >= opp.points ? "up" : "down" : "";
-  $("st-proj").textContent = m && opp ? `projected ${fmt(m.proj)} \u2013 ${fmt(opp.proj)}` : "";
+  const remA = Math.max(0, m && opp ? m.proj - m.points : 0), remB = Math.max(0, m && opp ? opp.proj - opp.points : 0);
+  const win = !m || !opp ? null : remA + remB < 0.5 ? m.points === opp.points ? 0.5 : m.points > opp.points ? 1 : 0 : 1 / (1 + Math.exp(-1.702 * (m.proj - opp.proj) / (6 + 0.32 * (remA + remB))));
+  if (m && opp) {
+    const k = `st-last-${L.id}-${L.week}-${m.roster_id}`;
+    if (sinceTxt === void 0) {
+      let was = null;
+      try {
+        was = JSON.parse(store(k) || "null");
+      } catch {
+      }
+      sinceTxt = was && (m.points - was.a > 0.05 || opp.points - was.b > 0.05) ? `Since ${new Date(was.t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}: +${fmt(Math.max(0, m.points - was.a))} you, +${fmt(Math.max(0, opp.points - was.b))} them` : "";
+      if (sinceTxt) setTimeout(() => {
+        sinceTxt = "";
+        hud();
+      }, 12e3);
+    }
+    store(k, JSON.stringify({ a: m.points, b: opp.points, t: Date.now() }));
+  }
+  const left = m && opp && L.games && Object.keys(L.games).length ? ` \xB7 ${toPlay(m)} v ${toPlay(opp)} to play` : "";
+  $("st-proj").textContent = m && opp ? sinceTxt || `projected ${fmt(m.proj)} \u2013 ${fmt(opp.proj)} \xB7 ${Math.round(win * 100)}% to win${left}` : "";
 }
 const pname = (pid) => L.players[pid] ? L.players[pid][0] : pid;
 function rosterTable(pids, t, withPts) {
@@ -912,9 +936,19 @@ function gamesOf(games, week) {
   }
   return map;
 }
+function datesOf(games, week) {
+  const map = {};
+  for (const g of games || []) if (String(g.week) === String(week) && g.date) {
+    map[g.home] = g.date;
+    map[g.away] = g.date;
+  }
+  return map;
+}
 async function gameStatus() {
   try {
-    L.games = gamesOf(await get(`${SCHEDULE}/${L.season}`), L.week);
+    const s = await get(`${SCHEDULE}/${L.season}`);
+    L.games = gamesOf(s, L.week);
+    L.gameDates = datesOf(s, L.week);
   } catch {
   }
 }
@@ -959,25 +993,32 @@ function count(what) {
   }
 }
 function askLeague(note) {
-  for (const id of ["jump-btn", "zoom-ctl", "play-btn"]) {
+  for (const id of ["jump-btn", "zoom-ctl", "play-btn", "st-fold", "gh-star"]) {
     const e = document.getElementById(id);
     if (e) e.style.display = "none";
   }
   $("st-league").textContent = "Sleeper Stadium";
-  $("st-score").textContent = "Type your Sleeper username (or paste an ESPN league link) to open your stadium";
+  $("st-score").textContent = "Your fantasy league as a live pixel football stadium";
   const btns = document.querySelector(".st-btns");
   if (btns) btns.style.display = "none";
+  const fr = document.createElement("style");
+  fr.textContent = ".lg-in:focus-visible,.lg-in+button:focus-visible{outline:3px solid #24292f;outline-offset:2px}";
+  document.head.appendChild(fr);
   const box = document.createElement("form");
   box.style.cssText = "display:flex;gap:6px;justify-content:center;margin-top:6px";
-  box.innerHTML = '<input id="lg-id" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Sleeper username, league ID or ESPN link" style="font:16px sans-serif;padding:6px 8px;width:240px"><button type="submit" style="font:16px sans-serif;padding:6px 12px">Open</button>';
+  box.innerHTML = '<input id="lg-id" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Sleeper @username" enterkeyhint="go" class="lg-in" aria-label="Sleeper username, league ID, Sleeper or ESPN league link" style="font:16px sans-serif;padding:8px 10px;width:min(260px,58vw);border:2px solid #9e7c0c;border-radius:8px;background:#fff"><button type="submit" style="font:700 16px sans-serif;padding:8px 16px;background:#24292f;color:#fff;border:0;border-radius:8px;cursor:pointer">Open</button>';
   const msg = document.createElement("div");
   msg.style.cssText = "margin:6px auto 0;font:14px system-ui,sans-serif;color:#5a4a33;max-width:340px;text-align:center";
+  const trust = document.createElement("div");
+  trust.style.cssText = "margin:6px auto 0;font:13px system-ui,sans-serif;color:#7a6a50;text-align:center";
+  trust.innerHTML = '<b style="font-size:14px;color:#5a4a33">Sleeper @username or a public ESPN league link</b><br><span style="color:#5a4a33">Reads the same public data your leaguemates see \xB7 no login \xB7 free &amp; open source \xB7 not affiliated with Sleeper</span>';
   const go = (id) => {
     location.search = `?league=${id}`;
   };
   box.onsubmit = async (e) => {
     e.preventDefault();
     const raw = (document.getElementById("lg-id").value || "").trim().replace(/^@/, "");
+    if (raw && !/^\d+$/.test(raw) && !/[\/.]/.test(raw)) store("st-user-name", raw);
     if (!raw) {
       msg.textContent = "Type your Sleeper username (the @name on your profile) or a league ID.";
       return;
@@ -1025,7 +1066,7 @@ function askLeague(note) {
   const demo = document.createElement("button");
   demo.type = "button";
   demo.textContent = "No league? Try a sample league";
-  demo.style.cssText = "display:block;margin:8px auto 0;font:600 14px sans-serif;padding:6px 12px;background:#ffd84a;border:1px solid #9e7c0c;border-radius:8px";
+  demo.style.cssText = "display:block;margin:8px auto 0;font:600 14px sans-serif;padding:6px 12px;background:none;color:#5a4a33;border:1px dashed #9e7c0c;border-radius:8px;cursor:pointer";
   demo.onclick = () => {
     location.search = "?league=1&sample=1";
   };
@@ -1034,16 +1075,34 @@ function askLeague(note) {
   look.alt = "A live league on the field";
   look.width = 300;
   look.height = 420;
-  look.style.cssText = "display:block;margin:10px auto 0;max-width:80vw;height:auto;border-radius:12px;border:2px solid #9e7c0c;image-rendering:pixelated";
+  look.style.cssText = "display:block;margin:4px auto 0;width:min(440px,88vw,calc((100vh - 340px) * 300 / 420));height:auto;border-radius:12px;border:2px solid #9e7c0c;image-rendering:pixelated;cursor:pointer";
+  look.title = "Open the sample league";
+  look.onclick = demo.onclick;
+  const tap = document.createElement("div");
+  tap.style.cssText = "margin:12px auto 0;font:600 13px system-ui,sans-serif;color:#7a4b00;text-align:center;cursor:pointer";
+  tap.innerHTML = "Live scores, touchdown alerts, win odds, the ASS Bowl and the bench of shame<br><u>No league? Tap the stadium for a sample</u>";
+  tap.style.fontWeight = "400";
+  tap.onclick = () => demo.onclick();
+  const star = document.createElement("a");
+  star.href = "https://github.com/savilar7-coder/sleeper-stadium";
+  star.target = "_blank";
+  star.rel = "noopener";
+  star.style.cssText = "display:block;width:max-content;margin:10px auto 0;padding:7px 14px;border-radius:10px;background:#24292f;color:#fff;text-decoration:none;font:700 14px system-ui,sans-serif";
+  star.textContent = "\u2B50 Star it on GitHub \xB7 free & open source";
   const by = document.createElement("p");
   by.style.cssText = "margin:8px auto 0;font:13px system-ui,sans-serif;color:#5a4a33;max-width:320px;text-align:center";
-  by.innerHTML = 'Built by <a href="https://lamaisonwebstudio.com/" target="_blank" rel="noopener">lamaisonwebstudio.com</a>. Podcast, Discord or business? <a href="https://lamaisonwebstudio.com/stadium/#custom" target="_blank" rel="noopener">Let&#39;s build yours.</a>';
+  by.innerHTML = 'Built by <a style="color:#7a4b00" href="https://lamaisonwebstudio.com/" target="_blank" rel="noopener">lamaisonwebstudio.com</a>. Podcast, Discord or business? <a style="color:#7a4b00" href="https://lamaisonwebstudio.com/stadium/#custom" target="_blank" rel="noopener">Let&#39;s build yours.</a>';
   if (note) {
     msg.textContent = note;
     msg.style.color = "#b23a2a";
     msg.style.fontWeight = "600";
   }
-  $("st-proj").replaceChildren(box, msg, demo, look, by);
+  $("st-proj").replaceChildren(box, trust, msg, tap, look, star, by);
+  try {
+    const last = store("st-user-name");
+    if (last && !note) document.getElementById("lg-id").value = last;
+  } catch (x) {
+  }
 }
 (async function main() {
   {
@@ -1102,6 +1161,11 @@ function askLeague(note) {
   game.scene.add("minigame", MiniGameScene, false);
   window.__village = game;
   window.__league = L;
+  window.__hud = hud;
+  if (window.ResizeObserver) new ResizeObserver(() => {
+    const s = game.scene.getScene("stadium");
+    if (s && s.cameras && s.cameras.main && s.applyZoom && s.logicalZoom && s.sys.isActive()) s.applyZoom(s.logicalZoom());
+  }).observe($("st-hud"));
   const fit = () => {
     game.scale.resize(Math.round(window.innerWidth * DPR), Math.round(window.innerHeight * DPR));
     game.scale.setZoom(1 / DPR);
