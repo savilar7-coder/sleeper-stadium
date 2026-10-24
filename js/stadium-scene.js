@@ -5,7 +5,7 @@ import { el, openPanel } from "./panel.js";
 import { drivePlayer, setupTouch } from "./touch.js";
 import { sfx } from "./sfx.js";
 import { World } from "./world.js";
-import { isMascot, mascotFur, mascotHead } from "./stadium-mascots.js";
+import { isMascot, kitNum, mascotFur, mascotHead } from "./stadium-mascots.js";
 let ROW = 5;
 const sweatActive = (L) => {
   if (/[?&]sweat=1/.test(location.search)) return true;
@@ -15,6 +15,7 @@ const sweatActive = (L) => {
 const RAVENS = ["#241773", "#241773", "#2e1f8f", "#000000", "#9e7c0c", "#c9a227"];
 let MAP_W = 22;
 const TEAM_END_ZONES = true;
+const CUT_SHEETS = new Map();
 let MAP_H = 49;
 const FIELD = { x0: 4, x1: 17, y0: 4, y1: 44 };
 const LOOKS = [
@@ -53,7 +54,10 @@ const FB_KITS = [
   ["#e31837", "#ffb81c", "#e31837", "#f04a63", "#9e0f25", "#ffb81c", "#f4f1ea"],
   ["#002c5f", "#ff8200", "#002c5f", "#16467f", "#001a3a", "#ff8200", "#f4f1ea"]
 ];
-;
+const kitOf = (t) => {
+  const n = kitNum(t);
+  return n == null ? null : FB_KITS[n % FB_KITS.length];
+};
 const shade = (hex, f) => "#" + [1, 3, 5].map((i) => {
   const v = parseInt(hex.slice(i, i + 2), 16), t = f > 0 ? 255 : 0;
   return Math.round(v + (t - v) * Math.abs(f)).toString(16).padStart(2, "0");
@@ -301,11 +305,7 @@ class StadiumScene extends World {
       for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) g.fillRect(lx + 2 + i * 6, ly + 2 + j * 6, 4, 4);
     }
     {
-      const kitOf0 = (t) => {
-        const m = t && /^FB(\d+)$/.exec(t.look || "");
-        return m ? FB_KITS[Number(m[1]) % FB_KITS.length] : null;
-      };
-      const top2 = [...this.league.teams || []].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts).slice(0, 2).map(kitOf0);
+      const top2 = [...this.league.teams || []].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts).slice(0, 2).map(kitOf);
       const cols = TEAM_END_ZONES && top2[0] && top2[1] ? [top2[0][2], top2[0][5], top2[1][2], top2[1][5]] : ["#241773", "#c9a227", "#241773", "#e8e2d0"];
       const ring = (d) => {
         g.roundRect(fx - d, fy - d, fw + 2 * d, fh + 2 * d, (fw + 2 * d) / 2.6);
@@ -362,10 +362,6 @@ class StadiumScene extends World {
       g.fillStyle = r() < 0.5 ? "rgba(20,60,20,0.22)" : "rgba(170,230,140,0.12)";
       g.fillRect(fx + Math.floor(r() * fw / 2) * 2, fy + Math.floor(r() * fh / 2) * 2, 2, 2);
     }
-    const kitOf = (t) => {
-      const m = t && /^FB(\d+)$/.exec(t.look || "");
-      return m ? FB_KITS[Number(m[1]) % FB_KITS.length] : null;
-    };
     const table = [...this.league.teams || []].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
     const k1 = TEAM_END_ZONES ? kitOf(table[0]) : null, k2 = TEAM_END_ZONES ? kitOf(table[1]) : null;
     const endZone = (y, kit, fallback) => {
@@ -825,7 +821,7 @@ class StadiumScene extends World {
     this.makeRaven();
     this.makeShorty();
     for (const t of this.league.teams) if (/^FB\d+$/.test(t.look)) this.makeTeamFootballer(t.look);
-    for (const t of this.league.teams) t.sheet = isMascot(t.look) ? this.makeTeamFootballer(`FB${t.roster_id * 5 % 12}`, t.look) : t.look;
+    for (const t of this.league.teams) t.sheet = isMascot(t.look) ? this.makeTeamFootballer(`FB${kitNum(t)}`, t.look) : t.look;
     const L = this.league, T = TILE, pairs = [...L.pairs].sort((a, b) => (b.some((t) => t.mine) ? 1 : 0) - (a.some((t) => t.mine) ? 1 : 0));
     const mid = (FIELD.x0 + FIELD.x1 + 1) / 2 * T, half = Math.min((FIELD.x1 - FIELD.x0 - 4) / 2, 7) * T, xs = [mid - half, mid + half];
     this.boards = [];
@@ -834,8 +830,12 @@ class StadiumScene extends World {
     pairs.forEach((pair, row) => {
       const y = (FIELD.y0 + 7 + row * ROW) * T;
       pair.forEach((t, side) => {
-        const x = xs[side], key = `team-${t.roster_id}-`;
-        this.makeChar(key, t.sheet || t.look);
+        const x = xs[side], key = `team-${t.roster_id}-`, sheet = t.sheet || t.look;
+        if (CUT_SHEETS.get(t.roster_id) !== sheet) {
+          for (const k of this.textures.getTextureKeys()) if (k.startsWith(key)) this.textures.remove(k);
+          CUT_SHEETS.set(t.roster_id, sheet);
+        }
+        this.makeChar(key, sheet);
         const s = this.add.sprite(x, y, `${key}${side === 0 ? "right" : "left"}0`).setOrigin(0.5, 1).setDepth(y).setScale(1.5);
         if (t.gold) {
           s.setTint(16769126, 16769126, 16756736, 16756736);
@@ -1134,7 +1134,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     }
   }
   makeFootballer() {
-    const me = this.league.teams.find((t) => t.mine), kit = me && /^FB\d+$/.test(me.look) ? FB_KITS[(Number(me.look.slice(2)) || 0) % FB_KITS.length] : null;
+    const me = this.league.teams.find((t) => t.mine), kit = kitOf(me);
     const C = kit ? { K: kit[0], KL: kit[3], GOLD: kit[1], GL: kit[5], PUR: kit[2], PL: kit[3], PD: kit[4], WH: kit[6], WD: kit[6] === "#f4f1ea" ? "#cfcac0" : kit[6] } : {};
     const draw = (dir, f, pose) => this.footballerGrid(dir, f, pose, C);
     const put = (key, grid) => {
@@ -1757,10 +1757,7 @@ ${t.points.toFixed(1)} pts`);
     this.fans = [];
     const me = this.league.teams.find((t) => t.mine), mineS = me && this.teamSprites.get(me.roster_id);
     const oppS = mineS && [...this.teamSprites.values()].find((o) => o !== mineS && o.t.matchup_id && o.t.matchup_id === me.matchup_id);
-    const kit = (S) => {
-      const m = S && /^FB(\d+)$/.exec(S.t.look);
-      return m ? FB_KITS[Number(m[1]) % FB_KITS.length] : null;
-    };
+    const kit = (S) => kitOf(S && S.t);
     const shirts = (S) => {
       const c = kit(S);
       return c ? [c[2], c[2], c[3], c[4], c[5]] : null;

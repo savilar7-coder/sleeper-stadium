@@ -95,15 +95,8 @@ async function loadEspn(leagueId) {
   const state = await get(`${API}/state/nfl`), season = state.league_season || state.season;
   const [lg, sched, blimpFile] = await Promise.all([espnLeague(leagueId, season), get(`${SCHEDULE}/${season}`).catch(() => null), get("stadium-blimp.json").catch(() => null)]);
   LOOKS = (await scenes)[0].LOOKS;
-  let local = {};
-  try {
-    local = JSON.parse(store("st-looks") || "{}") || {};
-  } catch {
-  }
-  for (const t of lg.teams) {
-    t.projPre = t.proj = t.starters.reduce((n, pid) => n + (lg.proj[pid] || 0), 0);
-    t.look = local[t.roster_id] || guessLook(t);
-  }
+  for (const t of lg.teams) t.projPre = t.proj = t.starters.reduce((n, pid) => n + (lg.proj[pid] || 0), 0);
+  applyLooks(lg.teams, {});
   const groups = {};
   for (const t of lg.teams) (groups[t.matchup_id || `bye-${t.roster_id}`] = groups[t.matchup_id || `bye-${t.roster_id}`] || []).push(t);
   return {
@@ -117,10 +110,23 @@ async function loadEspn(leagueId) {
     champs: [],
     games: gamesOf(sched, lg.week),
     gameDates: datesOf(sched, lg.week),
-    blimp: (blimpFile || {}).message || "",
+    blimp: blimpOf(blimpFile),
     espn: true
   };
 }
+function applyLooks(teams, picked) {
+  let local = {};
+  try {
+    local = JSON.parse(store("st-looks") || "{}") || {};
+  } catch {
+  }
+  const okLook = (v) => ALL_LOOKS.includes(v) || ["Raven", "Dumpster", "Steeler", "Shorty"].includes(v) || /^FB\d+$/.test(v);
+  const urlLooks = Object.fromEntries((new URLSearchParams(location.search).get("looks") || "").split(",").map((p) => p.split(".")).filter((p) => p.length === 2 && /^\d+$/.test(p[0]) && okLook(p[1])));
+  for (const t of teams) t.look = urlLooks[t.roster_id] || local[t.roster_id] || picked[t.roster_id] || guessLook(t);
+  const gold = new Set((new URLSearchParams(location.search).get("gold") || "").split(",").filter((x) => /^\d+$/.test(x)).map(Number));
+  for (const t of teams) t.gold = gold.has(t.roster_id);
+}
+const blimpOf = (blimpFile) => (new URLSearchParams(location.search).get("blimp") || (blimpFile || {}).message || "").slice(0, 60);
 async function load(leagueId) {
   if (isEspn(leagueId)) return loadEspn(leagueId);
   let [state, lg] = await Promise.all([get(`${API}/state/nfl`), get(`${API}/league/${leagueId}`)]);
@@ -198,16 +204,7 @@ async function load(leagueId) {
     };
   });
   for (const t of teams) t.projPre = t.proj = t.starters.reduce((n, pid) => n + (proj[pid] || 0), 0);
-  let local = {};
-  try {
-    local = JSON.parse(store("st-looks") || "{}") || {};
-  } catch {
-  }
-  const okLook = (v) => ALL_LOOKS.includes(v) || ["Raven", "Dumpster", "Steeler", "Shorty"].includes(v) || /^FB\d+$/.test(v);
-  const urlLooks = Object.fromEntries((new URLSearchParams(location.search).get("looks") || "").split(",").map((p) => p.split(".")).filter((p) => p.length === 2 && /^\d+$/.test(p[0]) && okLook(p[1])));
-  for (const t of teams) t.look = urlLooks[t.roster_id] || local[t.roster_id] || picked[t.roster_id] || guessLook(t);
-  const gold = new Set((new URLSearchParams(location.search).get("gold") || "").split(",").filter((x) => /^\d+$/.test(x)).map(Number));
-  for (const t of teams) t.gold = gold.has(t.roster_id);
+  applyLooks(teams, picked || {});
   const groups = {};
   for (const t of teams) (groups[t.matchup_id || `bye-${t.roster_id}`] = groups[t.matchup_id || `bye-${t.roster_id}`] || []).push(t);
   const preseason = teams.length > 1 && !teams.some((t) => t.matchup_id);
@@ -236,7 +233,7 @@ async function load(leagueId) {
     champs: champs || [],
     games: gamesOf(sched, week),
     gameDates: datesOf(sched, week),
-    blimp: (new URLSearchParams(location.search).get("blimp") || (blimpFile || {}).message || "").slice(0, 60)
+    blimp: blimpOf(blimpFile)
   };
   if (!champs) champsP.then((c) => {
     out.champs = c;
@@ -1518,11 +1515,16 @@ async function refreshPoints() {
   if (!L || document.hidden && !window.__tv) return;
   const n = ++refreshN;
   try {
-    const fresh = L.espn ? (await espnLeague(L.id, L.season)).teams : await get(`${API}/league/${L.id}/matchups/${L.week}`);
+    const r = L.espn ? await espnLeague(L.id, L.season) : null, fresh = r ? r.teams : await get(`${API}/league/${L.id}/matchups/${L.week}`);
     if (n !== refreshN) return;
+    if (r) {
+      Object.assign(L.players, r.players);
+      Object.assign(L.proj, r.proj);
+    }
     for (const x of fresh) {
       const t = L.teams.find((y) => y.roster_id === x.roster_id);
       if (t) Object.assign(t, { starters: x.starters || t.starters, points: x.points || 0, starters_points: x.starters_points || [], players_points: x.players_points || {} });
+      if (t && r) t.projPre = t.starters.reduce((s2, pid) => s2 + (L.proj[pid] || 0), 0);
     }
     await gameStatus();
     updateProj();

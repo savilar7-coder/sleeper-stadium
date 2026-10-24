@@ -1,5 +1,6 @@
 import { $, DPR } from "./core.js";
 import { sfx } from "./sfx.js";
+import { kitNum } from "./stadium-mascots.js";
 const YPX = 9;
 const ROUTES = [
   [[0, 16], [0, 30]],
@@ -30,8 +31,8 @@ const FB_KITS = [
   ["#002c5f", "#ff8200", "#002c5f", "#16467f", "#001a3a", "#ff8200", "#f4f1ea"]
 ];
 const kitOf = (t) => {
-  const m = t && /^FB(\d+)$/.exec(t.look || "");
-  return m ? FB_KITS[Number(m[1]) % FB_KITS.length] : null;
+  const n = kitNum(t);
+  return n == null ? null : FB_KITS[n % FB_KITS.length];
 };
 const hex = (s) => parseInt(s.slice(1), 16);
 const calm = () => !!window.__calm;

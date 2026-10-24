@@ -1,8 +1,9 @@
 const BASE = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons";
-const POS = { 1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DEF" };
+const POS = { 1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 7: "P", 9: "DT", 10: "DE", 11: "LB", 12: "CB", 13: "S", 14: "HC", 16: "DEF" };
 const PRO = { 1: "ATL", 2: "BUF", 3: "CHI", 4: "CIN", 5: "CLE", 6: "DAL", 7: "DEN", 8: "DET", 9: "GB", 10: "TEN", 11: "IND", 12: "KC", 13: "LV", 14: "LAR", 15: "MIA", 16: "MIN", 17: "NE", 18: "NO", 19: "NYG", 20: "NYJ", 21: "PHI", 22: "ARI", 23: "PIT", 24: "LAC", 25: "SF", 26: "SEA", 27: "TB", 28: "WAS", 29: "CAR", 30: "JAX", 33: "BAL", 34: "HOU" };
-const SLOT = { 0: "QB", 2: "RB", 3: "RB/WR", 4: "WR", 5: "WR/TE", 6: "TE", 7: "OP", 23: "FLEX", 16: "DEF", 17: "K" };
+const SLOT = { 0: "QB", 1: "TQB", 2: "RB", 3: "RB/WR", 4: "WR", 5: "WR/TE", 6: "TE", 7: "OP", 8: "DT", 9: "DE", 10: "LB", 11: "DL", 12: "CB", 13: "S", 14: "DB", 15: "DP", 23: "FLEX", 16: "DEF", 17: "K", 18: "P", 19: "HC", 24: "ER" };
 const ORDER = [0, 7, 2, 4, 3, 5, 6, 23, 16, 17];
+const orderOf = (lc) => [...ORDER, ...Object.keys(lc).map(Number).filter((k) => lc[k] > 0 && !ORDER.includes(k) && k !== 20 && k !== 21).sort((a, b) => a - b)];
 const isEspn = (id) => /^espn-\d+$/.test(String(id));
 async function espnLeague(id, season) {
   const n = String(id).replace(/^espn-/, "");
@@ -27,7 +28,7 @@ async function espnLeague(id, season) {
       pts[pid] = stat(p, 0, 1, week) || 0;
     }
     const lc = ((d.settings || {}).rosterSettings || {}).lineupSlotCounts || {};
-    const starters = ORDER.flatMap((k) => {
+    const starters = orderOf(lc).flatMap((k) => {
       const got = entries.filter((e) => e.lineupSlotId === k).map((e) => `e${e.playerId}`);
       return Array.from({ length: lc[k] || 0 }, (_, i) => got[i] || "0");
     });
@@ -56,7 +57,7 @@ async function espnLeague(id, season) {
     };
   });
   const counts = ((d.settings || {}).rosterSettings || {}).lineupSlotCounts || {};
-  const slots = ORDER.flatMap((k) => Array(counts[k] || 0).fill(SLOT[k]));
+  const slots = orderOf(counts).flatMap((k) => Array(counts[k] || 0).fill(SLOT[k] || "SLOT"));
   const past = {};
   for (const m of d.schedule || []) if (m.matchupPeriodId < period) {
     for (const side of ["home", "away"]) if (m[side]) (past[m.matchupPeriodId] = past[m.matchupPeriodId] || []).push({ roster_id: m[side].teamId, points: m[side].totalPoints || 0, matchup_id: m.id });

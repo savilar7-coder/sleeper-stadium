@@ -98,6 +98,11 @@ const MASCOT_LOOKS = MASCOT_NAMES.map((n) => "M" + n.replace(/ /g, ""));
 const byLook = Object.fromEntries(MASCOT_NAMES.map((n) => ["M" + n.replace(/ /g, ""), n]));
 const isMascot = (look) => !!byLook[look];
 const mascotName = (look) => byLook[look] || "";
+const kitNum = (t) => {
+  if (!t) return null;
+  const m = /^FB(\d+)$/.exec(t.look || "");
+  return m ? Number(m[1]) : isMascot(t.look) ? t.roster_id * 5 % 12 : null;
+};
 const mascotFur = (look) => Object.values(HEADS[byLook[look]][0])[0];
 const shade = (hex, f) => "#" + [1, 3, 5].map((i) => {
   const v = parseInt(hex.slice(i, i + 2), 16), t = f > 0 ? 255 : 0;
@@ -150,6 +155,7 @@ export {
   MASCOT_LOOKS,
   MASCOT_NAMES,
   isMascot,
+  kitNum,
   mascotFace,
   mascotFur,
   mascotHead,
