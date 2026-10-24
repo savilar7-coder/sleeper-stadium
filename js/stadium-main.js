@@ -4,6 +4,8 @@ import { sfx } from "./sfx.js";
 import { espnLeague, isEspn } from "./stadium-espn.js";
 window.__calm = /[?&]calm=1/.test(location.search) || !/[?&]calm=0/.test(location.search) && matchMedia("(prefers-reduced-motion: reduce)").matches;
 if (window.__calm) document.body.classList.add("calm");
+window.__tv = /[?&]tv=1/.test(location.search);
+if (window.__tv) document.body.classList.add("tv");
 const phaserReady = new Promise((ok, no) => {
   if (window.Phaser) {
     ok();
@@ -279,11 +281,18 @@ function winOdds(m, opp) {
   const remA = Math.max(0, m.proj - m.points), remB = Math.max(0, opp.proj - opp.points);
   return remA + remB < 0.5 ? m.points === opp.points ? 0.5 : m.points > opp.points ? 1 : 0 : 1 / (1 + Math.exp(-1.702 * (m.proj - opp.proj) / (6 + 0.32 * (remA + remB))));
 }
+function tvLine() {
+  const G = L.games || {};
+  const live = Object.values(G).filter((s) => s === "in_game").length / 2;
+  if (live >= 1) return `U0001F534 LIVE \xB7 ${Math.round(live)} NFL game${live >= 2 ? "s" : ""} on \xB7 scores every minute`;
+  const next = Object.keys(G).filter((k) => G[k] === "pre_game").map((k) => (L.gameDates || {})[k]).filter(Boolean).sort()[0];
+  return next ? `U0001F3C8 Next kickoff: ${(new Date(`${next}T12:00:00`)).toLocaleDateString("en-US", { weekday: "long" })}` : "U0001F3C1 Week final";
+}
 function hud() {
   rails();
   const m = mine(), opp = m && L.teams.find((t) => t.matchup_id && t.matchup_id === m.matchup_id && t !== m);
-  $("st-league").textContent = `${L.name} \xB7 week ${L.week}`;
-  $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : "Tap \u{1F451} My team to pick your team";
+  $("st-league").textContent = window.__tv ? `${L.name} \xB7 week ${L.week} \xB7 stadium.lamaisonwebstudio.com` : `${L.name} \xB7 week ${L.week}`;
+  $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : window.__tv ? tvLine() : "Tap \u{1F451} My team to pick your team";
   $("st-score").className = m && opp ? m.points >= opp.points ? "up" : "down" : "";
   const win = m && opp ? winOdds(m, opp) : null;
   if (m && opp) {
@@ -907,6 +916,7 @@ function matchupCard(me, opp) {
   sharePicture(cv, `week-${L.week}-matchup.png`, `${me.name} vs ${opp.name}`);
 }
 function drillTeaser() {
+  if (window.__tv) return;
   if (document.querySelector(".td-banner") || $("panel").hidden === false) {
     setTimeout(drillTeaser, 4e3);
     return;
@@ -930,6 +940,7 @@ function drillTeaser() {
   setTimeout(() => b.remove(), 12e3);
 }
 function recapReady() {
+  if (window.__tv) return;
   const G = Object.values(L.games || {}), k = `st-recap-${L.id}-${L.week}`;
   if (!G.length || G.some((s) => s !== "complete") || store(k) || game && game.scene.isActive("minigame")) return;
   store(k, "1");
@@ -1125,7 +1136,7 @@ function updateProj() {
   for (const t of L.teams) t.proj = liveProj(t);
 }
 async function refreshPoints() {
-  if (!L || document.hidden) return;
+  if (!L || document.hidden && !window.__tv) return;
   try {
     const fresh = L.espn ? (await espnLeague(L.id, L.season)).teams : await get(`${API}/league/${L.id}/matchups/${L.week}`);
     for (const x of fresh) {
@@ -1376,6 +1387,27 @@ function askLeague(note) {
   });
   if (!mine() && !navigator.webdriver) setTimeout(whoAreYou, 600);
   setInterval(refreshPoints, 6e4);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshPoints();
+  });
+  if (window.__tv) {
+    document.body.appendChild(el("div", { id: "tv-cap" }, el("b", {}, "\u{1F3DF}\uFE0F A live pixel stadium for YOUR fantasy league"), el("span", {}, "Free \xB7 Sleeper or ESPN \xB7 stadium.lamaisonwebstudio.com")));
+    let k = -1;
+    const tour = () => {
+      const s = game.scene.getScene("stadium");
+      if (!s || !s.sys.isActive() || !s.boards || !s.boards.length) return;
+      k++;
+      let i = k % s.boards.length;
+      if (k % 2 === 1) s.highlight();
+      if (k % 3 === 0) {
+        const close = s.boards.map((B, j) => ({ j, d: Math.abs(B.a.points - B.b.points), on: B.a.points || B.b.points })).filter((x) => x.on).sort((a, b) => a.d - b.d)[0];
+        if (close) i = close.j;
+      }
+      s.focusBoard(i);
+    };
+    setTimeout(tour, /[?&]sample=1/.test(location.search) ? 9e3 : 2500);
+    setInterval(tour, 12e3);
+  }
   window.addEventListener("pointerdown", () => sfx.unlock(), { once: true });
   $("play-btn").addEventListener("click", playGame);
   $("mg-exit").addEventListener("click", exitGame);

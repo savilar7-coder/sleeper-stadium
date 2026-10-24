@@ -190,3 +190,13 @@ body.calm #st-ticker span { animation: none; padding-left: 12px; }
 }
 #mg-score, #mg-down, #mg-msg, #mg-end-title, #mg-end-stat, #mg-end-why, #mg-end-best { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-weight: 600; } 
 #mg-down { font-weight: 500; }
+
+
+body.tv #jump-btn, body.tv #share-btn, body.tv #play-btn, body.tv #zoom-ctl, body.tv #prompt, body.tv #st-fold, body.tv .st-btns,
+body.tv #gh-star, body.tv #tip-pill, body.tv #share-lg { display: none !important; }
+body.tv #st-score { font-size: 26px; } body.tv #st-league { font-size: 16px; }
+body.tv .td-banner { zoom: 1.5; }
+#tv-cap { position: fixed; left: 50%; transform: translateX(-50%); bottom: 44px; z-index: 6; max-width: min(560px, calc(100vw - 24px)); text-align: center;  background: rgba(16, 19, 24, 0.88); color: #fff4d6;
+  border: 2px solid #ffd84a; border-radius: 10px; padding: 8px 12px; font: 600 14px/1.35 "Segoe UI", "Helvetica Neue", Arial, sans-serif; pointer-events: none; }
+#tv-cap b { display: block; color: #ffd84a; font-size: 22px; } #tv-cap span { font-size: 18px; }
+#mg-end-line { font: 600 14px "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #2b1d12; } 

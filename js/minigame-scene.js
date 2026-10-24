@@ -57,6 +57,13 @@ class MiniGameScene extends Phaser.Scene {
     this.score = { me: 0, opp: 0 };
     this.di = -1;
     this.hudTxt = "";
+    this.hail = this.hailUsed = false;
+    this.setSlow(1);
+    {
+      const pm = this.me.projPre || this.me.proj || 0, po = this.opp.projPre || this.opp.proj || 0, gap = Math.abs(pm - po), spread = Math.round(gap * 2) / 2;
+      const fav = spread === 0 ? null : pm > po ? this.me : this.opp;
+      this.line = { fav, spread, txt: fav ? `${fav.name} \u2212${spread.toFixed(1)}` : "Pick'em", boost: fav === this.opp ? Phaser.Math.Clamp(gap / 60, 0, 0.3) : 0 };
+    }
     this.stats = {};
     this.tally = { picks: 0, sacks: 0, downs: 0, clock: 0 };
     this.hud = $("mg-hud");
@@ -144,23 +151,27 @@ class MiniGameScene extends Phaser.Scene {
     this.clock = CLOCK;
     this.state = "pre";
     this.endZones();
-    this.say(kind === "off" ? "\u{1F3C8} Your ball!" : "\u{1F6E1} Defense!");
+    this.say(`${kind === "off" ? "\u{1F3C8} Your ball!" : "\u{1F6E1} Defense!"}${this.di === 0 ? ` \xB7 Line: ${this.line.txt}` : ""}`);
     this.firstPlay = true;
     this.updateHud();
     this.setupPlay();
   }
+  ptsOf(team, i, pid) {
+    const got = (team.starters_points || [])[i] || 0;
+    return Math.round((got || (this.L.proj || {})[pid] || 0) * 10) / 10;
+  }
   names(team) {
     const P = this.L.players, out = [];
-    for (const pid of team.starters || []) {
+    (team.starters || []).forEach((pid, i) => {
       const p = P[pid];
-      if (p && ["WR", "TE", "RB"].includes(p[1])) out.push(surname(p[0]));
-    }
-    while (out.length < 4) out.push(["Red", "Blue", "Gold", "Green"][out.length]);
+      if (p && ["WR", "TE", "RB"].includes(p[1])) out.push({ name: surname(p[0]), pid, pts: this.ptsOf(team, i, pid) });
+    });
+    while (out.length < 4) out.push({ name: ["Red", "Blue", "Gold", "Green"][out.length], pid: null, pts: 0 });
     return out.slice(0, 4);
   }
-  qbName(team) {
-    const P = this.L.players, q = (team.starters || []).find((pid) => P[pid] && P[pid][1] === "QB");
-    return q ? surname(P[q][0]) : "QB";
+  qbOf(team) {
+    const P = this.L.players, i = (team.starters || []).findIndex((pid) => P[pid] && P[pid][1] === "QB");
+    return i < 0 ? { name: "QB", pts: 0 } : { name: surname(P[team.starters[i]][0]), pts: this.ptsOf(team, i, team.starters[i]) };
   }
   setupPlay() {
     for (const o of this.objs || []) o.destroy();
@@ -168,6 +179,8 @@ class MiniGameScene extends Phaser.Scene {
     this.state = "pre";
     this.ball.setVisible(false);
     this.aimG.clear();
+    this.playId = (this.playId || 0) + 1;
+    if (!this.firstPlay && !this.hail) this.say("Set\u2026");
     const off = this.kind === "off" ? this.me : this.opp, def = this.kind === "off" ? this.opp : this.me;
     const W = this.W, y0 = -this.los * YPX, xs = [0.14, 0.38, 0.62, 0.86].map((f) => Phaser.Math.Clamp(f * W, EDGE, W - EDGE));
     const glow = this.sys.renderer && this.sys.renderer.type === Phaser.WEBGL;
@@ -182,19 +195,24 @@ class MiniGameScene extends Phaser.Scene {
           }
         } else s.setTint(14543103);
       }
-      const t = this.add.text(x, y - 44, label, { fontFamily: "Pixelify Sans", fontSize: "12px", color: "#fff", backgroundColor: "rgba(20,20,20,0.6)", padding: { x: 3, y: 1 } }).setOrigin(0.5, 1).setResolution(DPR).setDepth(9e3).setVisible(!!label);
+      const t = this.add.text(x, y - 44, label, { fontFamily: NUM_FONT, fontStyle: "bold", fontSize: "11px", color: "#fff", backgroundColor: "rgba(20,20,20,0.6)", padding: { x: 3, y: 1 } }).setOrigin(0.5, 1).setResolution(DPR).setDepth(9e3).setVisible(!!label);
       this.objs.push(s, t);
       return { s, t, team, x, y, vx: 0, vy: 0 };
     };
-    this.qb = make(off, W / 2, y0 + 4 * YPX, this.qbName(off), "up");
-    const routes = Phaser.Utils.Array.Shuffle(ROUTES.slice());
-    this.recv = this.names(off).map((n, i) => {
-      const r = make(off, xs[i], y0, n, "up");
+    const qb = this.qbOf(off);
+    this.qb = make(off, W / 2, y0 + 4 * YPX, qb.name, "up");
+    this.qb.pts = qb.pts;
+    const routes = this.hail ? ROUTES.map(() => [[0, 100 - this.los + 6]]) : Phaser.Utils.Array.Shuffle(ROUTES.slice());
+    const who = this.names(off), hot = Math.max(...who.map((n) => n.pts));
+    this.recv = who.map((n, i) => {
+      const r = make(off, xs[i], y0, `${n.name}${n.pts ? ` ${n.pts.toFixed(1)}` : ""}${hot > 0 && n.pts === hot ? " \u{1F525}" : ""}`, "up");
+      r.name = n.name;
+      r.pts = n.pts;
       const flip = xs[i] > W / 2 ? -1 : 1;
       r.path = routes[i].map(([dx, dy]) => ({ x: Phaser.Math.Clamp(xs[i] + dx * YPX * flip, EDGE, W - EDGE), y: y0 - dy * YPX }));
-      r.speed = (5.6 + Math.random() * 1.6) * YPX;
-      r.ring = this.add.ellipse(xs[i], y0 + 2, 26, 10, 4906624, 0.3).setStrokeStyle(3, 4906624).setAlpha(0.7).setDepth(2e3 + y0);
-      r.open = true;
+      r.speed = (5.6 + Phaser.Math.Clamp(n.pts / 30, 0, 1) * 1.6) * YPX;
+      r.ring = this.add.ellipse(xs[i], y0 + 2, 26, 10, 10265519, 0.4).setStrokeStyle(3, 10265519).setAlpha(0.7).setDepth(2e3 + y0);
+      r.open = null;
       r.wasOpen = null;
       this.objs.push(r.ring);
       return r;
@@ -203,11 +221,11 @@ class MiniGameScene extends Phaser.Scene {
       const d = make(def, r.x + (Math.random() - 0.5) * 20, y0 - (5 + Math.random() * 3) * YPX, "", "down");
       d.man = r;
       d.speed = (5.2 + Math.random()) * YPX;
-      d.lag = 0.5 + Math.random() * 0.4;
-      d.trail = 18 + Math.random() * 10;
+      d.lag = 0.5 + Math.random() * 0.4 + (this.kind === "off" ? this.line.boost : 0);
+      d.trail = this.hail ? 30 + Math.random() * 20 : 18 + Math.random() * 10;
       return d;
     });
-    const safety = make(def, W / 2, y0 - 16 * YPX, "", "down");
+    const safety = make(def, W / 2, y0 - (this.hail ? 30 : 16) * YPX, "", "down");
     safety.speed = 5.4 * YPX;
     this.defs.push(safety);
     this.you = this.kind === "def" ? this.defs[1] : null;
@@ -223,16 +241,25 @@ class MiniGameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, -110 * YPX - hb, W, 138 * YPX + hb);
     this.cameras.main.centerOn(W / 2, y0 - this.H * 0.28);
     this.updateHud();
+    if (this.hail) {
+      this.banner("HAIL MARY", "#ffffff");
+      this.say("\u{1F64F} 0:00 \u2014 one last play. Throw it up!");
+    }
+    const id = this.playId;
     this.time.delayedCall(700, () => {
-      this.state = "live";
-      this.t0 = this.time.now;
-      sfx.jump && sfx.jump();
-      if (this.firstPlay) {
-        this.firstPlay = false;
-        this.say(this.kind === "off" ? "\u{1F3C8} Tap a receiver in a green ring." : "\u{1F6E1} Tap where your defender should run.");
-      }
-      if (this.kind === "def") this.aiThrowAt = this.time.now + 1300 + Math.random() * 1300;
+      if (this.playId === id) this.snap();
     });
+  }
+  snap() {
+    if (this.state !== "pre") return;
+    this.state = "live";
+    this.t0 = this.time.now;
+    sfx.jump && sfx.jump();
+    if (this.hail) {
+    } else if (this.firstPlay) this.say(this.kind === "off" ? "Hut! \u{1F3C8} Tap a receiver in a green ring." : "Hut! \u{1F6E1} Tap where your defender should run.");
+    else this.say("Hut!");
+    this.firstPlay = false;
+    if (this.kind === "def") this.aiThrowAt = this.time.now + 1300 + Math.random() * 1300;
   }
   cover(r) {
     let c = 999, who = null;
@@ -246,6 +273,10 @@ class MiniGameScene extends Phaser.Scene {
     return { c, who };
   }
   tap(w) {
+    if (this.state === "pre") {
+      this.snap();
+      if (this.kind === "off") return;
+    }
     if (this.state !== "live" && !(this.kind === "def" && (this.state === "aim" || this.state === "air"))) return;
     if (this.kind === "off") {
       let best = null, bd = 1e9;
@@ -286,9 +317,10 @@ class MiniGameScene extends Phaser.Scene {
     let to = { x: r.s.x, y: r.s.y }, dist = 0, t = 0.35;
     for (let k = 0; k < 2; k++) {
       dist = Phaser.Math.Distance.Between(from.x, from.y, to.x, to.y);
-      t = 0.35 + dist / 330;
+      t = 0.35 + dist / (290 + (this.qb.pts || 0) * 3);
       to = this.leadPoint(r, t);
     }
+    if (this.hail && !calm()) this.setSlow(0.4);
     to = { x: Phaser.Math.Clamp(to.x, 10, this.W - 10), y: to.y - 16 };
     this.ball.setVisible(true).setPosition(from.x, from.y);
     this.ballShadow.setVisible(true);
@@ -314,10 +346,26 @@ class MiniGameScene extends Phaser.Scene {
   }
   arrive(r, at) {
     this.state = "over";
+    this.setSlow(1);
+    if (this.hail) {
+      this.hail = false;
+      const roll2 = Math.random();
+      if (roll2 < 0.25) {
+        const s = this.stats[r.name] || (this.stats[r.name] = { c: 0, td: 0, y: 0 });
+        s.c++;
+        s.y += 100 - this.los;
+        return this.endPlay(100 - this.los, `${r.name} comes down with it!`, "catch", r);
+      }
+      if (roll2 < 0.45) {
+        this.tally.picks++;
+        return this.turnover("Picked off in the end zone. \u{1F631}");
+      }
+      return this.endPlay(0, "Batted down. So close!", "inc");
+    }
     const dRecv = Phaser.Math.Distance.Between(at.x, at.y + 16, r.s.x, r.s.y), mine = this.kind === "off";
     if (dRecv > 40) return this.endPlay(0, "Overthrown. Incomplete.", "inc");
     const open = r.openAtThrow !== false && this.cover(r).c > 20, youOn = this.you && Phaser.Math.Distance.Between(at.x, at.y + 16, this.you.s.x, this.you.s.y) < 40, roll = Math.random();
-    const pPick = youOn ? 0.35 : open ? 0 : 0.15, pCatch = youOn ? 0.3 : open ? 0.85 : 0.35;
+    const pPick = youOn ? 0.35 : open ? 0 : 0.15, pCatch = youOn ? 0.3 : open ? 0.75 + Math.min(0.2, r.pts / 100) : 0.35;
     if (roll < pPick) {
       if (mine) this.tally.picks++;
       return this.turnover(mine ? "Intercepted! \u{1F631} He was covered." : "INTERCEPTION! \u{1F64C}");
@@ -326,11 +374,11 @@ class MiniGameScene extends Phaser.Scene {
     const yac = open ? 4 + Math.random() * 10 : Math.random() * 3;
     const gain = Math.round(-r.s.y / YPX - this.los + yac);
     if (mine) {
-      const s = this.stats[r.t.text] || (this.stats[r.t.text] = { c: 0, td: 0, y: 0 });
+      const s = this.stats[r.name] || (this.stats[r.name] = { c: 0, td: 0, y: 0 });
       s.c++;
       s.y += gain;
     }
-    const text = `${r.t.text} catches it${yac > 8 ? " and breaks free" : ""}!`;
+    const text = `${r.name} catches it${yac > 8 ? " and breaks free" : ""}!`;
     if (calm()) return this.endPlay(gain, text, "catch", r);
     this.burst(r.s.x, r.s.y - 20, 16777215, 6);
     this.tweens.add({ targets: r.s, scale: 1.5, duration: 60, yoyo: true });
@@ -346,7 +394,7 @@ class MiniGameScene extends Phaser.Scene {
     if (how === "sack" && mine) this.tally.sacks++;
     if (this.los >= 100) {
       this.score[mine ? "me" : "opp"] += 7;
-      if (mine && r && this.stats[r.t.text]) this.stats[r.t.text].td++;
+      if (mine && r && this.stats[r.name]) this.stats[r.name].td++;
       this.say(`${text} TOUCHDOWN ${mine ? this.me.name : this.opp.name}! \u{1F389}`);
       sfx.cheer && sfx.cheer();
       this.touchdown();
@@ -368,6 +416,11 @@ class MiniGameScene extends Phaser.Scene {
       if (mine) this.tally.downs++;
       this.say(`${text} Turnover on downs.`);
       return this.time.delayedCall(1800, () => this.nextDrive());
+    }
+    if (this.clock <= 0 && mine && !this.hailUsed && this.di === DRIVES.lastIndexOf("off") && this.score.me <= this.score.opp) {
+      this.hail = this.hailUsed = true;
+      this.say(`${text} \u23F1 0:00 \u2014 one last play!`);
+      return this.time.delayedCall(1500, () => this.setupPlay());
     }
     if (this.clock <= 0) {
       if (mine) this.tally.clock++;
@@ -409,8 +462,18 @@ class MiniGameScene extends Phaser.Scene {
     this.firstLine.y = -(this.los + this.toGo) * YPX;
     this.tweens.add({ targets: this.firstLine, alpha: 0.15, duration: 110, yoyo: true, repeat: 2, onComplete: () => this.firstLine.setAlpha(1) });
   }
-  touchdown() {
+  setSlow(k) {
+    this.slow = k;
+    this.tweens.timeScale = k;
+    this.time.timeScale = k;
+  }
+  banner(txt, color) {
     const v = this.view(), cy = v.y - this.H * 0.12;
+    const b = this.add.text(v.x, cy - this.H * 0.4, txt, { fontFamily: "Pixelify Sans", fontSize: "40px", fontStyle: "bold", color, stroke: "#2b1d12", strokeThickness: 6 }).setOrigin(0.5).setResolution(DPR).setDepth(9900);
+    this.tweens.add({ targets: b, y: cy, duration: 400, ease: "Back.easeOut", onComplete: () => this.tweens.add({ targets: b, alpha: 0, delay: 1200, duration: 250, onComplete: () => b.destroy() }) });
+  }
+  touchdown() {
+    const v = this.view();
     if (!calm()) {
       this.cameras.main.shake(250, 8e-3);
       for (let i = 0; i < 36; i++) {
@@ -418,8 +481,7 @@ class MiniGameScene extends Phaser.Scene {
         this.tweens.add({ targets: p, y: p.y + this.H * (0.6 + Math.random() * 0.3), x: x + (Math.random() - 0.5) * 40, angle: 360 * (Math.random() < 0.5 ? -1 : 1), duration: 1300 + Math.random() * 800, ease: "Sine.easeIn", onComplete: () => p.destroy() });
       }
     }
-    const b = this.add.text(v.x, cy - this.H * 0.4, "TOUCHDOWN", { fontFamily: "Pixelify Sans", fontSize: "40px", fontStyle: "bold", color: "#ffd84a", stroke: "#2b1d12", strokeThickness: 6 }).setOrigin(0.5).setResolution(DPR).setDepth(9900);
-    this.tweens.add({ targets: b, y: cy, duration: 400, ease: "Back.easeOut", onComplete: () => this.tweens.add({ targets: b, alpha: 0, delay: 1200, duration: 250, onComplete: () => b.destroy() }) });
+    this.banner("TOUCHDOWN", "#ffd84a");
   }
   finish() {
     for (const o of this.objs || []) o.destroy();
@@ -434,6 +496,9 @@ class MiniGameScene extends Phaser.Scene {
     const w = $("mg-end-why");
     w.textContent = why;
     w.hidden = !why;
+    const VL = this.line, edge = VL.fav === this.me ? margin - VL.spread : VL.fav === this.opp ? margin + VL.spread : margin;
+    const ats = VL.fav === this.opp && win ? "Upset! \u{1F436}" : edge > 0 ? "Covered \u2705" : edge === 0 ? "Push" : "Didn't cover";
+    $("mg-end-line").textContent = `Line: ${VL.txt} \xB7 ${ats}`;
     const key = `mg-best-${this.L.id}-${this.opp.roster_id}`, sign = (n) => `${n > 0 ? "+" : n < 0 ? "\u2212" : "\xB1"}${Math.abs(n)}`;
     let best = null;
     try {
@@ -455,7 +520,7 @@ class MiniGameScene extends Phaser.Scene {
     $("mg-exit").hidden = true;
     $("mg-end").hidden = false;
     this.hud.classList.add("mg-over");
-    $("mg-share").dataset.text = `${$("mg-end-title").textContent.replace(" \u2014 run it back", "")}${top ? ` \xB7 ${$("mg-end-stat").textContent}` : ""} \xB7 beat that in the 2-Minute Drill \u{1F3C8}`;
+    $("mg-share").dataset.text = `${$("mg-end-title").textContent.replace(" \u2014 run it back", "")}${top ? ` \xB7 ${$("mg-end-stat").textContent}` : ""} \xB7 ${ats} \xB7 beat that in the 2-Minute Drill \u{1F3C8}`;
     if (win) sfx.cheer && sfx.cheer();
   }
   say(t) {
@@ -472,7 +537,7 @@ class MiniGameScene extends Phaser.Scene {
   }
   update(time, delta) {
     if (this.state !== "live" && this.state !== "air" && this.state !== "aim") return;
-    const dt = delta / 1e3;
+    const dt = delta / 1e3 * (this.slow || 1);
     this.clock = Math.max(0, this.clock - dt);
     const move = (o, tx, ty, sp) => {
       tx = Phaser.Math.Clamp(tx, EDGE, this.W - EDGE);
@@ -523,7 +588,7 @@ class MiniGameScene extends Phaser.Scene {
     }
     if (this.state === "live") {
       move(this.qb, this.qb.s.x, this.qb.s.y, 0);
-      if (this.kind === "off" && time - this.t0 > 4200) return this.endPlay(-5, "Sacked!", "sack");
+      if (this.kind === "off" && time - this.t0 > (this.hail ? 5500 : 4200)) return this.endPlay(-5, "Sacked!", "sack");
       if (this.kind === "def" && time > this.aiThrowAt) {
         let best = this.recv[0], bo = -1;
         for (const r of this.recv) {

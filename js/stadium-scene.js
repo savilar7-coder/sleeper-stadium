@@ -883,10 +883,15 @@ class StadiumScene extends World {
     this.updateMoods();
     this.updatePodiums();
     const prev = this.prevPts || {}, prevSP = this.prevSP || {};
+    const nowMs = Date.now(), stale = this.lastScoreAt && nowMs - this.lastScoreAt > 15e4;
+    let awayPts = 0, awayTeams = 0;
     for (const { s, t } of this.teamSprites.values()) {
       if (prev[t.roster_id] != null && t.points > prev[t.roster_id] + 0.05) {
         const jump = t.points - prev[t.roster_id];
-        if (jump >= 4) {
+        if (stale) {
+          awayPts += jump;
+          awayTeams++;
+        } else if (jump >= 4) {
           const was2 = prevSP[t.roster_id] || [], now = t.starters_points || [];
           let best = -1, bestUp = 0;
           now.forEach((pts, i) => {
@@ -899,7 +904,7 @@ class StadiumScene extends World {
           const pid = best >= 0 ? (t.starters || [])[best] : null, who = pid && this.league.players[pid] ? this.league.players[pid][0] : "";
           this.touchdown(t, jump, who);
         }
-        this.celebrate(s, t);
+        if (!stale) this.celebrate(s, t);
         const was = prevSP[t.roster_id] || [], P = this.league.players || {};
         (t.starters_points || []).forEach((pts, i) => {
           const up = pts - (was[i] || 0), pid = (t.starters || [])[i];
@@ -912,6 +917,22 @@ class StadiumScene extends World {
     }
     this.prevPts = prev;
     this.prevSP = prevSP;
+    this.lastScoreAt = nowMs;
+    const odds = this.prevOdds = this.prevOdds || {};
+    for (const { a, b } of this.boards || []) {
+      const k = `${a.roster_id}-${b.roster_id}`, pa = this.winChance(a, b), was = odds[k];
+      odds[k] = pa;
+      if (was == null || stale || !this.sys.isActive() || Math.abs(pa - was) < 0.25) continue;
+      const fav = pa >= 0.5 ? a : b, now = Math.round(Math.max(pa, 1 - pa) * 100), before = Math.round((fav === a ? was : 1 - was) * 100);
+      this.tdQueue = this.tdQueue || [];
+      if (this.tdQueue.length >= 3) continue;
+      this.tdQueue.push({ text: "\u{1F4C8} BIG SWING", who: `${fav.name} now ${now}%`, sub: `was ${before}% \xB7 ${a.name} vs ${b.name}`, mine: !!(a.mine || b.mine) });
+      if (this.tdQueue.length === 1) this.nextTd();
+    }
+    if (stale && awayTeams && this.sys.isActive()) {
+      (this.tdQueue = this.tdQueue || []).push({ text: "\u23F1 WHILE YOU WERE AWAY", who: `+${awayPts.toFixed(1)} points`, sub: `across ${awayTeams} team${awayTeams > 1 ? "s" : ""}`, mine: false });
+      if (this.tdQueue.length === 1) this.nextTd();
+    }
     this.updateProps();
     this.updateJumbo();
     this.applyUiScale();
@@ -957,6 +978,7 @@ class StadiumScene extends World {
   touchdown(t, jump, who) {
     if (!this.sys.isActive()) return;
     const q = this.tdQueue = this.tdQueue || [];
+    if (q.length >= 3) return;
     q.push({ text: `\u{1F3C8} ${jump >= 5.5 ? "TOUCHDOWN" : "BIG PLAY"}`, who, sub: `+${jump.toFixed(1)} \xB7 ${t.name}`, mine: t.mine });
     const ts = this.teamSprites && this.teamSprites.get(t.roster_id);
     this.tdCheer = { left: ts ? ts.side === 0 : true, y: ts ? ts.s.y : 0, start: this.time.now, until: this.time.now + 3600 };
@@ -981,8 +1003,46 @@ class StadiumScene extends World {
     } });
     this.nudgeCamera(S.s.x, S.s.y - 30, t.mine);
   }
+  highlight() {
+    if ((this.tdQueue || []).length || Date.now() - (this.lastBannerAt || 0) < 22e3) return;
+    const L = this.league, P = L.players || {}, best = [];
+    for (const t of L.teams) (t.starters || []).forEach((pid, i) => {
+      const v = (t.starters_points || [])[i] || 0;
+      if (pid && pid !== "0" && v > 0) best.push({ pid, v, t });
+    });
+    best.sort((x, y) => y.v - x.v);
+    const live = (this.boards || []).filter((B) => B.a.points || B.b.points), close = [...live].sort((x, y) => Math.abs(x.a.points - x.b.points) - Math.abs(y.a.points - y.b.points))[0];
+    const ass = (this.boards || []).find((B) => B.sign);
+    const picks = [
+      best[0] && { text: "\u2B50 TOP PLAY", who: `${P[best[0].pid] ? P[best[0].pid][0] : ""} ${best[0].v.toFixed(1)}`, sub: best[0].t.name },
+      close && { text: "U0001F62C CLOSEST GAME", who: `${close.a.points.toFixed(1)} \u2013 ${close.b.points.toFixed(1)}`, sub: `${close.a.name} vs ${close.b.name}` },
+      ass && (ass.a.points || ass.b.points) && { text: "U0001F6BD ASS BOWL", who: `${ass.a.points.toFixed(1)} \u2013 ${ass.b.points.toFixed(1)}`, sub: `${ass.a.name} vs ${ass.b.name}` }
+    ].filter(Boolean);
+    if (!picks.length) return;
+    this.hlTurn = ((this.hlTurn || 0) + 1) % picks.length;
+    (this.tdQueue = this.tdQueue || []).push({ ...picks[this.hlTurn], mine: false });
+    if (this.tdQueue.length === 1) this.nextTd();
+  }
+  focusBoard(i) {
+    const B = (this.boards || [])[i];
+    if (!B || panelOpen) return;
+    const cam = this.cameras.main;
+    this.nudging = false;
+    this.spawnOffset = false;
+    const hud = document.getElementById("st-hud"), hudH = hud ? hud.getBoundingClientRect().bottom : 0;
+    cam.stopFollow();
+    cam.pan((FIELD.x0 + FIELD.x1 + 1) / 2 * TILE, B.board.y - 10 - hudH * this.scale.height / window.innerHeight / 2 / cam.zoom, 1200, "Sine.easeInOut", true);
+  }
   nudgeCamera(x, y, shake) {
     const cam = this.cameras.main;
+    if (window.__tv) {
+      if (!window.__calm) {
+        cam.stopFollow();
+        cam.pan(x, y, 600, "Sine.easeInOut", true);
+        if (shake) cam.shake(220, 4e-3);
+      }
+      return;
+    }
     if (panelOpen || this.target || this.stick && this.stick.active || this.nudging || window.__calm) return;
     if (cam.worldView.contains(x, y)) {
       if (shake) cam.shake(220, 4e-3);
@@ -1019,6 +1079,7 @@ class StadiumScene extends World {
   nextTd() {
     const q = this.tdQueue || [], item = q[0];
     if (!item) return;
+    this.lastBannerAt = Date.now();
     const el2 = document.createElement("div");
     el2.className = "td-banner" + (item.mine ? " mine" : "") + (window.__calm ? " calm" : "");
     el2.innerHTML = `<b></b><i></i><span></span>`;
