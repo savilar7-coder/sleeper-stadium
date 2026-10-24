@@ -133,6 +133,8 @@ class StadiumScene extends World {
     const picked = this.league.teams.some((t) => t.mine);
     this.youRing.setVisible(picked);
     this.youTag.setVisible(picked).setDepth(99990);
+    this.youOn = picked && mineTS && ((navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window || matchMedia("(pointer: coarse)").matches) ? mineTS.s : null;
+    this.player.setVisible(picked && !this.youOn);
     this.facing = "up";
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.blockers);
@@ -2100,7 +2102,7 @@ ${r1(t.points)} pts`);
     }
     shadowFor(this, this.player);
     if (this.youRing) {
-      const P = this.player, t = this.time.now;
+      const P = this.youOn || this.player, t = this.time.now;
       this.youRing.setPosition(P.x, P.y - 2).setDepth(P.y - 3).setScale(1 + Math.sin(t / 300) * 0.08);
       const out = P.x < (FIELD.x0 + FIELD.x1 + 1) / 2 * TILE, txt = out ? "YOU \u25B6" : "\u25C0 YOU";
       if (this.youTag.text !== txt) this.youTag.setText(txt);
