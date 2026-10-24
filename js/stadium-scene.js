@@ -1886,6 +1886,10 @@ ${t.points.toFixed(1)} pts`);
       return pid && pid !== "0" && (hasG ? st && st !== "complete" : true);
     }).map((pid) => P[pid] ? String(P[pid][0]).split(" ").slice(-1)[0] : pid);
   }
+  liveNow(t) {
+    const G = this.league.games || {}, P = this.league.players || {};
+    return (t.starters || []).some((pid) => pid && pid !== "0" && G[P[pid] ? P[pid][2] : pid] === "in_game");
+  }
   sweatLine(a, b) {
     const la = this.playersLeft(a), lb = this.playersLeft(b);
     if (!la.length && !lb.length) return { text: "FINAL", done: true };
@@ -1896,6 +1900,7 @@ ${t.points.toFixed(1)} pts`);
       return n.length > 16 ? `${n.slice(0, 15)}\u2026` : n;
     }, who = short(trail.name);
     if (!lt.length) return { text: `\u2705 ${short(lead.name)} wins`, done: true };
+    if (gap === "0.0") return { text: `Tied \xB7 ${la.length} v ${lb.length} to play`, done: false };
     return { text: `${who} needs ${gap} \xB7 ${names(lt)} left${ll.length ? ` vs ${ll.length}` : ""}`, done: false };
   }
   drawBars() {
@@ -1942,15 +1947,16 @@ ${t.points.toFixed(1)} pts`);
       if (o.pct.text !== t) o.pct.setText(t);
       const fs = Math.round(15 * DPR / Math.max(0.5, this.cameras.main.zoom / DPR));
       o.pct.setFontSize(Math.round(14 * DPR)).setStroke("#0f141a", Math.round(5 * DPR)).setScale(board.scaleX).setOrigin(0.5, 1).setPosition(kx, hy - 8).setDepth(board.depth + 1);
-      const sw = sweat ? this.sweatLine(a, b) : null, pt = sw ? sw.text : `proj ${a.proj.toFixed(1)} \u2013 ${b.proj.toFixed(1)}`;
+      const sw = sweat || this.liveNow(a) || this.liveNow(b) ? this.sweatLine(a, b) : null, pt = sw ? sw.text : `proj ${a.proj.toFixed(1)} \u2013 ${b.proj.toFixed(1)}`;
       if (projTxt.text !== pt) projTxt.setText(pt);
       const pcol = lead ? "#9dff7a" : "#e8e2ff";
       if (o.pct.style.color !== pcol) o.pct.setColor(pcol);
       const tcol = sw && !sw.done ? "#ffd84a" : "#9aa3ad";
       if (projTxt.style.color !== tcol) projTxt.setColor(tcol);
-      if (o.sweatStyle !== !!sw) {
-        o.sweatStyle = !!sw;
-        projTxt.setFontSize(Math.round((sw ? 13 : 11) * DPR)).setStroke("#0f141a", sw ? Math.round(3 * DPR) : 0);
+      const sty = sw ? sweat ? 13 : 12 : 11;
+      if (o.sweatStyle !== sty) {
+        o.sweatStyle = sty;
+        projTxt.setFontSize(Math.round(sty * DPR)).setStroke("#0f141a", sw ? Math.round(3 * DPR) : 0);
       }
       const dim = sw && sw.done && !a.mine && !b.mine ? 0.7 : 1;
       for (const g of [A.s, B.s, board, bar, o.rope, o.pct, projTxt]) if (g && g.alpha !== dim) g.setAlpha(dim);
