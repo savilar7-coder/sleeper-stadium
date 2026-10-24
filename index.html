@@ -89,6 +89,16 @@
   });
 })();
 </script>
+<script>
+(function () {
+  if (!/[?&](blimp|looks|gold)=/.test(location.search) || /[?&]sample=1/.test(location.search)) return;
+  document.documentElement.classList.add('pass');
+  var st = document.createElement('style');
+  st.textContent = 'html.pass #tip-pill,html.pass #live-tip,html.pass .tip-a,html.pass #nudge div:has(> .tip-a){display:none!important}'
+    + 'html.pass #st-league::after{content:" · ★ League Pass";color:#b8860b;font-weight:700}';
+  document.head.appendChild(st);
+})();
+</script>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
