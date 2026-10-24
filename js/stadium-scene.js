@@ -887,10 +887,10 @@ class StadiumScene extends World {
       if (prev[t.roster_id] != null && t.points > prev[t.roster_id] + 0.05) {
         const jump = t.points - prev[t.roster_id];
         if (jump >= 4) {
-          const was = prevSP[t.roster_id] || [], now = t.starters_points || [];
+          const was2 = prevSP[t.roster_id] || [], now = t.starters_points || [];
           let best = -1, bestUp = 0;
           now.forEach((pts, i) => {
-            const up = pts - (was[i] || 0);
+            const up = pts - (was2[i] || 0);
             if (up > bestUp) {
               bestUp = up;
               best = i;
@@ -900,6 +900,12 @@ class StadiumScene extends World {
           this.touchdown(t, jump, who);
         }
         this.celebrate(s, t);
+        const was = prevSP[t.roster_id] || [], P = this.league.players || {};
+        (t.starters_points || []).forEach((pts, i) => {
+          const up = pts - (was[i] || 0), pid = (t.starters || [])[i];
+          if (up > 0.05 && pid) (this.league.feed = this.league.feed || []).unshift(`${P[pid] ? String(P[pid][0]).split(" ").slice(-1)[0] : pid} +${up.toFixed(1)} \u2192 ${t.name.length > 16 ? `${t.name.slice(0, 15)}\u2026` : t.name}`);
+        });
+        if (this.league.feed) this.league.feed.length = Math.min(this.league.feed.length, 4);
       }
       prev[t.roster_id] = t.points;
       prevSP[t.roster_id] = (t.starters_points || []).slice();
@@ -1413,6 +1419,8 @@ class StadiumScene extends World {
     const live = pairs.filter((p) => p.a.points > 0 || p.b.points > 0);
     const name = (t) => t.name.length > 16 ? `${t.name.slice(0, 15)}\u2026` : t.name;
     const pages = [];
+    if ((L.feed || []).length) pages.push(`\u{1F3C8} LIVE
+${L.feed.join("\n")}`);
     const st = [...L.teams].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts).slice(0, 3);
     pages.push(`STANDINGS
 ${st.map((t, i) => `${i + 1}. ${name(t)}  ${t.wins}-${t.losses}`).join("\n")}`);

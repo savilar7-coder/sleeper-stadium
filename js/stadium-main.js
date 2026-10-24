@@ -264,13 +264,16 @@ function picksOf(rid) {
 const mine = () => L.teams.find((t) => t.mine);
 const toPlay = (t) => (t.starters || []).filter((pid) => pid && pid !== "0" && (L.games || {})[L.players[pid] ? L.players[pid][2] : pid] !== "complete").length;
 let sinceTxt;
+function winOdds(m, opp) {
+  const remA = Math.max(0, m.proj - m.points), remB = Math.max(0, opp.proj - opp.points);
+  return remA + remB < 0.5 ? m.points === opp.points ? 0.5 : m.points > opp.points ? 1 : 0 : 1 / (1 + Math.exp(-1.702 * (m.proj - opp.proj) / (6 + 0.32 * (remA + remB))));
+}
 function hud() {
   const m = mine(), opp = m && L.teams.find((t) => t.matchup_id && t.matchup_id === m.matchup_id && t !== m);
   $("st-league").textContent = `${L.name} \xB7 week ${L.week}`;
   $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : "Tap \u{1F451} My team to pick your team";
   $("st-score").className = m && opp ? m.points >= opp.points ? "up" : "down" : "";
-  const remA = Math.max(0, m && opp ? m.proj - m.points : 0), remB = Math.max(0, m && opp ? opp.proj - opp.points : 0);
-  const win = !m || !opp ? null : remA + remB < 0.5 ? m.points === opp.points ? 0.5 : m.points > opp.points ? 1 : 0 : 1 / (1 + Math.exp(-1.702 * (m.proj - opp.proj) / (6 + 0.32 * (remA + remB))));
+  const win = m && opp ? winOdds(m, opp) : null;
   if (m && opp) {
     const k = `st-last-${L.id}-${L.week}-${m.roster_id}`;
     if (sinceTxt === void 0) {
@@ -571,6 +574,7 @@ async function trophies() {
 function standings() {
   const rows = [...L.teams].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts);
   const power = [...L.teams].sort((a, b) => b.fpts - a.fpts).map((t) => t.roster_id);
+  const po = L.settings && L.settings.playoff_teams || 6, poWeek = L.settings && L.settings.playoff_week_start || 15;
   openPanel(`\u{1F3C6} ${L.name}`, async () => {
     const tr = await trophies();
     return [
@@ -578,17 +582,20 @@ function standings() {
         "table",
         {},
         el("tr", {}, el("th", {}, "#"), el("th", {}, "Team"), el("th", {}, "W-L"), el("th", { class: "num" }, "PF"), el("th", { class: "num" }, "Power")),
-        rows.map((t, i) => el(
-          "tr",
-          t.mine ? { class: "mine" } : {},
-          el("td", {}, String(i + 1)),
-          el("td", {}, `${t.mine ? "\u{1F451} " : ""}${t.name}`),
-          el("td", {}, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}`),
-          el("td", { class: "num" }, fmt(t.fpts)),
-          el("td", { class: "num" }, `#${power.indexOf(t.roster_id) + 1}`)
-        ))
+        rows.map((t, i) => [
+          el(
+            "tr",
+            t.mine ? { class: "mine" } : {},
+            el("td", {}, String(i + 1)),
+            el("td", {}, `${t.mine ? "\u{1F451} " : ""}${t.name}`),
+            el("td", {}, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}`),
+            el("td", { class: "num" }, fmt(t.fpts)),
+            el("td", { class: "num" }, `#${power.indexOf(t.roster_id) + 1}`)
+          ),
+          i + 1 === po && i + 1 < rows.length ? el("tr", {}, el("td", { colspan: "5", style: "padding:1px 0;border-top:3px dashed #c9a227;font-size:11px;color:#9e7c0c;text-align:center" }, "\u2014 playoff line \u2014")) : null
+        ])
       ),
-      el("p", { class: "small" }, "Power = rank by points scored this season. Top 6 make the playoffs (from week 15)."),
+      el("p", { class: "small" }, `Power = rank by points scored this season. Top ${po} make the playoffs (from week ${poWeek}).`),
       tr.length ? [el("h3", {}, "Season trophies"), el("div", { class: "chips" }, tr.map((x) => el("span", { class: "chip" }, x)))] : null,
       L.champs.length ? [el("h3", {}, "Champions"), el("div", { class: "chips" }, L.champs.map((c) => el("span", { class: "chip gold" }, `\u{1F3C6} ${c.season}: ${c.team}`)))] : null
     ];
@@ -803,9 +810,11 @@ function matchupCard(me, opp) {
   c.fillStyle = "#e0394c";
   c.font = `900 64px ${font}`;
   c.fillText("VS", W / 2, 440);
-  c.fillStyle = "#fff4d6";
-  c.font = `900 80px ${font}`;
-  c.fillText("WHO YOU GOT? \u{1F447}", W / 2, 800);
+  const d = me.points - opp.points, done = (me.starters || []).concat(opp.starters || []).every((pid) => !pid || pid === "0" || (L.games || {})[L.players[pid] ? L.players[pid][2] : pid] === "complete") && Object.keys(L.games || {}).length;
+  const line = !me.points && !opp.points ? "WHO YOU GOT? \u{1F447}" : done ? d >= 0 ? `WON BY ${fmt(d)} \u{1F60E}` : `LOST BY ${fmt(-d)} \u{1F624}` : `${d >= 0 ? "UP" : "DOWN"} ${fmt(Math.abs(d))} \xB7 ${Math.round(winOdds(me, opp) * 100)}% TO WIN`;
+  c.fillStyle = d >= 0 || !me.points ? "#fff4d6" : "#ffb4a8";
+  c.font = `900 ${line.length > 18 ? 64 : 80}px ${font}`;
+  c.fillText(line, W / 2, 800);
   c.fillStyle = "#c9a227";
   c.font = `bold 26px ${font}`;
   c.fillText("WATCH IT LIVE", W / 2, H - 112);
@@ -833,6 +842,54 @@ function recapReady() {
   b.querySelector(".rr-x").onclick = () => b.remove();
   document.body.appendChild(b);
   setTimeout(() => b.remove(), 15e3);
+}
+function awardsList() {
+  const pct = (t) => {
+    const g = t.wins + t.losses + t.ties;
+    return g ? (t.wins + t.ties / 2) / g : 0.5;
+  };
+  const pairs = Object.values(L.teams.reduce((m, t) => {
+    if (t.matchup_id) (m[t.matchup_id] = m[t.matchup_id] || []).push(t);
+    return m;
+  }, {})).filter((p) => p.length === 2);
+  const live = L.teams.filter((t) => t.matchup_id);
+  if (!pairs.length || !live.some((t) => t.points > 0)) return [];
+  const top = [...live].sort((a, b) => b.points - a.points)[0], low = [...live].sort((a, b) => a.points - b.points)[0];
+  const gap = (p) => Math.abs(p[0].points - p[1].points), byGap = [...pairs].sort((a, b) => gap(b) - gap(a));
+  const lead = (p) => p[0].points >= p[1].points ? p : [p[1], p[0]], decided = pairs.filter((p) => gap(p) > 0.05).map(lead);
+  const ass = [...pairs].sort((a, b) => pct(a[0]) + pct(a[1]) - (pct(b[0]) + pct(b[1])) || a[0].fpts + a[1].fpts - (b[0].fpts + b[1].fpts))[0];
+  const bench = (t) => Object.entries(t.players_points || {}).filter(([pid]) => !(t.starters || []).includes(pid)).reduce((n, [, v]) => n + (v || 0), 0);
+  const shame = [...live].sort((a, b) => bench(b) - bench(a))[0];
+  let mvp = null;
+  for (const t of live) (t.starters || []).forEach((pid, i) => {
+    const v = (t.starters_points || [])[i] || 0;
+    if (pid && pid !== "0" && (!mvp || v > mvp.v)) mvp = { pid, v, t };
+  });
+  const unlucky = [...decided].sort((a, b) => b[1].points - a[1].points)[0], lucky = [...decided].sort((a, b) => a[0].points - b[0].points)[0];
+  const blow = byGap[0], close = byGap[byGap.length - 1];
+  return [
+    ["\u{1F525} Top score", top.name, fmt(top.points)],
+    mvp && mvp.v > 0 ? ["\u2B50 MVP", `${pname(mvp.pid)} (${mvp.t.name})`, fmt(mvp.v)] : null,
+    ["\u{1F4A5} Biggest blowout", `${lead(blow)[0].name} over ${lead(blow)[1].name}`, `by ${fmt(gap(blow))}`],
+    ["\u{1F62C} Closest game", `${lead(close)[0].name} over ${lead(close)[1].name}`, `by ${fmt(gap(close))}`],
+    unlucky ? ["\u{1F494} Unluckiest", `${unlucky[1].name} lost with`, fmt(unlucky[1].points)] : null,
+    lucky ? ["\u{1F340} Luckiest win", `${lucky[0].name} won with`, fmt(lucky[0].points)] : null,
+    ["\u{1F6BD} ASS Bowl", `${lead(ass)[0].name} vs ${lead(ass)[1].name}`, `${fmt(lead(ass)[0].points)} \u2013 ${fmt(lead(ass)[1].points)}`],
+    ["\u{1FA91} Bench of shame", shame.name, `${fmt(bench(shame))} on the bench`],
+    ["\u{1F327}\uFE0F Lowest score", low.name, fmt(low.points)]
+  ].filter(Boolean);
+}
+function awards() {
+  const list = awardsList(), final = Object.values(L.games || {}).length && Object.values(L.games).every((s) => s === "complete");
+  openPanel(`\u{1F3C5} Week ${L.week} awards${final ? "" : " (so far)"}`, async () => [
+    list.length ? el("table", {}, list.map(([k, who, n]) => el("tr", {}, el("td", {}, el("b", {}, k)), el("td", {}, who), el("td", { class: "num" }, n)))) : el("p", {}, "No points yet this week. Awards show up once the games start."),
+    list.length ? (() => {
+      const b = el("button", { type: "button", class: "mu-share" }, "\u{1F4F8} Share as a picture");
+      b.onclick = () => recap();
+      return b;
+    })() : null,
+    el("p", { class: "small" }, final ? "Final for the week." : "Live: they change as the games go.")
+  ]);
 }
 function recap() {
   const pct = (t) => {
@@ -865,24 +922,17 @@ function recap() {
   c.fillStyle = "#ffd84a";
   c.font = `900 96px ${font}`;
   c.fillText(`WEEK ${L.week} RECAP`, W / 2, 220);
-  const rows = [
-    ["\u{1F525} Top score", `${top.name}`, fmt(top.points)],
-    ["\u{1F327}\uFE0F Lowest score", `${low.name}`, fmt(low.points)],
-    ["\u{1F4A5} Biggest blowout", `${lead(blow)[0].name} over ${lead(blow)[1].name}`, `by ${fmt(gap(blow))}`],
-    ["\u{1F62C} Closest game", `${lead(close)[0].name} over ${lead(close)[1].name}`, `by ${fmt(gap(close))}`],
-    ["\u{1F6BD} ASS Bowl", `${lead(ass)[0].name} vs ${lead(ass)[1].name}`, `${fmt(lead(ass)[0].points)} \u2013 ${fmt(lead(ass)[1].points)}`],
-    ["\u{1FA91} Bench of shame", `${shame.name}`, `${fmt(bench(shame))} left on the bench`]
-  ];
+  const rows = awardsList().slice(0, 8), RH = 112;
   rows.forEach(([k, who, n], i) => {
-    const y = 290 + i * 156;
+    const y = 270 + i * RH;
     c.fillStyle = "rgba(255,255,255,0.08)";
     c.beginPath();
-    c.roundRect(70, y, W - 140, 136, 22);
+    c.roundRect(70, y, W - 140, RH - 14, 20);
     c.fill();
     c.textAlign = "left";
     c.fillStyle = "#c9a227";
-    c.font = `bold 30px ${font}`;
-    c.fillText(k, 110, y + 46);
+    c.font = `bold 26px ${font}`;
+    c.fillText(k, 110, y + 36);
     c.font = `bold 36px ${font}`;
     const room = W - 220 - c.measureText(n).width - 40;
     c.textAlign = "right";
@@ -1192,7 +1242,8 @@ function askLeague(note) {
   $("share-btn").addEventListener("click", shareMine);
   $("st-table").addEventListener("click", standings);
   $("st-news").addEventListener("click", news);
-  $("st-recap").addEventListener("click", recap);
+  $("st-recap").addEventListener("click", awards);
+  $("st-recap").textContent = "\u{1F3C5} Awards";
   $("st-trade").addEventListener("click", () => tradeMaker(null));
   const fold = (on) => {
     $("st-hud").classList.toggle("mini", on);

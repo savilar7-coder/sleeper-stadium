@@ -156,3 +156,15 @@
 @media (prefers-reduced-motion: reduce) { #st-ticker span { animation: none; padding-left: 12px; } }
 body.calm #st-ticker span { animation: none; padding-left: 12px; }
 #st-hud.mini #st-score { padding-right: 40px; } 
+
+#mg-end { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(340px, calc(100vw - 32px)); box-sizing: border-box; z-index: 7; display: grid; gap: 6px;
+  padding: 14px 14px 12px; background: #fbf3df; border: 3px solid #6b4f2a; border-radius: 8px; box-shadow: 0 4px 0 rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35); text-align: center; }
+#mg-end[hidden], #mg-end-why[hidden], #mg-exit[hidden] { display: none; }
+#mg-end-title { font-size: 19px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+#mg-end-stat { font-size: 15px; }
+#mg-end-why { font-size: 14px; color: #a1361f; }
+#mg-end-best { font-size: 13px; color: #7a6a52; }
+.mg-end-btns { display: grid; gap: 6px; margin-top: 4px; }
+.mg-end-btns button { font: inherit; font-size: 15px; min-height: 44px; border: 2px solid #6b4f2a; border-radius: 5px; background: #f1e4c3; color: #2b1d12; cursor: pointer; }
+.mg-end-btns #mg-again { font-size: 18px; font-weight: 600; color: #fff; background: #d77a35; border-width: 3px; box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+#mg-down { font-variant-numeric: tabular-nums; }
