@@ -121,12 +121,12 @@ function applyLooks(teams, picked) {
   } catch {
   }
   const okLook = (v) => ALL_LOOKS.includes(v) || ["Raven", "Dumpster", "Steeler", "Shorty"].includes(v) || /^FB\d+$/.test(v);
-  const urlLooks = Object.fromEntries((new URLSearchParams(location.search).get("looks") || "").split(",").map((p) => p.split(".")).filter((p) => p.length === 2 && /^\d+$/.test(p[0]) && okLook(p[1])));
+  const urlLooks = Object.fromEntries((new URLSearchParams(location.search).get("looks") || (window.__pass || {}).looks || "").split(",").map((p) => p.split(".")).filter((p) => p.length === 2 && /^\d+$/.test(p[0]) && okLook(p[1])));
   for (const t of teams) t.look = urlLooks[t.roster_id] || local[t.roster_id] || picked[t.roster_id] || guessLook(t);
-  const gold = new Set((new URLSearchParams(location.search).get("gold") || "").split(",").filter((x) => /^\d+$/.test(x)).map(Number));
+  const gold = new Set((new URLSearchParams(location.search).get("gold") || (window.__pass || {}).gold || "").split(",").filter((x) => /^\d+$/.test(x)).map(Number));
   for (const t of teams) t.gold = gold.has(t.roster_id);
 }
-const blimpOf = (blimpFile) => (new URLSearchParams(location.search).get("blimp") || (blimpFile || {}).message || "").slice(0, 60);
+const blimpOf = (blimpFile) => (new URLSearchParams(location.search).get("blimp") || (window.__pass || {}).blimp || (blimpFile || {}).message || "").slice(0, 60);
 async function load(leagueId) {
   if (isEspn(leagueId)) return loadEspn(leagueId);
   let [state, lg] = await Promise.all([get(`${API}/state/nfl`), get(`${API}/league/${leagueId}`)]);
@@ -1537,11 +1537,28 @@ async function refreshPoints() {
 function count(what) {
   const site = { "savilar7-coder.github.io": "demo", "stadium.lamaisonwebstudio.com": "demo" }[location.hostname];
   if (!site) return;
-  const k = `${site}-${what}`, day = (new Date()).toISOString().slice(0, 10);
+  beacon(`${site}-${what}`);
+}
+function beacon(k) {
+  if (!/^(dynasty-stadium\.pages\.dev|savilar7-coder\.github\.io|stadium\.lamaisonwebstudio\.com)$/.test(location.hostname)) return;
+  const day = (new Date()).toISOString().slice(0, 10);
   try {
     if (store(`ev-${k}`) === day) return;
     store(`ev-${k}`, day);
     navigator.sendBeacon(`https://philosophers-trail.pages.dev/e?k=${k}`);
+  } catch {
+  }
+}
+async function countLeague(id) {
+  if (window.__pass && /^P\d{1,3}$/.test(window.__pass.code)) beacon(`lg-${window.__pass.code.toLowerCase()}`);
+  try {
+    if (String(id) === DYNASTY) beacon("lg-mine");
+  } catch {
+  }
+  try {
+    const d = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`stadium:${id}`)));
+    const h = [...d.slice(0, 6)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    beacon(`lgd-${h}`);
   } catch {
   }
 }
@@ -1685,6 +1702,7 @@ function askLeague(note) {
   }
   count("league");
   if (L.espn) count("espn");
+  countLeague(L.id);
   let saved = Number(store(`st-me-${L.id}`));
   const me = !saved && store("st-user-id") && L.teams.find((t) => t.owner_id === store("st-user-id"));
   if (me) {
