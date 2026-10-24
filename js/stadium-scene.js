@@ -150,8 +150,13 @@ class StadiumScene extends World {
     });
     setupTouch(this, (w) => {
       const door = this.doors.find((d) => Phaser.Math.Distance.Between(w.x, w.y, d.x, d.y - 30) < 60);
-      this.route = this.pathTo(this.player, door ? { x: door.x, y: door.y, door } : { x: w.x, y: w.y });
+      this.route = this.pathTo(this.player, door ? { x: door.x, y: door.y } : { x: w.x, y: w.y });
       this.target = this.route.shift();
+      if (this.tapOpen) this.tapOpen.remove();
+      this.tapOpen = door && door.id.startsWith("team-") ? this.time.delayedCall(340, () => {
+        this.tapOpen = null;
+        if (!panelOpen) door.open();
+      }) : null;
     });
     let lastTap = 0, lastXY = null;
     this.input.on("pointerup", (p) => {
@@ -159,6 +164,10 @@ class StadiumScene extends World {
       const now = this.time.now, near = lastXY && Math.hypot(p.x - lastXY.x, p.y - lastXY.y) < 40 * DPR;
       if (now - lastTap < 320 && near) {
         lastTap = 0;
+        if (this.tapOpen) {
+          this.tapOpen.remove();
+          this.tapOpen = null;
+        }
         const fit = this.fitZoom();
         this.setZoom(this.logicalZoom() < fit * 1.4 ? fit * 2 : fit);
         return;
