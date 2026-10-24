@@ -10,6 +10,7 @@ function el(tag, attrs = {}, ...kids) {
 }
 let closing = null;
 function openPanel(title, build, wide = false) {
+  document.querySelectorAll(".st-toast").forEach((x) => x.remove());
   clearTimeout(closing);
   $("panel").classList.remove("closing");
   setPanelOpen(true);

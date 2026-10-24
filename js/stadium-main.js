@@ -279,14 +279,14 @@ function rails() {
 }
 function winOdds(m, opp) {
   const remA = Math.max(0, m.proj - m.points), remB = Math.max(0, opp.proj - opp.points);
-  return remA + remB < 0.5 ? m.points === opp.points ? 0.5 : m.points > opp.points ? 1 : 0 : 1 / (1 + Math.exp(-1.702 * (m.proj - opp.proj) / (6 + 0.32 * (remA + remB))));
+  return remA + remB < 0.5 ? m.points === opp.points ? 0.5 : m.points > opp.points ? 1 : 0 : 1 / (1 + Math.exp(-1.702 * (m.proj - opp.proj) / (6 + 0.15 * (remA + remB))));
 }
 function tvLine() {
   const G = L.games || {};
   const live = Object.values(G).filter((s) => s === "in_game").length / 2;
-  if (live >= 1) return `U0001F534 LIVE \xB7 ${Math.round(live)} NFL game${live >= 2 ? "s" : ""} on \xB7 scores every minute`;
+  if (live >= 1) return `\u{1F534} LIVE \xB7 ${Math.round(live)} NFL game${live >= 2 ? "s" : ""} on \xB7 scores every minute`;
   const next = Object.keys(G).filter((k) => G[k] === "pre_game").map((k) => (L.gameDates || {})[k]).filter(Boolean).sort()[0];
-  return next ? `U0001F3C8 Next kickoff: ${(new Date(`${next}T12:00:00`)).toLocaleDateString("en-US", { weekday: "long" })}` : "U0001F3C1 Week final";
+  return next ? `\u{1F3C8} Next kickoff: ${(new Date(`${next}T12:00:00`)).toLocaleDateString("en-US", { weekday: "long" })}` : "\u{1F3C1} Week final";
 }
 function hud() {
   rails();
@@ -417,7 +417,8 @@ function matchup(rid) {
   };
   const rows = L.slots.map((slot, i) => el("div", { class: "mu-row" }, side(me, i, "left"), el("div", { class: "mu-slot" }, slot.replace("SUPER_FLEX", "SF").replace("REC_FLEX", "FLX")), side(opp, i, "right")));
   const lead = me.points === opp.points ? "" : me.points > opp.points ? "left" : "right";
-  openPanel(`\u2694\uFE0F ${me.name} vs ${opp.name}`, async () => [
+  const odds = Math.round(winOdds(me, opp) * 100);
+  openPanel(`\u2694\uFE0F ${me.name} vs ${opp.name} \xB7 ${odds}%`, async () => [
     el(
       "div",
       { class: "mu-head" },
@@ -705,7 +706,7 @@ function news() {
     return el("div", { class: "need" }, el("b", {}, `${x.type === "waiver" ? "\u{1F4CB} Waiver" : "\u{1F193} Free agent"} \xB7 ${who}`), el("span", {}, what));
   });
   openPanel("\u{1F4F0} League news", async () => [
-    rows.length ? el("div", { class: "needs" }, rows) : el("div", { class: "empty" }, "Quiet week."),
+    rows.length ? el("div", { class: "needs" }, rows) : el("div", { class: "empty" }, L.espn ? "ESPN trades and waivers aren\u2019t shown here yet." : "Quiet week."),
     el("p", { class: "small" }, `Weeks ${Math.max(1, L.week - 1)}\u2013${L.week}.`)
   ]);
 }
@@ -810,6 +811,7 @@ function shareOffer(me, partner, give, get_, a, b) {
 }
 const stadiumLink = () => `${location.host}${location.pathname.replace(/index\.html$/, "")}${L.id && !/dynasty-stadium/.test(location.host) && !/[?&]sample=1/.test(location.search) ? `?league=${L.id}` : ""}`;
 function toast(text) {
+  document.querySelectorAll(".st-toast").forEach((x) => x.remove());
   const t = el("div", { class: "st-toast" }, text);
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 3200);
@@ -968,9 +970,9 @@ function awardsList() {
   const pairs = Object.values(L.teams.reduce((m, t) => {
     if (t.matchup_id) (m[t.matchup_id] = m[t.matchup_id] || []).push(t);
     return m;
-  }, {})).filter((p) => p.length === 2);
-  const live = L.teams.filter((t) => t.matchup_id);
-  if (!pairs.length || !live.some((t) => t.points > 0)) return [];
+  }, {})).filter((p) => p.length === 2 && p[0].points > 0 && p[1].points > 0);
+  const live = pairs.flat();
+  if (!pairs.length) return [];
   const top = [...live].sort((a, b) => b.points - a.points)[0], low = [...live].sort((a, b) => a.points - b.points)[0];
   const gap = (p) => Math.abs(p[0].points - p[1].points), byGap = [...pairs].sort((a, b) => gap(b) - gap(a));
   const over = (t) => (t.starters || []).every((pid) => !pid || pid === "0" || (L.games || {})[L.players[pid] ? L.players[pid][2] : pid] === "complete") && Object.keys(L.games || {}).length;
@@ -1039,7 +1041,7 @@ function recap() {
   c.fillText(`${L.name}`.toUpperCase().slice(0, 34), W / 2, 110);
   c.fillStyle = "#ffd84a";
   c.font = `900 96px ${font}`;
-  c.fillText(`WEEK ${L.week} RECAP`, W / 2, 220);
+  c.fillText(`WEEK ${L.week} AWARDS`, W / 2, 220);
   const rows = awardsList().slice(0, 8), RH = 112;
   rows.forEach(([k, who, n], i) => {
     const y = 270 + i * RH;
@@ -1070,7 +1072,7 @@ function recap() {
   c.fillStyle = "#e8e2ff";
   c.font = `bold 30px ${font}`;
   c.fillText(stadiumLink(), W / 2, H - 70);
-  sharePicture(cv, `week-${L.week}-recap.png`, `Week ${L.week} recap`);
+  sharePicture(cv, `week-${L.week}-awards.png`, `Week ${L.week} awards`);
 }
 function whoAreYou() {
   openPanel("\u{1F44B} Who are you?", async () => [

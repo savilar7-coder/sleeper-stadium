@@ -1011,12 +1011,12 @@ class StadiumScene extends World {
       if (pid && pid !== "0" && v > 0) best.push({ pid, v, t });
     });
     best.sort((x, y) => y.v - x.v);
-    const live = (this.boards || []).filter((B) => B.a.points || B.b.points), close = [...live].sort((x, y) => Math.abs(x.a.points - x.b.points) - Math.abs(y.a.points - y.b.points))[0];
+    const live = (this.boards || []).filter((B) => B.a.points && B.b.points), close = [...live].sort((x, y) => Math.abs(x.a.points - x.b.points) - Math.abs(y.a.points - y.b.points))[0];
     const ass = (this.boards || []).find((B) => B.sign);
     const picks = [
       best[0] && { text: "\u2B50 TOP PLAY", who: `${P[best[0].pid] ? P[best[0].pid][0] : ""} ${best[0].v.toFixed(1)}`, sub: best[0].t.name },
-      close && { text: "U0001F62C CLOSEST GAME", who: `${close.a.points.toFixed(1)} \u2013 ${close.b.points.toFixed(1)}`, sub: `${close.a.name} vs ${close.b.name}` },
-      ass && (ass.a.points || ass.b.points) && { text: "U0001F6BD ASS BOWL", who: `${ass.a.points.toFixed(1)} \u2013 ${ass.b.points.toFixed(1)}`, sub: `${ass.a.name} vs ${ass.b.name}` }
+      close && { text: "\u{1F62C} CLOSEST GAME", who: `${close.a.points.toFixed(1)} \u2013 ${close.b.points.toFixed(1)}`, sub: `${close.a.name} vs ${close.b.name}` },
+      ass && (ass.a.points || ass.b.points) && { text: "\u{1F6BD} ASS BOWL", who: `${ass.a.points.toFixed(1)} \u2013 ${ass.b.points.toFixed(1)}`, sub: `${ass.a.name} vs ${ass.b.name}` }
     ].filter(Boolean);
     if (!picks.length) return;
     this.hlTurn = ((this.hlTurn || 0) + 1) % picks.length;
@@ -1315,7 +1315,7 @@ class StadiumScene extends World {
     });
     const champs = (L.champs || []).slice(0, 3);
     this.add.image(mid - 70, ty, "trophy").setOrigin(0.5, 1).setScale(1.5).setDepth(ty);
-    this.add.text(mid - 48, ty - 22, champs.length ? champs.map((c) => `\u{1F3C6} ${c.season}  ${c.team}`).join("\n") : "\u{1F3C6} Champions: first title still up for grabs", { ...sans, fontSize: "13px", color: "#ffe08a", backgroundColor: "rgba(30,22,10,0.85)", padding: { x: 6, y: 4 } }).setOrigin(0, 1).setDepth(ty + 1);
+    this.add.text(mid - 48, ty - 22, champs.length ? champs.map((c) => `\u{1F3C6} ${c.season}  ${c.team}`).join("\n") : L.espn ? "\u{1F3C6} This season\u2019s title is up for grabs" : "\u{1F3C6} Champions: first title still up for grabs", { ...sans, fontSize: "13px", color: "#ffe08a", backgroundColor: "rgba(30,22,10,0.85)", padding: { x: 6, y: 4 } }).setOrigin(0, 1).setDepth(ty + 1);
     px("bench", 20, 8, (p) => {
       p("#7a5232", 0, 0, 20, 2);
       p("#5a3a22", 0, 2, 20, 1);
@@ -1486,7 +1486,7 @@ class StadiumScene extends World {
   updateJumbo() {
     if (!this.jumbo) return;
     const L = this.league, pairs = (this.boards || []).map(({ a, b }) => ({ a, b, d: Math.abs(a.points - b.points) }));
-    const live = pairs.filter((p) => p.a.points > 0 || p.b.points > 0);
+    const live = pairs.filter((p) => p.a.points > 0 && p.b.points > 0);
     const name = (t) => t.name.length > 16 ? `${t.name.slice(0, 15)}\u2026` : t.name;
     const pages = [];
     if ((L.feed || []).length) pages.push(`\u{1F3C8} LIVE
@@ -1841,7 +1841,7 @@ ${t.points.toFixed(1)} pts`);
   winChance(a, b) {
     const remA = Math.max(0, a.proj - a.points), remB = Math.max(0, b.proj - b.points), diff = a.proj - b.proj;
     if (remA + remB < 0.5) return a.points === b.points ? 0.5 : a.points > b.points ? 1 : 0;
-    const sigma = 6 + 0.32 * (remA + remB);
+    const sigma = 6 + 0.15 * (remA + remB);
     return 1 / (1 + Math.exp(-1.702 * diff / sigma));
   }
   sweatOn() {

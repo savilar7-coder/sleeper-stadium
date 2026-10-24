@@ -12,7 +12,8 @@ const ROUTES = [
 const DRIVES = ["off", "def", "off", "def"];
 const EDGE = 30;
 const OPEN_PX = 34;
-const CLOCK = 60, RUNOFF = { catch: 6, inc: 2, sack: 5 };
+const CLOCK = 45, RUNOFF = { catch: 8, inc: 2, sack: 5 };
+const TOP_Y = -107 * YPX;
 const FB_KITS = [
   ["#c8102e", "#ffffff", "#c8102e", "#e8435a", "#8a0b20", "#ffffff", "#f4f1ea"],
   ["#0b2265", "#a5acaf", "#0b2265", "#25408f", "#06153f", "#ffffff", "#a5acaf"],
@@ -60,7 +61,7 @@ class MiniGameScene extends Phaser.Scene {
     this.hail = this.hailUsed = false;
     this.setSlow(1);
     {
-      const pm = this.me.projPre || this.me.proj || 0, po = this.opp.projPre || this.opp.proj || 0, gap = Math.abs(pm - po), spread = Math.round(gap * 2) / 2;
+      const pm = this.me.projPre || this.me.proj || 0, po = this.opp.projPre || this.opp.proj || 0, gap = Math.abs(pm - po), spread0 = Math.min(10.5, Math.round(gap / 3 * 2) / 2), spread = spread0 < 1 ? 0 : spread0;
       const fav = spread === 0 ? null : pm > po ? this.me : this.opp;
       this.line = { fav, spread, txt: fav ? `${fav.name} \u2212${spread.toFixed(1)}` : "Pick'em", boost: fav === this.opp ? Phaser.Math.Clamp(gap / 60, 0, 0.3) : 0 };
     }
@@ -72,6 +73,30 @@ class MiniGameScene extends Phaser.Scene {
     $("mg-end").hidden = true;
     this.msg.hidden = false;
     $("mg-exit").hidden = false;
+    const bx = $("mg-exit");
+    bx.mgScene = this;
+    if (!bx.dataset.confirm) {
+      bx.dataset.confirm = "1";
+      const label = bx.textContent;
+      bx.addEventListener("click", (e) => {
+        const sc = bx.mgScene;
+        if (!sc || sc.state === "end" || bx.dataset.armed === "1") {
+          bx.dataset.armed = "";
+          bx.textContent = label;
+          return;
+        }
+        e.stopImmediatePropagation();
+        bx.dataset.armed = "1";
+        bx.textContent = "Leave the game? Tap again";
+        clearTimeout(bx.mgT);
+        bx.mgT = setTimeout(() => {
+          bx.dataset.armed = "";
+          bx.textContent = label;
+        }, 3e3);
+      }, true);
+    }
+    bx.dataset.armed = "";
+    bx.textContent = "\u2715 Back to stadium";
     this.hud.classList.remove("mg-over");
     const sh = $("mg-share");
     if (!sh.dataset.on) {
@@ -145,10 +170,12 @@ class MiniGameScene extends Phaser.Scene {
   }
   startDrive(kind) {
     this.kind = kind;
-    this.los = 55;
+    this.los = 65;
     this.down = 1;
     this.toGo = 10;
     this.clock = CLOCK;
+    this.hail = false;
+    this.setSlow(1);
     this.state = "pre";
     this.endZones();
     this.say(`${kind === "off" ? "\u{1F3C8} Your ball!" : "\u{1F6E1} Defense!"}${this.di === 0 ? ` \xB7 Line: ${this.line.txt}` : ""}`);
@@ -157,21 +184,21 @@ class MiniGameScene extends Phaser.Scene {
     this.setupPlay();
   }
   ptsOf(team, i, pid) {
-    const got = (team.starters_points || [])[i] || 0;
-    return Math.round((got || (this.L.proj || {})[pid] || 0) * 10) / 10;
+    const got = (team.starters_points || [])[i] || 0, r = (x) => Math.round(x * 10) / 10;
+    return got ? { pts: r(got), proj: false } : (team.points || 0) > 0 ? { pts: 0, proj: false } : { pts: r((this.L.proj || {})[pid] || 0), proj: true };
   }
   names(team) {
     const P = this.L.players, out = [];
     (team.starters || []).forEach((pid, i) => {
       const p = P[pid];
-      if (p && ["WR", "TE", "RB"].includes(p[1])) out.push({ name: surname(p[0]), pid, pts: this.ptsOf(team, i, pid) });
+      if (p && ["WR", "TE", "RB"].includes(p[1])) out.push({ name: surname(p[0]), pid, ...this.ptsOf(team, i, pid) });
     });
     while (out.length < 4) out.push({ name: ["Red", "Blue", "Gold", "Green"][out.length], pid: null, pts: 0 });
     return out.slice(0, 4);
   }
   qbOf(team) {
     const P = this.L.players, i = (team.starters || []).findIndex((pid) => P[pid] && P[pid][1] === "QB");
-    return i < 0 ? { name: "QB", pts: 0 } : { name: surname(P[team.starters[i]][0]), pts: this.ptsOf(team, i, team.starters[i]) };
+    return i < 0 ? { name: "QB", pts: 0 } : { name: surname(P[team.starters[i]][0]), pts: this.ptsOf(team, i, team.starters[i]).pts };
   }
   setupPlay() {
     for (const o of this.objs || []) o.destroy();
@@ -205,11 +232,11 @@ class MiniGameScene extends Phaser.Scene {
     const routes = this.hail ? ROUTES.map(() => [[0, 100 - this.los + 6]]) : Phaser.Utils.Array.Shuffle(ROUTES.slice());
     const who = this.names(off), hot = Math.max(...who.map((n) => n.pts));
     this.recv = who.map((n, i) => {
-      const r = make(off, xs[i], y0, `${n.name}${n.pts ? ` ${n.pts.toFixed(1)}` : ""}${hot > 0 && n.pts === hot ? " \u{1F525}" : ""}`, "up");
+      const r = make(off, xs[i], y0, `${n.name}${n.pid ? ` ${n.proj ? "proj " : ""}${n.pts.toFixed(1)}` : ""}${hot > 0 && n.pts === hot ? " \u{1F525}" : ""}`, "up");
       r.name = n.name;
       r.pts = n.pts;
       const flip = xs[i] > W / 2 ? -1 : 1;
-      r.path = routes[i].map(([dx, dy]) => ({ x: Phaser.Math.Clamp(xs[i] + dx * YPX * flip, EDGE, W - EDGE), y: y0 - dy * YPX }));
+      r.path = routes[i].map(([dx, dy]) => ({ x: Phaser.Math.Clamp(xs[i] + dx * YPX * flip, EDGE, W - EDGE), y: Math.max(TOP_Y, y0 - dy * YPX) }));
       r.speed = (5.6 + Phaser.Math.Clamp(n.pts / 30, 0, 1) * 1.6) * YPX;
       r.ring = this.add.ellipse(xs[i], y0 + 2, 26, 10, 10265519, 0.4).setStrokeStyle(3, 10265519).setAlpha(0.7).setDepth(2e3 + y0);
       r.open = null;
@@ -243,7 +270,7 @@ class MiniGameScene extends Phaser.Scene {
     this.updateHud();
     if (this.hail) {
       this.banner("HAIL MARY", "#ffffff");
-      this.say("\u{1F64F} 0:00 \u2014 one last play. Throw it up!");
+      this.say("\u{1F64F} Last play of the drive! Throw it up.");
     }
     const id = this.playId;
     this.time.delayedCall(700, () => {
@@ -288,11 +315,12 @@ class MiniGameScene extends Phaser.Scene {
         }
       }
       if (best) this.aim(best);
-    } else if (this.you) this.you.goal = { x: w.x, y: w.y + 10 };
+    } else if (this.you) this.you.goal = { x: w.x, y: Math.max(TOP_Y, w.y + 10) };
   }
   aim(r) {
     this.state = "aim";
     this.target = r;
+    r.openAtTap = r.open;
     this.time.delayedCall(150, () => {
       this.aimG.clear();
       if (this.state === "aim") this.throwTo(r);
@@ -312,7 +340,6 @@ class MiniGameScene extends Phaser.Scene {
   throwTo(r) {
     this.state = "air";
     this.target = r;
-    r.openAtThrow = r.open;
     const from = { x: this.qb.s.x, y: this.qb.s.y - 24 };
     let to = { x: r.s.x, y: r.s.y }, dist = 0, t = 0.35;
     for (let k = 0; k < 2; k++) {
@@ -356,35 +383,34 @@ class MiniGameScene extends Phaser.Scene {
         s.y += 100 - this.los;
         return this.endPlay(100 - this.los, `${r.name} comes down with it!`, "catch", r);
       }
-      if (roll2 < 0.45) {
-        this.tally.picks++;
-        return this.turnover("Picked off in the end zone. \u{1F631}");
-      }
+      if (roll2 < 0.45) return this.turnover("Picked off in the end zone. \u{1F631}");
       return this.endPlay(0, "Batted down. So close!", "inc");
     }
     const dRecv = Phaser.Math.Distance.Between(at.x, at.y + 16, r.s.x, r.s.y), mine = this.kind === "off";
     if (dRecv > 40) return this.endPlay(0, "Overthrown. Incomplete.", "inc");
-    const open = r.openAtThrow !== false && this.cover(r).c > 20, youOn = this.you && Phaser.Math.Distance.Between(at.x, at.y + 16, this.you.s.x, this.you.s.y) < 40, roll = Math.random();
-    const pPick = youOn ? 0.35 : open ? 0 : 0.15, pCatch = youOn ? 0.3 : open ? 0.75 + Math.min(0.2, r.pts / 100) : 0.35;
+    const open = r.openAtTap !== false && this.cover(r).c > 20, youOn = this.you && Phaser.Math.Distance.Between(at.x, at.y + 16, this.you.s.x, this.you.s.y) < 40, roll = Math.random();
+    const pPick = youOn ? 0.35 : open ? 0 : 0.15, pCatch = youOn ? 0.3 : open ? 0.65 + Math.min(0.2, r.pts / 100) : 0.35;
     if (roll < pPick) {
       if (mine) this.tally.picks++;
       return this.turnover(mine ? "Intercepted! \u{1F631} He was covered." : "INTERCEPTION! \u{1F64C}");
     }
     if (roll >= pPick + pCatch) return this.endPlay(0, open ? mine ? "Dropped! Incomplete." : "Dropped! Lucky break." : mine ? "Broken up. Incomplete." : "Pass broken up! \u{1F6E1}", "inc");
-    const yac = open ? 4 + Math.random() * 10 : Math.random() * 3;
+    const yac = open ? 3 + Math.random() * 8 : Math.random() * 3;
     const gain = Math.round(-r.s.y / YPX - this.los + yac);
     if (mine) {
       const s = this.stats[r.name] || (this.stats[r.name] = { c: 0, td: 0, y: 0 });
       s.c++;
       s.y += gain;
     }
-    const text = `${r.name} catches it${yac > 8 ? " and breaks free" : ""}!`;
+    const text = `${r.name} catches it${yac > 7 ? " and breaks free" : ""}!`;
     if (calm()) return this.endPlay(gain, text, "catch", r);
     this.burst(r.s.x, r.s.y - 20, 16777215, 6);
     this.tweens.add({ targets: r.s, scale: 1.5, duration: 60, yoyo: true });
     this.time.delayedCall(60, () => this.endPlay(gain, text, "catch", r));
   }
   endPlay(gain, text, how, r) {
+    this.hail = false;
+    this.setSlow(1);
     this.state = "over";
     this.ball.setVisible(false);
     this.aimG.clear();
@@ -419,7 +445,7 @@ class MiniGameScene extends Phaser.Scene {
     }
     if (this.clock <= 0 && mine && !this.hailUsed && this.di === DRIVES.lastIndexOf("off") && this.score.me <= this.score.opp) {
       this.hail = this.hailUsed = true;
-      this.say(`${text} \u23F1 0:00 \u2014 one last play!`);
+      this.say(`${text} \u23F1 Last play of the drive!`);
       return this.time.delayedCall(1500, () => this.setupPlay());
     }
     if (this.clock <= 0) {
@@ -430,6 +456,8 @@ class MiniGameScene extends Phaser.Scene {
     this.time.delayedCall(1500, () => this.setupPlay());
   }
   turnover(text) {
+    this.hail = false;
+    this.setSlow(1);
     this.state = "over";
     this.ball.setVisible(false);
     this.aimG.clear();
@@ -569,7 +597,7 @@ class MiniGameScene extends Phaser.Scene {
         continue;
       }
       const target = d.man || this.recv.reduce((a, b) => b.s.y < a.s.y ? b : a);
-      const lagX = target.s.x - target.vx * d.lag, lagY = target.s.y - target.vy * d.lag - (d.man ? d.trail : 50);
+      const lagX = target.s.x - target.vx * d.lag, lagY = Math.max(TOP_Y, target.s.y - target.vy * d.lag - (d.man ? d.trail : 50));
       move(d, lagX, lagY, d.speed);
     }
     for (const r of this.recv) {
