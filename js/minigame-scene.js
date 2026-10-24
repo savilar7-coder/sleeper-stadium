@@ -243,6 +243,7 @@ class MiniGameScene extends Phaser.Scene {
       const r = make(off, xs[i], y0, `${n.name}${n.pid ? ` ${n.proj && this.W >= 400 ? "proj " : ""}${n.pts.toFixed(1)}` : ""}${hot > 0 && n.pts === hot ? " \u{1F525}" : ""}`, "up");
       r.name = n.name;
       r.pts = n.pts;
+      r.tagUp = i % 2 ? 15 : 0;
       const flip = xs[i] > W / 2 ? -1 : 1;
       r.path = routes[i].map(([dx, dy]) => ({ x: Phaser.Math.Clamp(xs[i] + dx * YPX * flip, EDGE, W - EDGE), y: Math.max(TOP_Y, y0 - dy * YPX) }));
       r.speed = (5.6 + Phaser.Math.Clamp(n.pts / 30, 0, 1) * 1.6) * YPX;
@@ -291,7 +292,7 @@ class MiniGameScene extends Phaser.Scene {
     this.t0 = this.time.now;
     sfx.jump && sfx.jump();
     if (this.hail) {
-    } else if (this.firstPlay) this.say(this.kind === "off" ? "Hut! \u{1F3C8} Tap a receiver in a green ring." : "Hut! \u{1F6E1} Tap where your defender should run.");
+    } else if (this.firstPlay) this.say(this.kind === "off" ? "Hut! \u{1F3C8} Wait for a green ring, then tap that receiver." : "Hut! \u{1F6E1} Tap where your defender should run.");
     else this.say("Hut!");
     this.firstPlay = false;
     if (this.kind === "def") this.aiThrowAt = this.time.now + 1300 + Math.random() * 1300;
@@ -598,7 +599,7 @@ class MiniGameScene extends Phaser.Scene {
       }
       const dir = Math.abs(dx) > Math.abs(dy) ? dx < 0 ? "left" : "right" : dy < 0 ? "up" : "down";
       o.s.setTexture(`team-${o.team.roster_id}-${d > 1 ? dir : o === this.qb || this.recv.includes(o) ? "up" : "down"}${d > 1 ? Math.floor(time / 120) % 4 : 0}`).setDepth(1e3 + o.s.y);
-      o.t.setPosition(Phaser.Math.Clamp(o.s.x, o.t.width / 2 + 2, this.W - o.t.width / 2 - 2), o.s.y - 44);
+      o.t.setPosition(Phaser.Math.Clamp(o.s.x, o.t.width / 2 + 2, this.W - o.t.width / 2 - 2), o.s.y - 44 - (o.tagUp || 0));
     };
     for (const r of this.recv) {
       const w = r.path[0];

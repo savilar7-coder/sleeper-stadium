@@ -964,7 +964,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
       B.board.setText(ko);
       return;
     }
-    const put = () => B.board.setText(`${cur.a.toFixed(1)}  :  ${cur.b.toFixed(1)}`);
+    const f1 = (n) => (Math.round(n * 10) / 10).toFixed(1), put = () => B.board.setText(`${f1(cur.a)}  :  ${f1(cur.b)}`);
     if (B.tick) {
       B.tick.stop();
       B.tick = null;

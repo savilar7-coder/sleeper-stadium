@@ -219,7 +219,7 @@ body.tv .td-banner { zoom: 1.5; }
 
 body:has(#panel:not([hidden])) #st-hud { visibility: hidden; }
 
-#panel-body td:last-child { white-space: nowrap; }
+#panel-body td:last-child { min-width: 4.8em; } 
 
 @media (max-width: 440px) {
   table.standings th:nth-child(5), table.standings td:nth-child(5) { display: none; }
@@ -227,3 +227,5 @@ body:has(#panel:not([hidden])) #st-hud { visibility: hidden; }
   table.standings td:nth-child(2) { overflow-wrap: anywhere; }
   #st-score { font-size: clamp(14px, 4.2vw, 18px); }
 }
+
+body:has(#panel:not([hidden])) #nudge { display: none; }
