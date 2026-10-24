@@ -235,3 +235,10 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
 
 
 .standings td.tm-name { max-width: 0; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@media (orientation: landscape) and (max-height: 500px) {
+  #st-hud { padding-top: 4px !important; padding-bottom: 6px !important; }
+  #st-hud #st-league, #st-hud #st-proj { display: none; }
+  #st-hud #st-score { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0 0 4px; }
+  #st-hud .st-btns button { min-height: 40px; padding: 4px 10px; font-size: 13px; }
+}

@@ -184,7 +184,7 @@ async function load(leagueId) {
       roster_id: r.roster_id,
       owner_id: r.owner_id,
       owner: u.display_name || "open slot",
-      name: u.metadata && u.metadata.team_name || u.display_name || `Team ${r.roster_id}`,
+      name: (u.metadata && u.metadata.team_name || u.display_name || `Team ${r.roster_id}`).trim() || `Team ${r.roster_id}`,
       wins: s.wins || 0,
       losses: s.losses || 0,
       ties: s.ties || 0,
@@ -1248,7 +1248,7 @@ function drillTeaser() {
   store("st-drill-seen", "1");
   const b = el(
     "div",
-    { id: "drill-tease", style: "position:fixed;left:50%;top:150px;transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #4ade80;border-radius:10px;padding:10px 12px;font:600 14px/1.35 system-ui,sans-serif;box-shadow:0 4px 14px #0008" },
+    { id: "drill-tease", style: "position:fixed;left:50%;bottom:calc(108px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #4ade80;border-radius:10px;padding:10px 12px;font:600 14px/1.35 system-ui,sans-serif;box-shadow:0 4px 14px #0008" },
     el("b", {}, "\u{1F3C8} New: play your matchup."),
     " Your starters vs theirs in a 1-minute 2-Minute Drill. ",
     el("button", { type: "button", class: "dt-go", style: "margin-left:4px;border:0;background:#4ade80;border-radius:6px;font-weight:700;padding:3px 9px" }, "Play"),
@@ -1286,7 +1286,7 @@ async function weekDigest() {
   ].filter(Boolean);
   const b = el(
     "div",
-    { id: "recap-ready", style: "position:fixed;left:50%;top:150px;transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:10px;padding:10px 12px;font:600 14px/1.4 system-ui,sans-serif;box-shadow:0 4px 14px #0008" },
+    { id: "recap-ready", style: "position:fixed;left:50%;bottom:calc(108px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:10px;padding:10px 12px;font:600 14px/1.4 system-ui,sans-serif;box-shadow:0 4px 14px #0008" },
     el("b", {}, `\u{1F4C5} Week ${now.week}, ${me.name}: `),
     bits.join(" \xB7 "),
     " ",
@@ -1305,7 +1305,7 @@ function recapReady() {
   store(k, "1");
   const b = el(
     "div",
-    { id: "recap-ready", style: "position:fixed;left:50%;top:150px;transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:12px;padding:10px 12px;font:14px system-ui,sans-serif;box-shadow:0 6px 18px #0008" },
+    { id: "recap-ready", style: "position:fixed;left:50%;bottom:calc(108px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:12px;padding:10px 12px;font:14px system-ui,sans-serif;box-shadow:0 6px 18px #0008" },
     el("b", {}, `\u{1F4F8} Week ${L.week} is final.`),
     " Your recap card is ready for the group chat. ",
     el("button", { type: "button", class: "rr-go", style: "margin-left:4px;border:0;background:#ffd84a;border-radius:6px;font-weight:700;padding:3px 9px" }, "Make it"),

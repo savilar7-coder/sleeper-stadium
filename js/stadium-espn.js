@@ -37,7 +37,7 @@ async function espnLeague(id, season) {
       roster_id: t.id,
       owner_id: null,
       owner: owner.displayName || [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "ESPN manager",
-      name: t.name || [t.location, t.nickname].filter(Boolean).join(" ") || `Team ${t.id}`,
+      name: (t.name || [t.location, t.nickname].filter(Boolean).join(" ") || `Team ${t.id}`).trim() || `Team ${t.id}`,
       wins: o.wins || 0,
       losses: o.losses || 0,
       ties: o.ties || 0,

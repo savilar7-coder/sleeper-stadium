@@ -171,7 +171,7 @@
 <div class="tip-thanks" hidden style="margin-top:4px;font-size:13px;color:#7a4b00;font-weight:600"></div>
 <div style="margin-top:4px;font-size:12px;color:#5a4a33">Built by <a href="https://lamaisonwebstudio.com/" target="_blank" rel="noopener" style="color:#5a4a33">lamaisonwebstudio.com</a>. Podcast, Discord or business? <a href="https://lamaisonwebstudio.com/stadium/#custom" target="_blank" rel="noopener" style="color:#7a4b00;font-weight:700">Let's talk</a></div>
 </div>
-<div id="tip" hidden style="position:fixed;left:50%;top:150px;transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:12px;padding:10px 12px;font:14px system-ui,sans-serif;box-shadow:0 6px 18px #0008">
+<div id="tip" hidden style="position:fixed;left:50%;bottom:calc(108px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:12px;padding:10px 12px;font:14px system-ui,sans-serif;box-shadow:0 6px 18px #0008">
 <b>Tip:</b> &#127941; <b>Awards</b> (top bar) and <b>Matchup &rarr; Share</b> make pictures for your group chat. <button id="tip-x" type="button" style="margin-left:4px;border:0;background:#ffd84a;border-radius:6px;font-weight:700;padding:2px 8px">Got it</button>
 </div>
 <script>
@@ -184,7 +184,7 @@
     if (tipDone || !e.target.closest || !e.target.closest('.who-btn')) return;
     tipDone = true;
     try { if (localStorage.getItem('st-tip')) return; localStorage.setItem('st-tip', '1'); } catch (x) {}
-    setTimeout(function () { var t = document.getElementById('tip'); t.hidden = false; document.getElementById('tip-x').onclick = function () { t.hidden = true; }; setTimeout(function () { t.hidden = true; }, 9000); }, 2500);
+    setTimeout(function () { var t = document.getElementById('tip'); t.hidden = false; var off = function () { t.hidden = true; document.removeEventListener('pointerdown', off, true); }; document.getElementById('tip-x').onclick = off; setTimeout(function () { document.addEventListener('pointerdown', off, true); }, 400); setTimeout(off, 6000); }, 2500);  // Oct 24 2026 (round 57): above Matchup/Share, not on your own row (top of the field on 375x667); any tap or 6 s hides it
   }, true);
   setTimeout(function show() {
     var pn = document.getElementById('panel'); if (pn && !pn.hidden) { setTimeout(show, 5000); return; }  // never on top of a menu
@@ -250,7 +250,7 @@
   }, test ? 3000 : 75000);
 })();
 </script>
-<div id="a2hs" hidden style="position:fixed;left:50%;top:150px;transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#fff8e6;color:#1d140c;border:2px solid #9e7c0c;border-radius:12px;padding:10px 12px;font:14px system-ui,sans-serif;box-shadow:0 6px 18px #0008">
+<div id="a2hs" hidden style="position:fixed;left:50%;bottom:calc(108px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#fff8e6;color:#1d140c;border:2px solid #9e7c0c;border-radius:12px;padding:10px 12px;font:14px system-ui,sans-serif;box-shadow:0 6px 18px #0008">
 <b>&#128242; Keep the stadium one tap away:</b> <span id="a2hs-how"></span> <button id="a2hs-x" type="button" style="margin-left:4px;border:0;background:#ffd84a;border-radius:6px;font-weight:700;padding:2px 8px">OK</button></div>
 <script>
 (function () {
