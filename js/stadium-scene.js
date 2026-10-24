@@ -58,6 +58,10 @@ const kitOf = (t) => {
   const n = kitNum(t);
   return n == null ? null : FB_KITS[n % FB_KITS.length];
 };
+const lum = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  return 0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255);
+};
 const shade = (hex, f) => "#" + [1, 3, 5].map((i) => {
   const v = parseInt(hex.slice(i, i + 2), 16), t = f > 0 ? 255 : 0;
   return Math.round(v + (t - v) * Math.abs(f)).toString(16).padStart(2, "0");
@@ -845,14 +849,15 @@ class StadiumScene extends World {
           CUT_SHEETS.set(t.roster_id, sheet);
         }
         this.makeChar(key, sheet);
-        const s = this.add.sprite(x, y, `${key}${side === 0 ? "right" : "left"}0`).setOrigin(0.5, 1).setDepth(y).setScale(1.5);
+        const s = this.add.sprite(x, y, `${key}${side === 0 ? "right" : "left"}0`).setOrigin(0.5, 1).setDepth(y).setScale(2);
+        this.add.ellipse(x, y - 1, 34, 10, 663304, 0.55).setDepth(y - 4);
         if (t.gold) {
           s.setTint(16769126, 16769126, 16756736, 16756736);
           const halo = this.add.image(x, y - 22, "soft-glow").setScale(2.4, 1.8).setTint(16762938).setAlpha(1).setBlendMode(Phaser.BlendModes.ADD).setDepth(y - 3);
           this.tweens.add({ targets: halo, alpha: 0.45, duration: 900, yoyo: true, repeat: -1 });
         }
         if (t.mine) this.add.image(x, y - 2, "soft-glow").setScale(1.4, 0.7).setTint(16767050).setBlendMode(Phaser.BlendModes.ADD).setDepth(y - 2);
-        const tag = this.label(x, y - 54, "", t.mine ? "#ffe08a" : "#fff4d6").setFontSize(Math.round(18 * DPR));
+        const tag = this.label(x, y - 62, "", t.mine ? "#ffe08a" : "#fff4d6").setFontSize(Math.round(18 * DPR));
         this.addBlocker(x - 7, y - 8, 14, 8);
         this.teamSprites.set(t.roster_id, { s, tag, t, side, key });
         this.doors.push({ x, y: y + 14, id: `team-${t.roster_id}`, name: t.name, verb: "Scout", open: () => window.__stadium ? window.__stadium.teamPanel(t.roster_id) : this.teamPanel(t.roster_id) });
@@ -1192,6 +1197,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
   }
   footballerGrid(dir, f, pose, C) {
     const { K = "#141018", KL = "#33293f", GOLD = "#c9a227", GL = "#ffd84a", PUR = "#3b2390", PL = "#5a3dbd", PD = "#241773", WH = "#f4f1ea", WD = "#cfcac0", head } = C;
+    const ARM = lum(PUR) < 60 ? GL : PL;
     const SK = head ? mascotFur(head) : "#c98d68", MASK = "#9aa1aa", BALL = "#8a4a22", CLEAT = "#141018";
     {
       const g = [...Array(16)].map(() => Array(16).fill(null)), px = (x, y, col) => {
@@ -1248,11 +1254,11 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
       } else if (side) {
         rect(8, jy + 1, 3, 2, BALL);
         px(9, jy + 1, WH);
-        rect(7 - step, jy, 2, 3, PL);
+        rect(7 - step, jy, 2, 3, ARM);
         px(7 - step, jy + 3, SK);
       } else {
-        rect(2, jy + Math.max(0, step), 1, 3, PL);
-        rect(13, jy + Math.max(0, -step), 1, 3, PL);
+        rect(2, jy + Math.max(0, step), 1, 3, ARM);
+        rect(13, jy + Math.max(0, -step), 1, 3, ARM);
         px(2, jy + 3 + Math.max(0, step), SK);
         rect(12, jy + 2, 2, 2, BALL);
       }
@@ -1265,7 +1271,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
         rect(5, hy, 6, 1, KL);
         px(4, hy, null);
         px(11, hy, null);
-        rect(7, hy, 2, side ? 4 : dir === "up" ? 7 : 3, GOLD);
+        rect(7, hy, 2, side ? 3 : dir === "up" ? 7 : 3, GOLD);
         px(5, hy + 1, shade(K, 0.65));
         px(5, hy + 2, shade(K, 0.35));
         px(6, hy + 1, shade(K, 0.35));
@@ -1282,18 +1288,20 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
         }
         if (dir === "down") {
           rect(5, hy + 3, 6, 3, SK);
-          px(6, hy + 4, CLEAT);
-          px(9, hy + 4, CLEAT);
+          rect(6, hy + 3, 1, 2, CLEAT);
+          rect(9, hy + 3, 1, 2, CLEAT);
           rect(5, hy + 5, 6, 1, MASK);
           rect(7, hy + 3, 1, 3, MASK);
           rect(5, hy + 6, 6, 1, MASK);
         } else if (side) {
           rect(9, hy + 3, 3, 3, SK);
-          px(10, hy + 4, CLEAT);
+          rect(10, hy + 3, 1, 2, CLEAT);
           rect(11, hy + 3, 2, 1, MASK);
           rect(12, hy + 3, 1, 4, MASK);
           rect(10, hy + 6, 3, 1, MASK);
-          px(6, hy + 4, PUR);
+          rect(5, hy + 3, 2, 2, GL);
+          px(5, hy + 3, shade(GL, 0.45));
+          px(6, hy + 4, shade(GL, -0.3));
         }
       }
       const out = g.map((rw) => rw.slice());
@@ -1819,7 +1827,7 @@ ${t.points.toFixed(1)} pts`);
       } else if (Math.random() < 0.5) {
         S.act = now + 700;
         S.actType = "stretch";
-        this.tweens.add({ targets: S.s, scaleY: 1.75, scaleX: 1.35, duration: 220, hold: 200, yoyo: true });
+        this.tweens.add({ targets: S.s, scaleY: 2.33, scaleX: 1.8, duration: 220, hold: 200, yoyo: true });
       } else {
         S.act = now + 1600;
         S.actType = "juggle";
@@ -1863,7 +1871,7 @@ ${t.points.toFixed(1)} pts`);
           onComplete: () => {
             ball.destroy();
             shadow.destroy();
-            this.tweens.add({ targets: to, scaleX: 2.3, scaleY: 1.75, duration: 90, yoyo: true, ease: "Quad.easeOut" });
+            this.tweens.add({ targets: to, scaleX: 3.07, scaleY: 2.33, duration: 90, yoyo: true, ease: "Quad.easeOut" });
           }
         });
       }
