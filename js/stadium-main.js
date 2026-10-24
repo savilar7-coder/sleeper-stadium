@@ -458,7 +458,12 @@ function matchup(rid) {
           return f ? el("small", { style: "color:#b23a2a;font-weight:700" }, ` \u26A0\uFE0F ${f}`) : null;
         })()
       ),
-      el("div", { class: "mu-pts" }, pts == null ? "\u2013" : fmt(pts))
+      (() => {
+        const tm = p[2], st = (L.games || {})[tm], d = (L.gameDates || {})[tm];
+        if (!pts && st === "pre_game" && d) return el("div", { class: "mu-pts", style: "font-size:13px;color:#8a7a5c" }, (new Date(`${d}T12:00:00`)).toLocaleDateString("en-US", { weekday: "short" }));
+        if (!pts && pid && pid !== "0" && tm && !st && Object.keys(L.games || {}).length) return el("div", { class: "mu-pts", style: "font-size:13px;color:#8a7a5c" }, "BYE");
+        return el("div", { class: "mu-pts" }, pts == null ? "\u2013" : fmt(pts));
+      })()
     );
   };
   const rows = L.slots.map((slot, i) => el("div", { class: "mu-row" }, side(me, i, "left"), el("div", { class: "mu-slot" }, slot.replace("SUPER_FLEX", "SF").replace("REC_FLEX", "FLX")), side(opp, i, "right")));
