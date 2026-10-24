@@ -127,7 +127,7 @@ class StadiumScene extends World {
     this.spawnDY = sy - y0;
     this.player = this.physics.add.sprite(sx, sy, "playerup0").setOrigin(0.5, 1);
     this.player.body.setSize(14, 8).setOffset(9, 24);
-    this.player.setScale(1.5);
+    this.player.setScale(2);
     this.youRing = this.add.ellipse(0, 0, 44, 16, 16767050, 0.35).setStrokeStyle(2, 16767050, 0.9);
     this.youTag = this.label(0, 0, "\u25C0 YOU", "#1d140c").setStyle({ backgroundColor: "#ffd84a" }).setFontSize(Math.round(15 * DPR));
     const picked = this.league.teams.some((t) => t.mine);
@@ -861,6 +861,7 @@ class StadiumScene extends World {
         const tag = this.label(x, y - 62, "", t.mine ? "#ffe08a" : "#fff4d6").setFontSize(Math.round(18 * DPR));
         this.addBlocker(x - 7, y - 8, 14, 8);
         this.teamSprites.set(t.roster_id, { s, tag, t, side, key });
+        if (!window.__calm) this.tweens.add({ targets: s, originY: 1.035, duration: 380 + t.roster_id % 5 * 45, delay: t.roster_id * 137 % 600, yoyo: true, repeat: -1, ease: "Sine.easeInOut", onUpdate: () => s.updateDisplayOrigin() });
         this.doors.push({ x, y: y + 14, id: `team-${t.roster_id}`, name: t.name, verb: "Scout", open: () => window.__stadium ? window.__stadium.teamPanel(t.roster_id) : this.teamPanel(t.roster_id) });
       });
       if (pair.length === 2 && !L.preseason) {
@@ -1180,7 +1181,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     const name = mascot ? `${mascot}-${look}` : look, key = `a-ch-${name}`;
     if (this.textures.exists(key)) return name;
     const [H, HS, J, JL, JD, N, PA] = FB_KITS[(Number(look.slice(2)) || 0) % FB_KITS.length];
-    const C = { K: H, KL: JL, GOLD: HS, GL: N, PUR: J, PL: JL, PD: JD, WH: PA, WD: PA === "#f4f1ea" ? "#cfcac0" : PA, head: mascot };
+    const C = { K: H, KL: JL, GOLD: HS, GL: N, PUR: J, PL: JL, PD: JD, WH: PA, WD: PA === "#f4f1ea" ? "#cfcac0" : PA, head: mascot, big: (Number(look.slice(2)) || 0) % 3 === 1 };
     const ct = this.textures.createCanvas(key, 64, 112), c = ct.getContext();
     const put = (ox, oy, grid) => grid.forEach((rw, y) => rw.forEach((col, x) => {
       if (col) {
@@ -1197,7 +1198,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     return name;
   }
   footballerGrid(dir, f, pose, C) {
-    const { K = "#141018", KL = "#33293f", GOLD = "#c9a227", GL = "#ffd84a", PUR = "#3b2390", PL = "#5a3dbd", PD = "#241773", WH = "#f4f1ea", WD = "#cfcac0", head } = C;
+    const { K = "#141018", KL = "#33293f", GOLD = "#c9a227", GL = "#ffd84a", PUR = "#3b2390", PL = "#5a3dbd", PD = "#241773", WH = "#f4f1ea", WD = "#cfcac0", head, big } = C, tw = big ? 1 : 0;
     const ARM = lum(PUR) < 60 ? GL : PL;
     const SK = head ? mascotFur(head) : "#c98d68", MASK = "#9aa1aa", BALL = "#8a4a22", CLEAT = "#141018";
     {
@@ -1222,9 +1223,9 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
         rect(8, 14 - r, 3, 1, CLEAT);
       }
       const jy = 8 + bob, jh = 4 - bob;
-      rect(side ? 5 : 3, jy, side ? 6 : 10, jh, PUR);
-      rect(side ? 5 : 3, jy, side ? 6 : 10, 1, PL);
-      rect(side ? 10 : 12, jy + 1, 1, jh - 1, PD);
+      rect((side ? 5 : 3) - tw, jy, (side ? 6 : 10) + 2 * tw, jh, PUR);
+      rect((side ? 5 : 3) - tw, jy, (side ? 6 : 10) + 2 * tw, 1, PL);
+      rect((side ? 10 : 12) + tw, jy + 1, 1, jh - 1, PD);
       if (side) {
         px(6 + step, 12, PUR);
         px(8 - step, 12, PD);
@@ -1232,10 +1233,10 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
         px(5, 12, PUR);
         px(10, 12, PD);
       }
-      rect(side ? 5 : 4, jy + jh - 1, side ? 5 : 8, 1, PD);
+      rect((side ? 5 : 4) - tw, jy + jh - 1, (side ? 5 : 8) + 2 * tw, 1, PD);
       if (!side) {
-        rect(3, jy, 2, 1, GOLD);
-        rect(11, jy, 2, 1, GOLD);
+        rect(3 - tw, jy, 2, 1, GOLD);
+        rect(11 + tw, jy, 2, 1, GOLD);
         rect(6, jy + 1, 3, 1, GL);
         px(6, jy + 2, GL);
         px(8, jy + 2, GL);
@@ -1258,10 +1259,10 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
         rect(7 - step, jy, 2, 3, ARM);
         px(7 - step, jy + 3, SK);
       } else {
-        rect(2, jy + Math.max(0, step), 1, 3, ARM);
-        rect(13, jy + Math.max(0, -step), 1, 3, ARM);
-        px(2, jy + 3 + Math.max(0, step), SK);
-        rect(12, jy + 2, 2, 2, BALL);
+        rect(2 - tw, jy + Math.max(0, step), 1, 3, ARM);
+        rect(13 + tw, jy + Math.max(0, -step), 1, 3, ARM);
+        px(2 - tw, jy + 3 + Math.max(0, step), SK);
+        rect(12 + tw, jy + 2, 2, 2, BALL);
       }
       const hy = 1 + bob;
       if (head) mascotHead(head, dir, K, GOLD).forEach((rw, y) => rw.forEach((col, x) => {
