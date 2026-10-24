@@ -955,6 +955,7 @@ class StadiumScene extends World {
     return `KICKOFF ${(new Date(`${ds[0]}T12:00:00`)).toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}`;
   }
   touchdown(t, jump, who) {
+    if (!this.sys.isActive()) return;
     const q = this.tdQueue = this.tdQueue || [];
     q.push({ text: `\u{1F3C8} ${jump >= 5.5 ? "TOUCHDOWN" : "BIG PLAY"}`, who, sub: `+${jump.toFixed(1)} \xB7 ${t.name}`, mine: t.mine });
     const ts = this.teamSprites && this.teamSprites.get(t.roster_id);
@@ -1033,6 +1034,7 @@ class StadiumScene extends World {
     }, 3200);
   }
   celebrate(s, t) {
+    if (!this.sys.isActive()) return;
     sfx.pop && sfx.pop();
     const b = (this.boards || []).find((x) => x.a === t || x.b === t);
     if (b && !b.popping && !window.__calm) {

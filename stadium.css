@@ -188,3 +188,5 @@ body.calm #st-ticker span { animation: none; padding-left: 12px; }
   .st-btns button { font-size: 16px; padding: 4px 14px; }
   #panel { width: min(760px, calc(100vw - 32px)); } #panel-body table { font-size: 16px; } #panel-body td, #panel-body th { padding: 6px 8px; }
 }
+#mg-score, #mg-down, #mg-msg, #mg-end-title, #mg-end-stat, #mg-end-why, #mg-end-best { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-weight: 600; } 
+#mg-down { font-weight: 500; }

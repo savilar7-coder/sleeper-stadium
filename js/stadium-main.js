@@ -555,6 +555,10 @@ function playGame() {
   const opp = L.teams.find((t) => t.matchup_id && t.matchup_id === me.matchup_id && t !== me) || L.teams.find((t) => t !== me);
   closePanel();
   for (const id of ["st-hud", "zoom-ctl", "jump-btn", "share-btn", "play-btn", "prompt"]) $(id).style.display = "none";
+  for (const id of ["st-rail-l", "st-rail-r", "st-ticker", "gh-star", "tip-pill", "share-lg", "drill-tease", "recap-ready"]) {
+    const e = document.getElementById(id);
+    if (e) e.style.visibility = "hidden";
+  }
   game.scene.sleep("stadium");
   if (game.scene.getScene("minigame")) game.scene.stop("minigame");
   game.scene.start("minigame", { me, opp, league: L });
@@ -562,7 +566,11 @@ function playGame() {
 function exitGame() {
   game.scene.stop("minigame");
   $("mg-hud").hidden = true;
-  for (const id of ["st-hud", "zoom-ctl", "jump-btn", "share-btn", "play-btn"]) $(id).style.display = "";
+  for (const id of ["st-hud", "zoom-ctl", "jump-btn", "share-btn", "play-btn", "prompt"]) $(id).style.display = "";
+  for (const id of ["st-rail-l", "st-rail-r", "st-ticker", "gh-star", "tip-pill", "share-lg"]) {
+    const e = document.getElementById(id);
+    if (e) e.style.visibility = "";
+  }
   game.scene.wake("stadium");
 }
 function pastWeeks() {
@@ -818,7 +826,12 @@ function sharePicture(cv, name, title) {
     toast(`\u{1F4F8} Picture saved${copied ? " \xB7 link copied" : ""}. Paste it in your league chat!`);
   });
 }
-let shareAfterPick = false, playAfterPick = false;
+let shareAfterPick = false, playAfterPick = 0;
+function playWhenReady(tries = 0) {
+  const s = game && game.scene.getScene("stadium");
+  if (s && s.sys.isActive() && game.scene.getScene("minigame") && s.textures.exists("football")) playGame();
+  else if (tries < 60) setTimeout(() => playWhenReady(tries + 1), 300);
+}
 function shareMine() {
   count("share");
   const m = mine();
@@ -894,7 +907,11 @@ function matchupCard(me, opp) {
   sharePicture(cv, `week-${L.week}-matchup.png`, `${me.name} vs ${opp.name}`);
 }
 function drillTeaser() {
-  if (!mine() || store("st-drill-seen") || document.getElementById("recap-ready")) return;
+  if (document.querySelector(".td-banner") || $("panel").hidden === false) {
+    setTimeout(drillTeaser, 4e3);
+    return;
+  }
+  if (!mine() || store("st-drill-seen") || document.getElementById("recap-ready") || game && game.scene.isActive("minigame")) return;
   store("st-drill-seen", "1");
   const b = el(
     "div",
@@ -914,7 +931,7 @@ function drillTeaser() {
 }
 function recapReady() {
   const G = Object.values(L.games || {}), k = `st-recap-${L.id}-${L.week}`;
-  if (!G.length || G.some((s) => s !== "complete") || store(k)) return;
+  if (!G.length || G.some((s) => s !== "complete") || store(k) || game && game.scene.isActive("minigame")) return;
   store(k, "1");
   const b = el(
     "div",
@@ -945,7 +962,8 @@ function awardsList() {
   if (!pairs.length || !live.some((t) => t.points > 0)) return [];
   const top = [...live].sort((a, b) => b.points - a.points)[0], low = [...live].sort((a, b) => a.points - b.points)[0];
   const gap = (p) => Math.abs(p[0].points - p[1].points), byGap = [...pairs].sort((a, b) => gap(b) - gap(a));
-  const lead = (p) => p[0].points >= p[1].points ? p : [p[1], p[0]], decided = pairs.filter((p) => gap(p) > 0.05).map(lead);
+  const over = (t) => (t.starters || []).every((pid) => !pid || pid === "0" || (L.games || {})[L.players[pid] ? L.players[pid][2] : pid] === "complete") && Object.keys(L.games || {}).length;
+  const lead = (p) => p[0].points >= p[1].points ? p : [p[1], p[0]], decided = pairs.filter((p) => gap(p) > 0.05 && over(p[0]) && over(p[1])).map(lead);
   const ass = [...pairs].sort((a, b) => pct(a[0]) + pct(a[1]) - (pct(b[0]) + pct(b[1])) || a[0].fpts + a[1].fpts - (b[0].fpts + b[1].fpts))[0];
   const bench = (t) => Object.entries(t.players_points || {}).filter(([pid]) => !(t.starters || []).includes(pid)).reduce((n, [, v]) => n + (v || 0), 0);
   const shame = [...live].sort((a, b) => bench(b) - bench(a))[0];
@@ -1065,10 +1083,8 @@ function setMine(rid) {
     shareAfterPick = false;
     setTimeout(shareMine, 700);
   }
-  if (playAfterPick) {
-    playAfterPick = false;
-    setTimeout(playGame, 900);
-  }
+  if (playAfterPick && Date.now() - playAfterPick < 6e4) setTimeout(playWhenReady, 600);
+  playAfterPick = 0;
 }
 const SCHEDULE = "https://api.sleeper.com/schedule/nfl/regular";
 function gamesOf(games, week) {
@@ -1291,12 +1307,12 @@ function askLeague(note) {
   setTimeout(recapReady, 4e3);
   if (location.hash === "#drill") {
     history.replaceState(null, "", location.pathname + location.search);
-    if (mine()) setTimeout(playGame, 1200);
+    if (mine()) setTimeout(playWhenReady, 600);
     else {
-      playAfterPick = true;
+      playAfterPick = Date.now();
       whoAreYou();
     }
-  } else setTimeout(drillTeaser, 6e3);
+  } else setTimeout(drillTeaser, 11e3);
   game = new Phaser.Game({
     type: (navigator.maxTouchPoints || 0) > 0 ? Phaser.AUTO : Phaser.CANVAS,
     parent: "game",

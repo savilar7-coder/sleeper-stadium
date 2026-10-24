@@ -10,6 +10,7 @@ const ROUTES = [
   [[0, 3], [-10, 5]]
 ];
 const DRIVES = ["off", "def", "off", "def"];
+const EDGE = 30;
 const OPEN_PX = 34;
 const CLOCK = 60, RUNOFF = { catch: 6, inc: 2, sack: 5 };
 const FB_KITS = [
@@ -32,6 +33,7 @@ const kitOf = (t) => {
 };
 const hex = (s) => parseInt(s.slice(1), 16);
 const calm = () => !!window.__calm;
+const NUM_FONT = '"Segoe UI", "Helvetica Neue", Arial, sans-serif';
 const surname = (n) => {
   const w = String(n).split(" ").filter((x) => !/^(jr|sr|ii|iii|iv|v)\.?$/i.test(x));
   return w[w.length - 1] || n;
@@ -64,13 +66,6 @@ class MiniGameScene extends Phaser.Scene {
     this.msg.hidden = false;
     $("mg-exit").hidden = false;
     this.hud.classList.remove("mg-over");
-    const tick = document.getElementById("st-ticker");
-    if (tick) {
-      tick.style.display = "none";
-      this.events.once("shutdown", () => {
-        tick.style.display = "";
-      });
-    }
     const sh = $("mg-share");
     if (!sh.dataset.on) {
       sh.dataset.on = "1";
@@ -111,12 +106,14 @@ class MiniGameScene extends Phaser.Scene {
       g.fillStyle([9071178, 5916214, 13214247, 7023146][x * 7 + y * 3 & 3], 0.8);
       g.fillRect(x, y, 4, 4);
     }
+    g.fillStyle(7032618);
+    g.fillRect(0, -110 * YPX - 4, W, 4);
     g.fillStyle(16777215, 0.8);
     for (let y = 0; y <= 100; y += 10) {
       g.fillRect(0, -y * YPX - 1, W, 2);
       const n = y <= 50 ? y : 100 - y;
       if (n) {
-        this.add.text(10, -y * YPX - 18, String(n), { fontFamily: "Pixelify Sans", fontSize: "14px", color: "#ffffff" }).setAlpha(0.6).setResolution(DPR);
+        this.add.text(10, -y * YPX - 18, String(n), { fontFamily: NUM_FONT, fontStyle: "bold", fontSize: "14px", color: "#ffffff" }).setAlpha(0.6).setResolution(DPR);
       }
     }
     this.ezG = this.add.graphics().setDepth(-9);
@@ -172,7 +169,7 @@ class MiniGameScene extends Phaser.Scene {
     this.ball.setVisible(false);
     this.aimG.clear();
     const off = this.kind === "off" ? this.me : this.opp, def = this.kind === "off" ? this.opp : this.me;
-    const W = this.W, y0 = -this.los * YPX, xs = [0.14, 0.38, 0.62, 0.86].map((f) => f * W);
+    const W = this.W, y0 = -this.los * YPX, xs = [0.14, 0.38, 0.62, 0.86].map((f) => Phaser.Math.Clamp(f * W, EDGE, W - EDGE));
     const glow = this.sys.renderer && this.sys.renderer.type === Phaser.WEBGL;
     const make = (team, x, y, label, facing) => {
       const s = this.add.sprite(x, y, `team-${team.roster_id}-${facing}0`).setOrigin(0.5, 1).setScale(1.3).setDepth(1e3 + y);
@@ -194,7 +191,7 @@ class MiniGameScene extends Phaser.Scene {
     this.recv = this.names(off).map((n, i) => {
       const r = make(off, xs[i], y0, n, "up");
       const flip = xs[i] > W / 2 ? -1 : 1;
-      r.path = routes[i].map(([dx, dy]) => ({ x: Phaser.Math.Clamp(xs[i] + dx * YPX * flip, 16, W - 16), y: y0 - dy * YPX }));
+      r.path = routes[i].map(([dx, dy]) => ({ x: Phaser.Math.Clamp(xs[i] + dx * YPX * flip, EDGE, W - EDGE), y: y0 - dy * YPX }));
       r.speed = (5.6 + Math.random() * 1.6) * YPX;
       r.ring = this.add.ellipse(xs[i], y0 + 2, 26, 10, 4906624, 0.3).setStrokeStyle(3, 4906624).setAlpha(0.7).setDepth(2e3 + y0);
       r.open = true;
@@ -222,6 +219,8 @@ class MiniGameScene extends Phaser.Scene {
     }
     this.losLine.y = y0;
     this.firstLine.setAlpha(1).y = -(this.los + this.toGo) * YPX;
+    const hb = Math.ceil((this.hud.getBoundingClientRect().bottom || 0) + 4);
+    this.cameras.main.setBounds(0, -110 * YPX - hb, W, 138 * YPX + hb);
     this.cameras.main.centerOn(W / 2, y0 - this.H * 0.28);
     this.updateHud();
     this.time.delayedCall(700, () => {
@@ -476,6 +475,7 @@ class MiniGameScene extends Phaser.Scene {
     const dt = delta / 1e3;
     this.clock = Math.max(0, this.clock - dt);
     const move = (o, tx, ty, sp) => {
+      tx = Phaser.Math.Clamp(tx, EDGE, this.W - EDGE);
       const dx = tx - o.s.x, dy = ty - o.s.y, d = Math.hypot(dx, dy);
       const v = Math.min(d, sp * dt);
       o.vx = d ? dx / d * sp : 0;
@@ -489,7 +489,7 @@ class MiniGameScene extends Phaser.Scene {
       }
       const dir = Math.abs(dx) > Math.abs(dy) ? dx < 0 ? "left" : "right" : dy < 0 ? "up" : "down";
       o.s.setTexture(`team-${o.team.roster_id}-${d > 1 ? dir : o === this.qb || this.recv.includes(o) ? "up" : "down"}${d > 1 ? Math.floor(time / 120) % 4 : 0}`).setDepth(1e3 + o.s.y);
-      o.t.setPosition(o.s.x, o.s.y - 44);
+      o.t.setPosition(Phaser.Math.Clamp(o.s.x, o.t.width / 2 + 2, this.W - o.t.width / 2 - 2), o.s.y - 44);
     };
     for (const r of this.recv) {
       const w = r.path[0];
