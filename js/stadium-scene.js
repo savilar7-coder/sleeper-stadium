@@ -397,7 +397,7 @@ class StadiumScene extends World {
     for (let i = 1; i <= 9; i++) {
       const y = fy + ez + (fh - 2 * ez) * i / 10;
       g.fillRect(fx + 4, y - 1, fw - 8, 3);
-      g.font = '600 22px "Pixelify Sans", sans-serif';
+      g.font = '800 22px "Segoe UI", "Helvetica Neue", Arial, sans-serif';
       const num = String(i <= 5 ? i * 10 : (10 - i) * 10);
       g.fillStyle = "rgba(0,0,0,0.35)";
       g.fillText(num, fx + 10, y - 4);
@@ -411,12 +411,25 @@ class StadiumScene extends World {
       for (let i = 1; i < 100; i++) {
         if (i % 10 === 0) continue;
         const y = top + len * i / 100;
-        for (const hx of [fx + 10, fx + fw - 18]) g.fillRect(hx, y, 8, 2);
+        for (const hx of [fx + 10, fx + fw - 18]) if (hx > fx + 10 || i % 10 < 8) g.fillRect(hx, y, 8, 2);
       }
       g.fillStyle = "rgba(255,255,255,0.85)";
       g.fillRect(fx + 4, top, 3, len);
       g.fillRect(fx + fw - 7, top, 3, len);
-      const cy = top + len / 2, cx = fx + fw / 2;
+      let cy = top + len / 2, k = 1;
+      const cx = fx + fw / 2;
+      const nRows = (this.league.pairs || []).length;
+      if (nRows > 1) {
+        const rowY = (r2) => (FIELD.y0 + 7 + r2 * ROW) * T, gaps = [];
+        for (let r2 = 0; r2 + 1 < nRows; r2++) gaps.push([rowY(r2) + 64, rowY(r2 + 1) - 68]);
+        const [g0, g1] = gaps.reduce((a, b) => Math.abs((b[0] + b[1]) / 2 - cy) < Math.abs((a[0] + a[1]) / 2 - cy) ? b : a);
+        cy = (g0 + g1) / 2;
+        k = Math.max(0.4, Math.min(1, (g1 - g0) / 2 / 72));
+      }
+      g.save();
+      g.translate(cx, cy);
+      g.scale(k, k);
+      g.translate(-cx, -cy);
       const ini = (this.league.name || "").replace(/[^A-Za-z0-9 ]/g, "").split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 3).toUpperCase();
       g.globalAlpha = k1 ? 0.5 : 0.22;
       g.fillStyle = k1 ? k1[2] : "#241773";
@@ -440,6 +453,7 @@ class StadiumScene extends World {
       g.textAlign = "center";
       g.font = `600 ${k1 && ini.length > 2 ? 38 : 46}px "Pixelify Sans", sans-serif`;
       g.fillText(k1 ? ini || "FF" : "D", cx, cy + 16);
+      g.restore();
       g.globalAlpha = 1;
     }
     for (const y of [fy + 6, fy + fh - 12]) {
@@ -850,9 +864,7 @@ class StadiumScene extends World {
       tag.setFontSize(Math.round((len <= 13 ? 18 : len <= 17 ? 15 : 13) * DPR));
       tag.setText(`${t.mine ? "\u{1F451} " : ""}${t.gold ? "\u{1F3C6} " : ""}${nm}`).setColor(t.mine ? "#ffe08a" : opp && t.points > opp.points ? "#b9f5a8" : "#fff4d6");
     }
-    for (const { board, a, b } of this.boards || []) {
-      board.setText(`${a.points.toFixed(1)}  :  ${b.points.toFixed(1)}`);
-    }
+    for (const B of this.boards || []) this.tickBoard(B);
     this.updateMoods();
     this.updatePodiums();
     const prev = this.prevPts || {}, prevSP = this.prevSP || {};
@@ -883,6 +895,24 @@ class StadiumScene extends World {
     this.updateJumbo();
     this.applyUiScale();
   }
+  tickBoard(B) {
+    const cur = B.cur || (B.cur = { a: B.a.points, b: B.b.points });
+    const put = () => B.board.setText(`${cur.a.toFixed(1)}  :  ${cur.b.toFixed(1)}`);
+    if (B.tick) {
+      B.tick.stop();
+      B.tick = null;
+    }
+    if (window.__calm || Math.abs(cur.a - B.a.points) < 0.05 && Math.abs(cur.b - B.b.points) < 0.05) {
+      cur.a = B.a.points;
+      cur.b = B.b.points;
+      put();
+      return;
+    }
+    B.tick = this.tweens.add({ targets: cur, a: B.a.points, b: B.b.points, duration: 700, ease: "Cubic.easeOut", onUpdate: put, onComplete: () => {
+      B.tick = null;
+      put();
+    } });
+  }
   touchdown(t, jump, who) {
     const q = this.tdQueue = this.tdQueue || [];
     q.push({ text: `\u{1F3C8} ${jump >= 5.5 ? "TOUCHDOWN" : "BIG PLAY"}`, who, sub: `+${jump.toFixed(1)} \xB7 ${t.name}`, mine: t.mine });
@@ -911,7 +941,7 @@ class StadiumScene extends World {
   }
   nudgeCamera(x, y, shake) {
     const cam = this.cameras.main;
-    if (panelOpen || this.target || this.stick && this.stick.active || this.nudging) return;
+    if (panelOpen || this.target || this.stick && this.stick.active || this.nudging || window.__calm) return;
     this.nudging = true;
     const off = () => this.spawnOffset ? 3.2 * TILE : 0;
     this.endNudge = () => {
@@ -951,6 +981,16 @@ class StadiumScene extends World {
   }
   celebrate(s, t) {
     sfx.pop && sfx.pop();
+    const b = (this.boards || []).find((x) => x.a === t || x.b === t);
+    if (b && !b.popping && !window.__calm) {
+      const s0 = b.board.scaleX;
+      b.popping = true;
+      this.tweens.add({ targets: b.board, scaleX: { from: s0 * 1.3, to: s0 }, scaleY: { from: s0 * 0.8, to: s0 }, duration: 340, ease: "Back.easeOut", onComplete: () => {
+        b.popping = false;
+      } });
+    }
+    this.pop(s.x, s.y - 70, `+${(t.points - (this.prevPts[t.roster_id] || 0)).toFixed(1)}`, "#b9f5a8");
+    if (window.__calm) return;
     this.tweens.add({ targets: s, y: s.y - 26, duration: 180, yoyo: true, repeat: 2, ease: "Quad.easeOut" });
     for (let i = 0; i < 26; i++) {
       const c = this.add.rectangle(s.x, s.y - 40, 4, 4, Phaser.Utils.Array.GetRandom([16767050, 16735581, 7268351, 10354554, 16777215])).setDepth(100001);
@@ -958,9 +998,6 @@ class StadiumScene extends World {
       this.tweens.add({ targets: c, x: s.x + Math.cos(a) * v, y: s.y - 40 + Math.sin(a) * v + 40, angle: 360, alpha: 0, duration: 1100 + Math.random() * 500, onComplete: () => c.destroy() });
       this.tweens.add({ targets: c, scaleX: 0.15, duration: 140 + Math.random() * 120, yoyo: true, repeat: 5 });
     }
-    const b = (this.boards || []).find((x) => x.a === t || x.b === t);
-    if (b) this.tweens.add({ targets: b.board, scale: b.board.scale * 1.25, duration: 160, yoyo: true, repeat: 1 });
-    this.pop(s.x, s.y - 70, `+${(t.points - (this.prevPts[t.roster_id] || 0)).toFixed(1)}`, "#b9f5a8");
   }
   makeFootballer() {
     const draw = (dir, f, pose) => this.footballerGrid(dir, f, pose, {});
@@ -1225,10 +1262,10 @@ class StadiumScene extends World {
     this.add.text(gx + 30, gy + 4, "\u{1F356} tailgate", { ...sans, fontSize: "11px", color: "#fff4d6" }).setOrigin(0.5, 0).setDepth(gy + 2);
     const rowsY = [...this.teamSprites.values()].map((x) => x.s.y).filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
     const band = (k) => rowsY[k] != null ? rowsY[k] + 62 : null;
-    const fl = (F.x0 - 0.55) * T, fr = (F.x1 + 1.55) * T;
-    for (const [k, x] of [[0, fl], [2, fl], [0, fr], [2, fr]]) {
+    const fr = (F.x1 + 1.55) * T;
+    for (const k of [0, 2]) {
       const y = band(k);
-      if (y != null) this.add.image(x, y, "bench").setOrigin(0.5, 1).setAngle(90).setDepth(y);
+      if (y != null) this.add.image(fr, y, "bench").setOrigin(0.5, 1).setAngle(90).setDepth(y);
     }
     px("gatorade", 10, 12, (p) => {
       p("#e8642e", 1, 2, 8, 9);
@@ -1236,7 +1273,7 @@ class StadiumScene extends World {
       p("#f4f1ea", 0, 0, 10, 2);
       p("#1d1d22", 4, 6, 2, 2);
     });
-    if (band(1) != null) this.add.image(fl, band(1), "gatorade").setOrigin(0.5, 1).setDepth(band(1));
+    if (band(1) != null) this.add.image(fr, band(1), "gatorade").setOrigin(0.5, 1).setDepth(band(1));
     px("chain", 4, 26, (p) => {
       p("#1d1d22", 1, 4, 2, 22);
       p("#ff7a1a", 0, 0, 4, 4);
@@ -1733,6 +1770,12 @@ ${t.points.toFixed(1)} pts`);
       for (const g of [A.s, B.s, board, bar, o.pct, projTxt]) if (g && g.alpha !== dim) g.setAlpha(dim);
       const r = board.getBounds();
       projTxt.setPosition(r.centerX, r.bottom + 1).setDepth(board.depth);
+      if (!o.lead) o.lead = this.add.graphics();
+      o.lead.clear().setDepth(board.depth + 1).setAlpha(dim);
+      if (Math.abs(a.points - b.points) >= 0.05) {
+        const h = Math.max(2, 2.5 * DPR * board.scaleY), w = r.width / 2 - 14 * board.scaleX * DPR, left = a.points > b.points;
+        o.lead.fillStyle(16767050, 1).fillRect(left ? r.left + 7 * board.scaleX * DPR : r.centerX + 7 * board.scaleX * DPR, r.bottom - h - 2 * board.scaleY * DPR, w, h);
+      }
       if (o.sign) {
         const pr = projTxt.getBounds();
         o.sign.setPosition(pr.centerX, pr.bottom + 4);

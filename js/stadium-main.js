@@ -2,6 +2,7 @@ import { $, DPR } from "./core.js";
 import { closePanel, el, openPanel } from "./panel.js";
 import { sfx } from "./sfx.js";
 import { espnLeague, isEspn } from "./stadium-espn.js";
+window.__calm = /[?&]calm=1/.test(location.search) || !/[?&]calm=0/.test(location.search) && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const phaserReady = new Promise((ok, no) => {
   if (window.Phaser) {
     ok();
