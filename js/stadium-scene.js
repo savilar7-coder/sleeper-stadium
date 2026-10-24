@@ -1111,6 +1111,11 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     el2.querySelector("i").textContent = item.who || "";
     el2.querySelector("span").textContent = item.sub;
     item.el = el2;
+    const ts = item.rid != null && this.teamSprites && this.teamSprites.get(item.rid), cam = this.cameras.main;
+    if (ts) {
+      const r = this.game.canvas.getBoundingClientRect(), sy = r.top + (ts.s.y - cam.worldView.y) * cam.zoom * (r.height / this.game.canvas.height);
+      if (sy > 0 && sy < innerHeight) el2.style.top = sy < innerHeight * 0.5 ? "68%" : "30%";
+    }
     document.body.appendChild(el2);
     sfx.cheer && sfx.cheer();
     setTimeout(() => {

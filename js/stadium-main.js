@@ -1679,7 +1679,7 @@ function askLeague(note) {
   look.onclick = demo.onclick;
   const tap = document.createElement("div");
   tap.style.cssText = "margin:12px auto 0;font:600 13px system-ui,sans-serif;color:#7a4b00;text-align:center;cursor:pointer";
-  tap.innerHTML = "Live scores, touchdown alerts, win odds, the ASS Bowl and the bench of shame<br><u>No league? Tap the stadium for a sample</u>";
+  tap.innerHTML = "Live scores, touchdown alerts, win odds, the ASS Bowl, and play your matchup as a 2-minute mini game<br><u>No league? Tap the stadium for a sample</u>";
   tap.style.fontWeight = "400";
   tap.onclick = () => demo.onclick();
   const star = document.createElement("a");
