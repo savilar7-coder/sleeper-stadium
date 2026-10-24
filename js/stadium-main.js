@@ -1228,7 +1228,7 @@ function matchupCard(me, opp) {
   c.fillStyle = "#e8e2ff";
   c.font = `bold 44px ${font}`;
   c.fillText(location.host, W / 2, H - 62);
-  sharePicture(cv, `week-${L.week}-matchup.png`, `${me.name} vs ${opp.name}`);
+  sharePicture(cv, `week-${L.week}-matchup.png`, `${me.name} ${fmt(me.points)} \u2013 ${fmt(opp.points)} ${opp.name}, live in the ${L.name} stadium \u{1F3DF}\uFE0F`);
 }
 function drillTeaser() {
   if (window.__tv) return;
@@ -1452,7 +1452,7 @@ function recap() {
   c.fillStyle = "#e8e2ff";
   c.font = `bold 44px ${font}`;
   c.fillText(location.host, W / 2, H - 62);
-  sharePicture(cv, `week-${L.week}-awards.png`, `Week ${L.week} awards`);
+  sharePicture(cv, `week-${L.week}-awards.png`, `${L.name} week ${L.week} awards \u{1F3C5}`);
 }
 function whoAreYou() {
   openPanel("\u{1F44B} Who are you?", async () => [

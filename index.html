@@ -311,6 +311,7 @@
 })();
 </script>
 <script>document.addEventListener('click', function (e) { if (!e.target.closest || !e.target.closest('.star-a')) return; try { var day = new Date().toISOString().slice(0, 10); if (localStorage.getItem('ev-demo-star') !== day) { localStorage.setItem('ev-demo-star', day); navigator.sendBeacon('https://philosophers-trail.pages.dev/e?k=demo-star'); } } catch (x) {} }, true);</script>
+<style>@media (min-width: 1280px) { #pass-foot { left: 16px !important; right: auto !important; bottom: 14px !important; height: 26px !important; background: rgba(16,19,24,.88); border: 2px solid #3a3f47; border-radius: 8px; font-size: 13px !important; } } /* round 46: on laptops it floated over the field, on the ASS BOWL sign */</style>
 <div id="pass-foot" style="position:fixed;left:0;right:0;bottom:calc(30px + env(safe-area-inset-bottom));z-index:3;height:18px;display:none;justify-content:center;align-items:center;gap:4px;padding:0 12px;font:11px/18px system-ui,sans-serif;color:#b9b0a0;white-space:nowrap;pointer-events:none"><span style="overflow:hidden;text-overflow:ellipsis;min-width:0">Made for <b id="pass-foot-n" style="color:#fff4d6;font-weight:600"></b></span><span>&middot;</span><a id="pass-foot-a" href="https://lamaisonwebstudio.com/stadium/make/" target="_blank" rel="noopener" style="flex:none;color:#ffd84a;pointer-events:auto">get one for your league</a></div>
 <script>
 (function () {

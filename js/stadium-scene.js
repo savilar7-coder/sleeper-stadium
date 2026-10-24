@@ -7,6 +7,7 @@ import { sfx } from "./sfx.js";
 import { World } from "./world.js";
 import { isMascot, kitNum, mascotFur, mascotHead } from "./stadium-mascots.js";
 let ROW = 5;
+const r1 = (n) => (Math.round(n * 10) / 10).toFixed(1);
 const sweatActive = (L) => {
   if (/[?&]sweat=1/.test(location.search)) return true;
   const st = Object.values(L && L.games || {}), left = st.filter((x) => x !== "complete").length / 2;
@@ -1043,8 +1044,8 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     const ass = (this.boards || []).find((B) => B.sign);
     const picks = [
       best[0] && { text: "\u2B50 TOP PLAY", who: `${P[best[0].pid] ? P[best[0].pid][0] : ""} ${best[0].v.toFixed(1)}`, sub: best[0].t.name },
-      close && { text: "\u{1F62C} CLOSEST GAME", who: `${close.a.points.toFixed(1)} \u2013 ${close.b.points.toFixed(1)}`, sub: `${close.a.name} vs ${close.b.name}` },
-      ass && (ass.a.points || ass.b.points) && { text: "\u{1F6BD} ASS BOWL", who: `${ass.a.points.toFixed(1)} \u2013 ${ass.b.points.toFixed(1)}`, sub: `${ass.a.name} vs ${ass.b.name}` }
+      close && { text: "\u{1F62C} CLOSEST GAME", who: `${r1(close.a.points)} \u2013 ${r1(close.b.points)}`, sub: `${close.a.name} vs ${close.b.name}` },
+      ass && (ass.a.points || ass.b.points) && { text: "\u{1F6BD} ASS BOWL", who: `${r1(ass.a.points)} \u2013 ${r1(ass.b.points)}`, sub: `${ass.a.name} vs ${ass.b.name}` }
     ].filter(Boolean);
     if (!picks.length) return;
     this.hlTurn = ((this.hlTurn || 0) + 1) % picks.length;
@@ -1569,20 +1570,20 @@ ${st.map((t, i) => `${i + 1}. ${name(t)}  ${t.wins}-${t.losses}`).join("\n")}`);
       const blow = [...live].sort((x, y) => y.d - x.d)[0], close = live.filter((p) => p.a.points > 0 && p.b.points > 0).sort((x, y) => x.d - y.d)[0];
       const [bw, bl] = lead(blow);
       pages.push(`BIGGEST BLOWOUT
-${name(bw)} ${bw.points.toFixed(1)}
-over ${name(bl)} ${bl.points.toFixed(1)}`);
+${name(bw)} ${r1(bw.points)}
+over ${name(bl)} ${r1(bl.points)}`);
       if (close) {
         const [cw, cl] = lead(close);
         pages.push(`CLOSEST GAME
-${name(cw)} ${cw.points.toFixed(1)}
-${name(cl)} ${cl.points.toFixed(1)}`);
+${name(cw)} ${r1(cw.points)}
+${name(cl)} ${r1(cl.points)}`);
       }
     }
     if (this.spotId != null) {
       const t = L.teams.find((x) => x.roster_id === this.spotId);
       if (t) pages.push(`\u{1F526} TOP SCORER
 ${name(t)}
-${t.points.toFixed(1)} pts`);
+${r1(t.points)} pts`);
     }
     this.jumbo.setAll(pages);
   }
@@ -1885,7 +1886,7 @@ ${t.points.toFixed(1)} pts`);
     };
     const bench = (t.players || []).filter((p) => !(t.starters || []).includes(p));
     openPanel(`${t.mine ? "\u{1F451} " : ""}${t.name}`, async () => [
-      el("p", { class: "small" }, `${t.owner} \xB7 ${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""} \xB7 ${t.fpts.toFixed(1)} points for \xB7 week ${this.league.week}: ${t.points.toFixed(1)}`),
+      el("p", { class: "small" }, `${t.owner} \xB7 ${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""} \xB7 ${t.fpts.toFixed(1)} points for \xB7 week ${this.league.week}: ${r1(t.points)}`),
       el("h3", {}, "Starters"),
       el("table", {}, (t.starters || []).map((pid, i) => row(pid, (t.starters_points || [])[i]))),
       bench.length ? [el("h3", {}, "Bench"), el("table", {}, bench.map((pid) => row(pid, (t.players_points || {})[pid])))] : null

@@ -174,12 +174,12 @@ body.calm #st-ticker span { animation: none; padding-left: 12px; }
 
 #st-rail-l, #st-rail-r { display: none; }
 @media (min-width: 1280px) {
-  #st-rail-l, #st-rail-r { display: grid; align-content: start; gap: 8px; position: fixed; top: 20px; bottom: 56px; width: clamp(220px, calc(50vw - 500px), 360px);
+  #st-rail-l, #st-rail-r { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 8px; position: fixed; top: 20px; bottom: 56px; width: clamp(220px, calc(50vw - 500px), 360px);
     overflow: auto; z-index: 3; font: 600 15px/1.35 "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #fff4d6; }
   #st-rail-l { left: 16px; } #st-rail-r { right: 16px; }
   .rail-card { background: rgba(16, 19, 24, 0.85); border: 2px solid #3a3f47; border-radius: 8px; padding: 10px 12px; }
   .rail-card b { display: block; color: #ffd84a; margin-bottom: 4px; }
-  .rail-row { display: flex; justify-content: space-between; gap: 8px; } .rail-row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .rail-row span:last-child { flex: none; } 
+  .rail-row { display: flex; justify-content: space-between; gap: 8px; } .rail-row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }  .rail-row span:last-child { flex: none; } 
   .rail-row.mine { color: #ffe08a; } .rail-cut { border-top: 2px dashed #c9a227; margin: 4px 0; font-size: 11px; color: #c9a227; text-align: center; }
   #st-ticker { display: none; } 
 }
