@@ -136,6 +136,10 @@ class StadiumScene extends World {
     this.youTag.setVisible(picked).setDepth(99990);
     this.youOn = picked && mineTS && ((navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window || matchMedia("(pointer: coarse)").matches) ? mineTS.s : null;
     this.player.setVisible(picked && !this.youOn);
+    this.homeTS = this.youOn ? mineTS : null;
+    this.walkAs = null;
+    this.walkSpot = { x: sx, y: sy };
+    if (this.homeTS) this.homeTS.home = { x: mineTS.s.x, y: mineTS.s.y };
     this.facing = "up";
     this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, this.blockers);
@@ -145,6 +149,17 @@ class StadiumScene extends World {
     this.spawnOffset = true;
     const fitZoom = () => this.setZoom(villageZoom || this.fitZoom());
     fitZoom();
+    if (mineTS && !window.__tv) {
+      this.time.delayedCall(60, () => this.alignMine(mineTS));
+      const hudEl = document.getElementById("st-hud"), ro = hudEl && window.ResizeObserver ? new ResizeObserver(() => this.time.delayedCall(30, () => this.alignMine(mineTS))) : null;
+      if (ro) ro.observe(hudEl);
+      const onRs = () => this.time.delayedCall(30, () => this.alignMine(mineTS));
+      this.scale.on("resize", onRs);
+      this.events.once("shutdown", () => {
+        if (ro) ro.disconnect();
+        this.scale.off("resize", onRs);
+      });
+    }
     this.scale.on("resize", fitZoom);
     this.events.once("shutdown", () => this.scale.off("resize", fitZoom));
     this.keys = this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT", false);
@@ -158,7 +173,13 @@ class StadiumScene extends World {
     });
     setupTouch(this, (w) => {
       const door = this.doors.find((d) => Phaser.Math.Distance.Between(w.x, w.y, d.x, d.y - 30) < 60);
-      this.route = this.pathTo(this.player, door ? { x: door.x, y: door.y } : { x: w.x, y: w.y });
+      const homeTap = this.homeTS && Phaser.Math.Distance.Between(w.x, w.y, this.homeTS.home.x, this.homeTS.home.y - 30) < 60;
+      this.route = this.pathTo(this.player, homeTap ? this.walkSpot : door ? { x: door.x, y: door.y } : { x: w.x, y: w.y });
+      if (this.homeTS) {
+        this.walkAs = this.homeTS;
+        this.idleAt = 0;
+        this.goingHome = !!homeTap;
+      }
       this.target = this.route.shift();
       if (this.tapOpen) this.tapOpen.remove();
       this.tapOpen = door && door.id.startsWith("team-") ? this.time.delayedCall(340, () => {
@@ -188,6 +209,17 @@ class StadiumScene extends World {
     this.ambient = { shadows: new Map() };
     this.near = null;
     this.promptKey = "";
+  }
+  alignMine(mineTS) {
+    if (!this.spawnOffset || !mineTS || !mineTS.tag || !this.sys.isActive()) return;
+    const cam = this.cameras.main, opp = [...this.teamSprites.values()].find((x) => x !== mineTS && x.s.y === mineTS.s.y && Math.abs(x.s.x - mineTS.s.x) > TILE);
+    const rowTop = Math.min(mineTS.tag.getBounds().top, opp && opp.tag ? opp.tag.getBounds().top : Infinity, mineTS.s.y - mineTS.s.displayHeight) - 0.4 * TILE;
+    const hud = document.getElementById("st-hud"), hudB = hud && hud.getClientRects().length ? hud.getBoundingClientRect().bottom * this.scale.height / window.innerHeight : 0;
+    const vh = cam.height / cam.zoom, midY = rowTop - hudB / cam.zoom + vh / 2;
+    if (this.player.y - this.spawnOffY <= midY + 0.5) return;
+    this.spawnOffY = this.player.y - midY;
+    cam.setFollowOffset(this.spawnOffX, this.spawnOffY);
+    cam.centerOn(this.player.x - this.spawnOffX, midY);
   }
   pathTo(from, goal) {
     return this.findPath(from, goal) || [goal];
@@ -2206,8 +2238,34 @@ ${r1(t.points)} pts`);
     const wv = this.cameras.main.worldView, pad = 4 / this.cameras.main.zoom;
     for (const x of this.teamSprites.values()) {
       const half = x.tag.displayWidth * x.tag.originX, lo = wv.x + pad + half, hi = wv.right - pad - (x.tag.displayWidth - half);
-      x.tag.x = lo > hi ? x.s.x : Math.min(hi, Math.max(lo, x.s.x));
+      const bx = x === this.walkAs ? x.home.x : x.s.x;
+      x.tag.x = lo > hi ? bx : Math.min(hi, Math.max(lo, bx));
     }
+  }
+  walkMine(time) {
+    const S = this.walkAs, s = S.s, P = this.player, G = this.gait || {}, moving = !!G.moving;
+    const atSpot = !this.target && (this.goingHome || Phaser.Math.Distance.Between(P.x, P.y, this.walkSpot.x, this.walkSpot.y) < 24);
+    const goal = atSpot ? S.home : { x: P.x, y: P.y };
+    s.x += (goal.x - s.x) * 0.3;
+    s.y += (goal.y - s.y) * 0.3;
+    s.setOrigin(0.5, 1).setDepth(s.y);
+    const f = moving ? `${G.shown || this.facing}${Math.floor((this.walkTimer || 0) / 115) % 4}` : atSpot ? `${S.side === 0 ? "right" : "left"}0` : `${this.facing}0`;
+    if (s.frame.name !== f && s.texture.has(f)) s.setFrame(f);
+    if (atSpot && Math.hypot(goal.x - s.x, goal.y - s.y) < 1) {
+      s.setPosition(S.home.x, S.home.y).setDepth(S.home.y);
+      this.walkAs = null;
+      this.goingHome = false;
+      return;
+    }
+    if (!this.target && !atSpot && !moving) {
+      this.idleAt = this.idleAt || time;
+      if (time - this.idleAt > 4e3) {
+        this.route = this.pathTo(P, this.walkSpot);
+        this.target = this.route.shift();
+        this.idleAt = 0;
+        this.goingHome = true;
+      }
+    } else this.idleAt = 0;
   }
   update(time, delta) {
     this.drawBars();
@@ -2245,7 +2303,12 @@ ${r1(t.points)} pts`);
       }
     }
     drivePlayer(this, vx, vy, SPEED, delta);
+    if (this.walkAs) this.walkMine(time);
     for (const S of this.teamSprites.values()) {
+      if (S === this.walkAs) {
+        shadowFor(this, S.s);
+        continue;
+      }
       const { s, t, side, key: key2 } = S, dance = S.act > time && S.actType === "dance";
       const opp = S.opp !== void 0 ? S.opp : S.opp = this.league.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o.roster_id !== t.roster_id) || null;
       const hop = dance ? 7 : opp && t.points > opp.points ? 3 : 1.2;

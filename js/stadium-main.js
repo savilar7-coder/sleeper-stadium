@@ -77,6 +77,14 @@ async function champions(lg) {
   }
   const out = [];
   let id = lg.previous_league_id;
+  if (id && id !== "0") await new Promise((r) => {
+    const t0 = Date.now(), k = () => {
+      const s = game && game.scene && game.scene.getScene("stadium");
+      if (s && s.teamSprites && s.teamSprites.size || Date.now() - t0 > 5e3) r();
+      else setTimeout(k, 250);
+    };
+    k();
+  });
   for (let i = 0; id && id !== "0" && i < 6; i++) {
     try {
       const [old, bracket, rosters, users] = await Promise.all([get(`${API}/league/${id}`), get(`${API}/league/${id}/winners_bracket`), get(`${API}/league/${id}/rosters`), get(`${API}/league/${id}/users`)]);
