@@ -1144,7 +1144,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
         b.popping = false;
       } });
     }
-    this.pop(s.x, s.y - 100, `+${(t.points - (this.prevPts[t.roster_id] || 0)).toFixed(1)}`, "#b9f5a8");
+    this.pop(s.x, s.y - 112, `+${(t.points - (this.prevPts[t.roster_id] || 0)).toFixed(1)}`, "#b9f5a8");
     if (window.__calm) return;
     this.tweens.add({ targets: s, y: s.y - 26, duration: 180, yoyo: true, repeat: 2, ease: "Quad.easeOut" });
     for (let i = 0; i < 26; i++) {
@@ -1200,7 +1200,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
   footballerGrid(dir, f, pose, C) {
     const { K = "#141018", KL = "#33293f", GOLD = "#c9a227", GL = "#ffd84a", PUR = "#3b2390", PL = "#5a3dbd", PD = "#241773", WH = "#f4f1ea", WD = "#cfcac0", head, big } = C, tw = big ? 1 : 0;
     const ARM = lum(PUR) < 60 ? GL : PL;
-    const SK = head ? mascotFur(head) : "#c98d68", MASK = "#9aa1aa", BALL = "#8a4a22", CLEAT = "#141018";
+    const SK = head ? mascotFur(head) : "#c98d68", MASK = Math.abs(lum(GOLD) - lum(K)) > 50 ? GOLD : "#9aa1aa", BALL = "#8a4a22", CLEAT = "#141018";
     {
       const g = [...Array(16)].map(() => Array(16).fill(null)), px = (x, y, col) => {
         if (x >= 0 && x < 16 && y >= 0 && y < 16) g[y][x] = col;
@@ -1212,6 +1212,8 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
       if (side) {
         rect(6 + step, 12, 2, 2, WH);
         rect(8 - step, 12, 2, 2, WD);
+        rect(6 + step, 13, 2, 1, PUR);
+        rect(8 - step, 13, 2, 1, PD);
         rect(6 + step, 14, 3, 1, CLEAT);
         rect(8 - step, 14, 3, 1, CLEAT);
       } else {
@@ -1219,6 +1221,8 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
         rect(5, 12, 3, 2 - l, WH);
         rect(8, 12, 3, 2 - r, WD);
         rect(7, 12, 1, 2, "#9a958c");
+        rect(5, 13 - l, 3, 1, PUR);
+        rect(8, 13 - r, 3, 1, PD);
         rect(5, 14 - l, 3, 1, CLEAT);
         rect(8, 14 - r, 3, 1, CLEAT);
       }
