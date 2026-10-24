@@ -12,6 +12,7 @@ const ROUTES = [
 const DRIVES = ["off", "def", "off", "def"];
 const EDGE = 30;
 const OPEN_PX = 34;
+const TUNE = { offStart: 58, defStart: 65, toGo: 12, sackMs: 3e3, coverMs: 900, incRunoff: 5, yacMin: 3, yacRange: 8, cpuOpenCatch: 0.65, cpuYac: 1, meOpenCatch: 0.55, youPick: 0.25, youCatch: 0.3 };
 const CLOCK = 45, RUNOFF = { catch: 8, inc: 2, sack: 5 };
 const TOP_Y = -107 * YPX;
 const FB_KITS = [
@@ -55,6 +56,8 @@ class MiniGameScene extends Phaser.Scene {
     this.H = this.scale.height / DPR;
     this.cameras.main.setZoom(DPR).setBackgroundColor("#2b5c2a").setBounds(0, -140 * YPX, this.W, 168 * YPX);
     this.drawField();
+    this.T = { ...TUNE, ...window.__mgTune || {} };
+    this.runoff = { ...RUNOFF, inc: this.T.incRunoff };
     this.score = { me: 0, opp: 0 };
     this.di = -1;
     this.hudTxt = "";
@@ -170,9 +173,9 @@ class MiniGameScene extends Phaser.Scene {
   }
   startDrive(kind) {
     this.kind = kind;
-    this.los = 65;
+    this.los = kind === "off" ? this.T.offStart : this.T.defStart;
     this.down = 1;
-    this.toGo = 10;
+    this.toGo = this.T.toGo;
     this.clock = CLOCK;
     this.hail = false;
     this.setSlow(1);
@@ -389,13 +392,13 @@ class MiniGameScene extends Phaser.Scene {
     const dRecv = Phaser.Math.Distance.Between(at.x, at.y + 16, r.s.x, r.s.y), mine = this.kind === "off";
     if (dRecv > 40) return this.endPlay(0, "Overthrown. Incomplete.", "inc");
     const open = r.openAtTap !== false && this.cover(r).c > 20, youOn = this.you && Phaser.Math.Distance.Between(at.x, at.y + 16, this.you.s.x, this.you.s.y) < 40, roll = Math.random();
-    const pPick = youOn ? 0.35 : open ? 0 : 0.15, pCatch = youOn ? 0.3 : open ? 0.65 + Math.min(0.2, r.pts / 100) : 0.35;
+    const pPick = youOn ? this.T.youPick : open ? 0 : 0.15, pCatch = youOn ? this.T.youCatch : open ? (mine ? this.T.meOpenCatch : this.T.cpuOpenCatch) + Math.min(0.2, r.pts / 100) : 0.35;
     if (roll < pPick) {
       if (mine) this.tally.picks++;
       return this.turnover(mine ? "Intercepted! \u{1F631} He was covered." : "INTERCEPTION! \u{1F64C}");
     }
     if (roll >= pPick + pCatch) return this.endPlay(0, open ? mine ? "Dropped! Incomplete." : "Dropped! Lucky break." : mine ? "Broken up. Incomplete." : "Pass broken up! \u{1F6E1}", "inc");
-    const yac = open ? 3 + Math.random() * 8 : Math.random() * 3;
+    const yac = (open ? this.T.yacMin + Math.random() * this.T.yacRange : Math.random() * 3) * (mine ? 1 : this.T.cpuYac);
     const gain = Math.round(-r.s.y / YPX - this.los + yac);
     if (mine) {
       const s = this.stats[r.name] || (this.stats[r.name] = { c: 0, td: 0, y: 0 });
@@ -415,7 +418,7 @@ class MiniGameScene extends Phaser.Scene {
     this.ball.setVisible(false);
     this.aimG.clear();
     const mine = this.kind === "off";
-    this.clock = Math.max(0, this.clock - (RUNOFF[how] || 0));
+    this.clock = Math.max(0, this.clock - (this.runoff[how] || 0));
     this.los = Math.max(1, this.los + gain);
     if (how === "sack" && mine) this.tally.sacks++;
     if (this.los >= 100) {
@@ -601,7 +604,7 @@ class MiniGameScene extends Phaser.Scene {
       move(d, lagX, lagY, d.speed);
     }
     for (const r of this.recv) {
-      r.open = this.cover(r).c > OPEN_PX;
+      r.open = this.cover(r).c > OPEN_PX && !(this.state === "live" && this.time.now - this.t0 < this.T.coverMs);
       const col = r.open ? 4906624 : 15680580;
       r.ring.setPosition(r.s.x, r.s.y + 2).setFillStyle(col, 0.3).setStrokeStyle(3, col).setDepth(2e3 + r.s.y);
       if (r.open !== r.wasOpen) {
@@ -616,7 +619,7 @@ class MiniGameScene extends Phaser.Scene {
     }
     if (this.state === "live") {
       move(this.qb, this.qb.s.x, this.qb.s.y, 0);
-      if (this.kind === "off" && time - this.t0 > (this.hail ? 5500 : 4200)) return this.endPlay(-5, "Sacked!", "sack");
+      if (this.kind === "off" && time - this.t0 > (this.hail ? 5500 : this.T.sackMs)) return this.endPlay(-5, "Sacked!", "sack");
       if (this.kind === "def" && time > this.aiThrowAt) {
         let best = this.recv[0], bo = -1;
         for (const r of this.recv) {

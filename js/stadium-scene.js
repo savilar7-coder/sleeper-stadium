@@ -1505,6 +1505,14 @@ ${L.feed.join("\n")}`);
       if (best.length) pages.push(`\u2B50 TOP PLAYS
 ${best.slice(0, 3).map((x) => `${nm(x.pid)} ${x.v.toFixed(1)} \u2192 ${name(x.t)}`).join("\n")}`);
     }
+    {
+      const G = L.games || {}, P = L.players || {};
+      if (Object.values(G).some((s) => s === "pre_game")) {
+        const bad = L.teams.filter((t) => (t.starters || []).some((pid) => !pid || pid === "0" || Object.keys(G).length && P[pid] && P[pid][2] && !G[P[pid][2]]));
+        if (bad.length) pages.push(`\u26A0\uFE0F LINEUP ALERT
+${bad.slice(0, 3).map((t) => `${name(t)}: empty slot or bye`).join("\n")}`);
+      }
+    }
     const st = [...L.teams].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts).slice(0, 3);
     pages.push(`STANDINGS
 ${st.map((t, i) => `${i + 1}. ${name(t)}  ${t.wins}-${t.losses}`).join("\n")}`);
@@ -1886,11 +1894,18 @@ ${t.points.toFixed(1)} pts`);
       const hy = A.s.y - 20, x1 = A.s.x + 12, x2 = B.s.x - 12, len = x2 - x1;
       const kx = x1 + len * Phaser.Math.Clamp(1 - pa, 0.2, 0.8) + Math.sin(now / 260 + a.roster_id) * 2;
       bar.clear();
-      for (let i = 0; i < len; i += 2) {
-        const x = x1 + i, sag = Math.sin(i / len * Math.PI) * 3;
-        bar.fillStyle(3810836, 1).fillRect(x, hy + sag - 3, 2, 6);
-        bar.fillStyle(Math.floor(i / 4) % 2 ? 13935452 : 10251832, 1).fillRect(x, hy + sag - 2, 2, 4);
+      const rk = `${x1}|${x2}|${hy}`;
+      if (!o.rope) o.rope = this.add.graphics();
+      if (o.ropeKey !== rk) {
+        o.ropeKey = rk;
+        o.rope.clear();
+        for (let i = 0; i < len; i += 2) {
+          const x = x1 + i, sag = Math.sin(i / len * Math.PI) * 3;
+          o.rope.fillStyle(3810836, 1).fillRect(x, hy + sag - 3, 2, 6);
+          o.rope.fillStyle(Math.floor(i / 4) % 2 ? 13935452 : 10251832, 1).fillRect(x, hy + sag - 2, 2, 4);
+        }
       }
+      o.rope.setDepth(Math.min(A.s.depth, B.s.depth) - 1.5);
       bar.fillStyle(1905676, 1).fillRect(kx - 6, hy - 6, 12, 12).fillRect(kx - 5, hy + 5, 10, 12);
       bar.fillStyle(13777466, 1).fillRect(kx - 5, hy - 5, 10, 10).fillRect(kx - 4, hy + 5, 8, 11);
       bar.fillStyle(16747146, 1).fillRect(kx - 4, hy - 4, 3, 3);
@@ -1902,13 +1917,16 @@ ${t.points.toFixed(1)} pts`);
       o.pct.setFontSize(Math.round(14 * DPR)).setStroke("#0f141a", Math.round(5 * DPR)).setScale(board.scaleX).setOrigin(0.5, 1).setPosition(kx, hy - 8).setDepth(board.depth + 1);
       const sw = sweat ? this.sweatLine(a, b) : null, pt = sw ? sw.text : `proj ${a.proj.toFixed(1)} \u2013 ${b.proj.toFixed(1)}`;
       if (projTxt.text !== pt) projTxt.setText(pt);
-      projTxt.setColor(sw && !sw.done ? "#ffd84a" : "#9aa3ad");
+      const pcol = lead ? "#9dff7a" : "#e8e2ff";
+      if (o.pct.style.color !== pcol) o.pct.setColor(pcol);
+      const tcol = sw && !sw.done ? "#ffd84a" : "#9aa3ad";
+      if (projTxt.style.color !== tcol) projTxt.setColor(tcol);
       if (o.sweatStyle !== !!sw) {
         o.sweatStyle = !!sw;
         projTxt.setFontSize(Math.round((sw ? 13 : 11) * DPR)).setStroke("#0f141a", sw ? Math.round(3 * DPR) : 0);
       }
       const dim = sw && sw.done && !a.mine && !b.mine ? 0.7 : 1;
-      for (const g of [A.s, B.s, board, bar, o.pct, projTxt]) if (g && g.alpha !== dim) g.setAlpha(dim);
+      for (const g of [A.s, B.s, board, bar, o.rope, o.pct, projTxt]) if (g && g.alpha !== dim) g.setAlpha(dim);
       const r = board.getBounds();
       projTxt.setPosition(r.centerX, r.bottom + 1).setDepth(board.depth);
       if (!o.lead) o.lead = this.add.graphics();
@@ -1968,11 +1986,12 @@ ${t.points.toFixed(1)} pts`);
     drivePlayer(this, vx, vy, SPEED, delta);
     for (const S of this.teamSprites.values()) {
       const { s, t, side, key: key2 } = S, dance = S.act > time && S.actType === "dance";
-      const opp = this.league.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o.roster_id !== t.roster_id);
+      const opp = S.opp !== void 0 ? S.opp : S.opp = this.league.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o.roster_id !== t.roster_id) || null;
       const hop = dance ? 7 : opp && t.points > opp.points ? 3 : 1.2;
       s.setOrigin(0.5, 1 + Math.abs(Math.sin(time / (dance ? 120 : 260) + t.roster_id)) * hop / 32);
       const face = dance ? Math.floor(time / 160) % 2 ? "left" : "right" : side === 0 ? "right" : "left";
-      s.setTexture(`${key2}${face}${Math.floor(time / 300 + t.roster_id) % 2}`);
+      const tk = `${key2}${face}${Math.floor(time / 300 + t.roster_id) % 2}`;
+      if (s.texture.key !== tk) s.setTexture(tk);
       shadowFor(this, s);
     }
     shadowFor(this, this.player);
@@ -1992,7 +2011,11 @@ ${t.points.toFixed(1)} pts`);
         if (k2 > 0 && k2 < 1) jump += Math.sin(k2 * Math.PI) * 12;
       }
       f.s.y = f.y + 12 - wave - bob - jump;
-      if (!f.keep) f.s.setTexture(wave > 3.5 || jump > 0 ? f.up : f.down);
+      if (!f.keep) {
+        const fk = wave > 3.5 || jump > 0 ? f.up : f.down;
+        if (f.s.texture.key !== fk) f.s.setTexture(fk);
+      }
+      ;
     }
     let best = null, bestD = 44;
     for (const d of this.doors) {

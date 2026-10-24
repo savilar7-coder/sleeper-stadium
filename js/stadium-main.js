@@ -145,7 +145,8 @@ async function load(leagueId) {
     }
   }
   const champsP = champions(lg);
-  const [users, rosters, matchups, picks, tx1, tx2, players, proj, sched, picked, blimpFile] = await Promise.all([
+  const projP = weekProjections(season, week);
+  const [users, rosters, matchups, picks, tx1, tx2, players, proj0, sched, picked, blimpFile] = await Promise.all([
     get(`${API}/league/${leagueId}/users`),
     get(`${API}/league/${leagueId}/rosters`),
     get(`${API}/league/${leagueId}/matchups/${week}`),
@@ -156,11 +157,12 @@ async function load(leagueId) {
       if (!r.ok) throw new Error(r.status);
       return r.json();
     })).catch(() => get("/api/sleeper/players")).catch(() => ({})),
-    weekProjections(season, week),
+    Promise.race([projP, new Promise((r) => setTimeout(() => r(null), 300))]),
     get(`${SCHEDULE}/${season}`).catch(() => null),
     get("stadium-avatars.json").catch(() => ({})),
     get("stadium-blimp.json").catch(() => null)
   ]);
+  const proj = proj0 || {};
   const champs = await Promise.race([champsP, new Promise((r) => setTimeout(r, 0, null))]);
   LOOKS = (await scenes)[0].LOOKS;
   const byUser = Object.fromEntries(users.map((u) => [u.user_id, u]));
@@ -228,6 +230,16 @@ async function load(leagueId) {
   if (!champs) champsP.then((c) => {
     out.champs = c;
     fillChamps();
+  });
+  if (proj0 === null) projP.then((pp) => {
+    Object.assign(proj, pp);
+    for (const t of out.teams) t.projPre = (t.starters || []).reduce((n, pid) => n + (pp[pid] || 0), 0);
+    if (L === out) {
+      updateProj();
+      hud();
+      const sc = game && game.scene.getScene("stadium");
+      if (sc && sc.refreshScores && sc.sys.isActive()) sc.refreshScores();
+    }
   });
   return out;
 }
@@ -397,6 +409,15 @@ const face = (pid) => {
   };
   return img;
 };
+function lineupFlag(t, i) {
+  const pid = (t.starters || [])[i];
+  if (!pid || pid === "0") return "EMPTY";
+  const P = L.players[pid], team = P && P[2], G = L.games || {}, st = team && G[team];
+  if (Object.keys(G).length && team && !st) return "BYE";
+  if (!team) return "NO TEAM";
+  if (st === "pre_game" && !L.proj[pid] && !(t.starters_points || [])[i]) return "NO PROJ";
+  return "";
+}
 function matchup(rid) {
   const me = L.teams.find((t) => t.roster_id === rid) || mine() || L.teams[0];
   const opp = L.teams.find((t) => t.matchup_id && t.matchup_id === me.matchup_id && t !== me);
@@ -411,7 +432,16 @@ function matchup(rid) {
       "div",
       { class: `mu-side ${cls}` },
       pid && pid !== "0" ? face(pid) : el("span", { class: "mu-face" }),
-      el("div", { class: "mu-who" }, el("b", {}, p[0]), el("small", {}, `${p[2] || ""}${proj != null ? ` \xB7 proj ${fmt(proj)}` : ""}`)),
+      el(
+        "div",
+        { class: "mu-who" },
+        el("b", {}, p[0]),
+        el("small", {}, `${p[2] || ""}${proj != null ? ` \xB7 proj ${fmt(proj)}` : ""}`),
+        (() => {
+          const f = lineupFlag(t, i);
+          return f ? el("small", { style: "color:#b23a2a;font-weight:700" }, ` \u26A0\uFE0F ${f}`) : null;
+        })()
+      ),
       el("div", { class: "mu-pts" }, pts == null ? "\u2013" : fmt(pts))
     );
   };
@@ -691,7 +721,8 @@ function standings() {
 }
 function news() {
   const name = (rid) => (L.teams.find((t) => t.roster_id === rid) || {}).name || `Team ${rid}`;
-  const rows = L.news.slice(0, 40).map((x) => {
+  const trades = L.news.filter((x) => x.type === "trade"), moves = L.news.filter((x) => x.type !== "trade");
+  const rows = [...trades, ...moves].slice(0, 40).map((x) => {
     const adds = Object.entries(x.adds || {}), drops = Object.entries(x.drops || {});
     if (x.type === "trade") {
       const parts = (x.roster_ids || []).map((rid) => {
@@ -706,6 +737,7 @@ function news() {
     return el("div", { class: "need" }, el("b", {}, `${x.type === "waiver" ? "\u{1F4CB} Waiver" : "\u{1F193} Free agent"} \xB7 ${who}`), el("span", {}, what));
   });
   openPanel("\u{1F4F0} League news", async () => [
+    L.news.length ? el("p", { class: "small" }, `${trades.length} trade${trades.length === 1 ? "" : "s"} \xB7 ${moves.length} waiver / free-agent move${moves.length === 1 ? "" : "s"} (last 2 weeks)`) : null,
     rows.length ? el("div", { class: "needs" }, rows) : el("div", { class: "empty" }, L.espn ? "ESPN trades and waivers aren\u2019t shown here yet." : "Quiet week."),
     el("p", { class: "small" }, `Weeks ${Math.max(1, L.week - 1)}\u2013${L.week}.`)
   ]);

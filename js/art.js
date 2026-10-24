@@ -32,7 +32,7 @@ function preloadArt(scene, lite = false) {
     for (const a of ANIMALS) scene.load.image(`a-an-${a}`, `assets/animals/${a}.png`);
   }
   if (!lite) for (const c of new Set([...Object.values(CHAR), ...CHAR_POOL, ...FOLK])) scene.load.image(`a-ch-${c}`, `assets/chars/${c}.png`);
-  scene.load.spritesheet("a-smoke", "assets/fx/Smoke.png", { frameWidth: 32, frameHeight: 32 });
+  if (!scene.textures.exists("a-smoke")) scene.load.spritesheet("a-smoke", "assets/fx/Smoke.png", { frameWidth: 32, frameHeight: 32 });
 }
 function makeTextures(scene) {
   const cut = (key, src, sx, sy, sw, sh, scale = 2, cw = sw * scale, ch = sh * scale) => {
