@@ -454,8 +454,7 @@ function matchup(rid) {
   };
   const rows = L.slots.map((slot, i) => el("div", { class: "mu-row" }, side(me, i, "left"), el("div", { class: "mu-slot" }, slot.replace("SUPER_FLEX", "SF").replace("REC_FLEX", "FLX")), side(opp, i, "right")));
   const lead = me.points === opp.points ? "" : me.points > opp.points ? "left" : "right";
-  const odds = Math.round(winOdds(me, opp) * 100);
-  openPanel(`\u2694\uFE0F ${me.name} vs ${opp.name} \xB7 ${odds}%`, async () => [
+  openPanel(`\u2694\uFE0F ${me.name} vs ${opp.name}`, async () => [
     el(
       "div",
       { class: "mu-head" },
@@ -617,7 +616,11 @@ function playGame() {
   const opp = L.teams.find((t) => t.matchup_id && t.matchup_id === me.matchup_id && t !== me) || L.teams.find((t) => t !== me);
   closePanel();
   for (const id of ["st-hud", "zoom-ctl", "jump-btn", "share-btn", "play-btn", "prompt"]) $(id).style.display = "none";
-  for (const id of ["st-rail-l", "st-rail-r", "st-ticker", "gh-star", "tip-pill", "share-lg", "drill-tease", "recap-ready"]) {
+  for (const id of ["drill-tease", "recap-ready"]) {
+    const e = document.getElementById(id);
+    if (e) e.remove();
+  }
+  for (const id of ["st-rail-l", "st-rail-r", "st-ticker", "gh-star", "tip-pill", "share-lg"]) {
     const e = document.getElementById(id);
     if (e) e.style.visibility = "hidden";
   }
@@ -712,7 +715,7 @@ async function headToHead(a, b) {
   return games.reverse();
 }
 async function playoffOdds() {
-  if (L.espn || L.preseason) return null;
+  if (L.espn || L.preseason || /[?&]sample=1/.test(location.search)) return null;
   if (L.poOdds) return L.poOdds;
   const po = L.settings && L.settings.playoff_teams || 6, last = (L.settings && L.settings.playoff_week_start || 15) - 1;
   if (Number(L.week) > last) return null;
@@ -870,17 +873,17 @@ async function tradeLedger() {
   const { all } = await pastWeeks(), byWeek = {};
   all.forEach((ms, i) => {
     const m = byWeek[i + 1] = {};
-    for (const t of ms || []) Object.assign(m, t.players_points || {});
+    for (const t of ms || []) m[t.roster_id] = t.players_points || {};
   });
   const cur = byWeek[Number(L.week)] = {};
-  for (const t of L.teams) Object.assign(cur, t.players_points || {});
-  const since = (pid, w0) => Object.entries(byWeek).reduce((n, [w, m]) => n + (Number(w) >= w0 ? m[pid] || 0 : 0), 0);
+  for (const t of L.teams) cur[t.roster_id] = t.players_points || {};
+  const since = (pid, w0, rid) => Object.entries(byWeek).reduce((n, [w, m]) => n + (Number(w) >= w0 ? (m[rid] || {})[pid] || 0 : 0), 0);
   const name = (rid) => (L.teams.find((t) => t.roster_id === rid) || {}).name || `Team ${rid}`;
   return tx.sort((a, b) => b.status_updated - a.status_updated).map((x) => {
     const w0 = x.leg || 1, sides = (x.roster_ids || []).map((rid) => {
       const got = Object.entries(x.adds || {}).filter(([, r]) => r === rid).map(([pid]) => pid);
       const picks = (x.draft_picks || []).filter((pk) => pk.owner_id === rid).map((pk) => `${pk.season} R${pk.round}`);
-      return { rid, got, picks, pts: got.reduce((n, pid) => n + since(pid, w0), 0) };
+      return { rid, got, picks, pts: got.reduce((n, pid) => n + since(pid, w0, rid), 0) };
     }).sort((a, b) => b.pts - a.pts);
     return el(
       "div",
@@ -1067,7 +1070,7 @@ function sharePicture(cv, name, title) {
     const file = new File([blob], name, { type: "image/png" });
     try {
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title, text: `${title} \xB7 ${stadiumLink()}` });
+        await navigator.share({ files: [file], title, text: `${title} \xB7 https://${stadiumLink()}` });
         return;
       }
     } catch {
@@ -1110,6 +1113,7 @@ function shareMine() {
   }
   navigator.clipboard.writeText(url).then(() => toast("\u{1F517} Stadium link copied. Paste it in your league chat!"), () => prompt("Copy this link:", url));
 }
+const handle = (t) => !L.espn && t.owner && t.owner !== "open slot" ? `@${t.owner}` : t.name;
 function matchupCard(me, opp) {
   const W = 1080, H = 1080, cv = el("canvas", { width: W, height: H }), c = cv.getContext("2d"), font = 'system-ui, "Segoe UI", Arial, sans-serif';
   const g = c.createLinearGradient(0, 0, 0, H);
@@ -1129,38 +1133,64 @@ function matchupCard(me, opp) {
       if (k < 0 || (t.starters_points[i] || 0) > (t.starters_points[k] || 0)) k = i;
     });
     const pid = t.starters[k];
-    return pid && L.players[pid] ? `${L.players[pid][0]} ${fmt(t.starters_points[k] || 0)}` : "";
+    return pid && L.players[pid] && (t.starters_points[k] || 0) > 0 ? `${L.players[pid][0]} ${fmt(t.starters_points[k])}` : "";
   };
   c.textAlign = "center";
+  c.fillStyle = "#ffd84a";
+  c.font = `900 30px ${font}`;
+  c.fillText("\u{1F3DF}\uFE0F SLEEPER STADIUM", W / 2, 62);
   c.fillStyle = "#c9a227";
-  c.font = `bold 32px ${font}`;
-  c.fillText(`${L.name} \xB7 WEEK ${L.week}`.toUpperCase().slice(0, 40), W / 2, 100);
-  [[me, 280], [opp, W - 280]].forEach(([t, x]) => {
+  c.font = `bold 28px ${font}`;
+  c.fillText(`${L.name} \xB7 WEEK ${L.week}`.toUpperCase().slice(0, 44), W / 2, 104);
+  const sc = game && game.scene.getScene("stadium");
+  [[me, 280, "right"], [opp, W - 280, "left"]].forEach(([t, x, dir]) => {
+    const tex = sc && sc.textures.exists(`team-${t.roster_id}-${dir}0`) ? sc.textures.get(`team-${t.roster_id}-${dir}0`).getSourceImage() : null;
+    if (tex) {
+      c.imageSmoothingEnabled = false;
+      c.drawImage(tex, x - 96, 130, 192, 192);
+    }
     c.fillStyle = "#fff4d6";
-    c.fillText(fit(t.name, 46, 440), x, 300);
-    c.fillStyle = "#ffd84a";
-    c.font = `900 150px ${font}`;
-    c.fillText(fmt(t.points), x, 470);
+    c.fillText(fit(t.name, 42, 470), x, 370);
     c.fillStyle = "#b9b3d9";
-    c.font = `bold 30px ${font}`;
-    c.fillText(`proj ${fmt(t.proj)}`, x, 530);
+    c.font = `bold 26px ${font}`;
+    if (handle(t)[0] === "@") c.fillText(fit(handle(t), 26, 440), x, 408);
+    c.fillStyle = "#ffd84a";
+    c.font = `900 130px ${font}`;
+    c.fillText(fmt(t.points), x, 540);
+    c.fillStyle = "#b9b3d9";
+    c.font = `bold 28px ${font}`;
+    c.fillText(`proj ${fmt(t.proj)}`, x, 588);
+    const bp = best(t);
     c.fillStyle = "#9dff7a";
-    c.fillText(fit(best(t) ? `\u2B50 ${best(t)}` : "", 28, 440), x, 600);
+    c.fillText(fit(bp ? `\u2B50 ${bp}` : "kickoff pending", 26, 440), x, 636);
   });
   c.fillStyle = "#e0394c";
   c.font = `900 64px ${font}`;
-  c.fillText("VS", W / 2, 440);
-  const d = me.points - opp.points, done = (me.starters || []).concat(opp.starters || []).every((pid) => !pid || pid === "0" || (L.games || {})[L.players[pid] ? L.players[pid][2] : pid] === "complete") && Object.keys(L.games || {}).length;
-  const line = !me.points && !opp.points ? "WHO YOU GOT? \u{1F447}" : done ? d >= 0 ? `WON BY ${fmt(d)} \u{1F60E}` : `LOST BY ${fmt(-d)} \u{1F624}` : `${d >= 0 ? "UP" : "DOWN"} ${fmt(Math.abs(d))} \xB7 ${Math.round(winOdds(me, opp) * 100)}% TO WIN`;
+  c.fillText("VS", W / 2, 500);
+  const d = me.points - opp.points, done = (me.starters || []).concat(opp.starters || []).every((pid) => {
+    const st = (L.games || {})[L.players[pid] ? L.players[pid][2] : pid];
+    return !pid || pid === "0" || !st || st === "complete";
+  }) && Object.keys(L.games || {}).length;
+  const who = fit(handle(opp), 60, 560), pct = Math.round(winOdds(me, opp) * 100);
+  const head = !me.points && !opp.points ? "WHO YOU GOT? \u{1F447}" : done ? d >= 0 ? `BEAT ${who} BY ${fmt(d)} \u{1F60E}` : `LOST TO ${who} BY ${fmt(-d)} \u{1F624}` : `${d >= 0 ? "UP" : "DOWN"} ${fmt(Math.abs(d))} ${d >= 0 ? "ON" : "TO"} ${who}`;
+  const sub = !me.points && !opp.points ? `${pct}% to win \xB7 kickoff soon` : done ? "FINAL" : `${pct}% TO WIN \xB7 ${toPlay(me)} v ${toPlay(opp)} TO PLAY`;
+  let hp = 84;
+  c.font = `900 ${hp}px ${font}`;
+  while (c.measureText(head).width > W - 80 && hp > 24) {
+    hp -= 4;
+    c.font = `900 ${hp}px ${font}`;
+  }
   c.fillStyle = d >= 0 || !me.points ? "#fff4d6" : "#ffb4a8";
-  c.font = `900 ${line.length > 18 ? 64 : 80}px ${font}`;
-  c.fillText(line, W / 2, 800);
+  c.fillText(head, W / 2, 770);
+  c.fillStyle = "#9dff7a";
+  c.font = `900 44px ${font}`;
+  c.fillText(sub, W / 2, 836);
   c.fillStyle = "#c9a227";
-  c.font = `bold 26px ${font}`;
-  c.fillText("WATCH IT LIVE", W / 2, H - 112);
-  c.fillStyle = "#e8e2ff";
   c.font = `bold 30px ${font}`;
-  c.fillText(stadiumLink(), W / 2, H - 70);
+  c.fillText("\u25B6 WATCH IT LIVE", W / 2, H - 120);
+  c.fillStyle = "#e8e2ff";
+  c.font = `bold 44px ${font}`;
+  c.fillText(location.host, W / 2, H - 62);
   sharePicture(cv, `week-${L.week}-matchup.png`, `${me.name} vs ${opp.name}`);
 }
 function drillTeaser() {
@@ -1265,7 +1295,10 @@ function awardsList() {
   if (!pairs.length) return [];
   const top = [...live].sort((a, b) => b.points - a.points)[0], low = [...live].sort((a, b) => a.points - b.points)[0];
   const gap = (p) => Math.abs(p[0].points - p[1].points), byGap = [...pairs].sort((a, b) => gap(b) - gap(a));
-  const over = (t) => (t.starters || []).every((pid) => !pid || pid === "0" || (L.games || {})[L.players[pid] ? L.players[pid][2] : pid] === "complete") && Object.keys(L.games || {}).length;
+  const over = (t) => (t.starters || []).every((pid) => {
+    const st = (L.games || {})[L.players[pid] ? L.players[pid][2] : pid];
+    return !pid || pid === "0" || !st || st === "complete";
+  }) && Object.keys(L.games || {}).length;
   const lead = (p) => p[0].points >= p[1].points ? p : [p[1], p[0]], decided = pairs.filter((p) => gap(p) > 0.05 && over(p[0]) && over(p[1])).map(lead);
   const ass = [...pairs].sort((a, b) => pct(a[0]) + pct(a[1]) - (pct(b[0]) + pct(b[1])) || a[0].fpts + a[1].fpts - (b[0].fpts + b[1].fpts))[0];
   const bench = (t) => Object.entries(t.players_points || {}).filter(([pid]) => !(t.starters || []).includes(pid)).reduce((n, [, v]) => n + (v || 0), 0);
@@ -1302,23 +1335,7 @@ function awards() {
   ]);
 }
 function recap() {
-  const pct = (t) => {
-    const g2 = t.wins + t.losses + t.ties;
-    return g2 ? (t.wins + t.ties / 2) / g2 : 0.5;
-  };
-  const pairs = Object.values(L.teams.reduce((m, t) => {
-    if (t.matchup_id) (m[t.matchup_id] = m[t.matchup_id] || []).push(t);
-    return m;
-  }, {})).filter((p) => p.length === 2);
-  const live = L.teams.filter((t) => t.matchup_id);
-  if (!pairs.length) return;
-  const top = [...live].sort((a, b) => b.points - a.points)[0], low = [...live].sort((a, b) => a.points - b.points)[0];
-  const gap = (p) => Math.abs(p[0].points - p[1].points), byGap = [...pairs].sort((a, b) => gap(b) - gap(a));
-  const blow = byGap[0], close = byGap[byGap.length - 1];
-  const ass = [...pairs].sort((a, b) => pct(a[0]) + pct(a[1]) - (pct(b[0]) + pct(b[1])) || a[0].fpts + a[1].fpts - (b[0].fpts + b[1].fpts))[0];
-  const bench = (t) => Object.entries(t.players_points || {}).filter(([pid]) => !t.starters.includes(pid)).reduce((n, [, v]) => n + (v || 0), 0);
-  const shame = [...live].sort((a, b) => bench(b) - bench(a))[0];
-  const lead = (p) => p[0].points >= p[1].points ? p : [p[1], p[0]];
+  if (!awardsList().length) return;
   const W = 1080, H = 1350, cv = el("canvas", { width: W, height: H }), c = cv.getContext("2d"), font = 'system-ui, "Segoe UI", Arial, sans-serif';
   const g = c.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, "#2e1f8f");
@@ -1331,10 +1348,17 @@ function recap() {
   c.fillText(`${L.name}`.toUpperCase().slice(0, 34), W / 2, 110);
   c.fillStyle = "#ffd84a";
   c.font = `900 96px ${font}`;
+  const fin = Object.values(L.games || {}).length && Object.values(L.games).every((x) => x === "complete");
   c.fillText(`WEEK ${L.week} AWARDS`, W / 2, 220);
-  const rows = awardsList().slice(0, 8), RH = 112;
+  if (!fin) {
+    c.fillStyle = "#9dff7a";
+    c.font = `bold 34px ${font}`;
+    c.fillText("SO FAR \xB7 GAMES STILL ON", W / 2, 262);
+  }
+  const all = awardsList(), roast = ["\u{1F6BD}", "\u{1FA91}", "\u{1F494}"], rows = [...all.filter((r) => roast.some((e) => r[0].startsWith(e))), ...all.filter((r) => !roast.some((e) => r[0].startsWith(e)))].slice(0, 8);
+  const RH = Math.min(112, Math.floor(880 / Math.max(1, rows.length)));
   rows.forEach(([k, who, n], i) => {
-    const y = 270 + i * RH;
+    const y = 290 + i * RH;
     c.fillStyle = "rgba(255,255,255,0.08)";
     c.beginPath();
     c.roundRect(70, y, W - 140, RH - 14, 20);
@@ -1357,11 +1381,11 @@ function recap() {
   });
   c.textAlign = "center";
   c.fillStyle = "#c9a227";
-  c.font = `bold 26px ${font}`;
-  c.fillText("LIVE STADIUM", W / 2, H - 112);
-  c.fillStyle = "#e8e2ff";
   c.font = `bold 30px ${font}`;
-  c.fillText(stadiumLink(), W / 2, H - 70);
+  c.fillText("\u25B6 WATCH IT LIVE", W / 2, H - 120);
+  c.fillStyle = "#e8e2ff";
+  c.font = `bold 44px ${font}`;
+  c.fillText(location.host, W / 2, H - 62);
   sharePicture(cv, `week-${L.week}-awards.png`, `Week ${L.week} awards`);
 }
 function whoAreYou() {
@@ -1414,9 +1438,10 @@ async function gameStatus() {
   } catch {
   }
 }
-const koSeen = {};
+const koSeen = {}, seenPre = new Set();
 function leftShare(team) {
-  const k = `st-ko-${L.season}-${L.week}`;
+  if (/[?&]sample=1/.test(location.search)) return 0.5;
+  const k = `st-ko-${L.id}-${L.season}-${L.week}`;
   if (!koSeen[k]) {
     try {
       koSeen[k] = JSON.parse(store(k) || "{}");
@@ -1426,7 +1451,7 @@ function leftShare(team) {
   }
   const m = koSeen[k];
   if (!m[team]) {
-    m[team] = Date.now();
+    m[team] = Date.now() - (seenPre.has(team) ? 0 : 1.5 * 36e5);
     try {
       store(k, JSON.stringify(m));
     } catch {
@@ -1439,6 +1464,7 @@ function liveProj(t) {
   return (t.starters || []).reduce((n, pid, i) => {
     const pre = L.proj[pid] || 0, got = (t.starters_points || [])[i] || 0;
     const team = L.players[pid] ? L.players[pid][2] : pid, st = G[team];
+    if (st === "pre_game") seenPre.add(team);
     if (st === "complete") return n + got;
     if (st === "in_game") return n + got + Math.max(0, pre - got) * leftShare(team);
     return n + (got || pre);

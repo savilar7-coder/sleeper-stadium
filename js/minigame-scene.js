@@ -562,7 +562,8 @@ class MiniGameScene extends Phaser.Scene {
     const again = $("mg-again");
     if (again) again.focus({ preventScroll: true });
     this.hud.classList.add("mg-over");
-    $("mg-share").dataset.text = `${$("mg-end-title").textContent.replace(" \u2014 run it back", "")}${top ? ` \xB7 ${$("mg-end-stat").textContent}` : ""} \xB7 ${ats} \xB7 beat that in the 2-Minute Drill \u{1F3C8}`;
+    const oppWho = !this.L.espn && this.opp.owner && this.opp.owner !== "open slot" ? `@${this.opp.owner}` : this.opp.name;
+    $("mg-share").dataset.text = tie ? `Tied ${oppWho}'s starters ${me}\u2013${opp} in the 2-Minute Drill. Break it \u{1F447}` : win ? `I beat ${oppWho}'s starters ${me}\u2013${opp} in the 2-Minute Drill${top ? ` (${$("mg-end-stat").textContent.replace(/^⭐ /, "")})` : ""}. Bet you can't \u{1F447}` : `${oppWho}'s starters got me ${opp}\u2013${me} in the 2-Minute Drill. Run it back? \u{1F447}`;
     if (win) sfx.cheer && sfx.cheer();
   }
   say(t) {

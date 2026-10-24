@@ -47,9 +47,14 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keydown", (e) => {
   if (e.key !== "Tab" || !panelOpen) return;
-  const f = [...$("panel").querySelectorAll('button, a[href], input, select, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled && x.offsetParent);
+  const f = [...$("panel").querySelectorAll('button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled && x.offsetParent);
   if (!f.length) return;
   const first = f[0], last = f[f.length - 1];
+  if (!$("panel").contains(document.activeElement)) {
+    e.preventDefault();
+    first.focus();
+    return;
+  }
   if (e.shiftKey && document.activeElement === first) {
     e.preventDefault();
     last.focus();
