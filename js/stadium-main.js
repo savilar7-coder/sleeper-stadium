@@ -174,6 +174,7 @@ async function load(leagueId) {
       losses: s.losses || 0,
       ties: s.ties || 0,
       fpts: (s.fpts || 0) + (s.fpts_decimal || 0) / 100,
+      fpts_against: (s.fpts_against || 0) + (s.fpts_against_decimal || 0) / 100,
       points: m.points || 0,
       matchup_id: m.matchup_id || null,
       starters: m.starters || r.starters || [],
@@ -205,6 +206,7 @@ async function load(leagueId) {
   const out = {
     id: leagueId,
     name: lg.name,
+    settings: lg.settings || {},
     season,
     week,
     slots,
@@ -264,11 +266,21 @@ function picksOf(rid) {
 const mine = () => L.teams.find((t) => t.mine);
 const toPlay = (t) => (t.starters || []).filter((pid) => pid && pid !== "0" && (L.games || {})[L.players[pid] ? L.players[pid][2] : pid] !== "complete").length;
 let sinceTxt;
+function rails() {
+  for (const id of ["st-rail-l", "st-rail-r"]) if (!document.getElementById(id)) document.body.appendChild(Object.assign(document.createElement("aside"), { id }));
+  const rows = [...L.teams].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts), po = L.settings && L.settings.playoff_teams || 6;
+  const card = el("div", { class: "rail-card" }, el("b", {}, "\u{1F3C6} Standings"), rows.map((t, i) => [
+    el("div", { class: `rail-row${t.mine ? " mine" : ""}` }, el("span", {}, `${i + 1}. ${t.mine ? "\u{1F451} " : ""}${t.name}`), el("span", {}, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}`)),
+    i + 1 === po && i + 1 < rows.length ? el("div", { class: "rail-cut" }, "playoff line") : null
+  ]));
+  document.getElementById("st-rail-l").replaceChildren(card);
+}
 function winOdds(m, opp) {
   const remA = Math.max(0, m.proj - m.points), remB = Math.max(0, opp.proj - opp.points);
   return remA + remB < 0.5 ? m.points === opp.points ? 0.5 : m.points > opp.points ? 1 : 0 : 1 / (1 + Math.exp(-1.702 * (m.proj - opp.proj) / (6 + 0.32 * (remA + remB))));
 }
 function hud() {
+  rails();
   const m = mine(), opp = m && L.teams.find((t) => t.matchup_id && t.matchup_id === m.matchup_id && t !== m);
   $("st-league").textContent = `${L.name} \xB7 week ${L.week}`;
   $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : "Tap \u{1F451} My team to pick your team";
@@ -404,7 +416,18 @@ function matchup(rid) {
       el("div", { class: "mu-vs" }, "VS"),
       el("div", { class: `mu-team ${lead === "right" ? "lead" : ""}` }, el("b", {}, fmt(opp.points)), el("small", {}, `proj ${fmt(opp.proj)}`), el("span", {}, opp.name))
     ),
+    await (async () => {
+      const h = await headToHead(me, opp);
+      if (!h.length) return null;
+      const won = h.filter((g) => g.a > g.b).length, lost = h.filter((g) => g.a < g.b).length;
+      return el("p", { class: "small", style: "text-align:center;margin:6px 0" }, `This season: ${me.name} ${won}\u2013${lost} vs ${opp.name} \xB7 ${h.map((g) => `wk ${g.w}: ${fmt(g.a)}\u2013${fmt(g.b)}`).join(" \xB7 ")}`);
+    })(),
     el("div", { class: "mu-rows" }, rows),
+    me.mine ? (() => {
+      const b = el("button", { type: "button", class: "mu-play", style: "display:block;width:100%;margin:8px 0 0;min-height:44px;padding:10px;border-radius:10px;border:2px solid #1d140c;background:#2e7d32;color:#fff;font-weight:700;font-size:15px;cursor:pointer" }, "\u{1F3C8} Play this matchup \xB7 2-Minute Drill");
+      b.onclick = () => playGame();
+      return b;
+    })() : null,
     (() => {
       const b = el("button", { type: "button", class: "mu-share" }, "\u{1F4F8} Share this matchup");
       b.onclick = () => matchupCard(me, opp);
@@ -542,11 +565,43 @@ function exitGame() {
   for (const id of ["st-hud", "zoom-ctl", "jump-btn", "share-btn", "play-btn"]) $(id).style.display = "";
   game.scene.wake("stadium");
 }
+function pastWeeks() {
+  if (!L.pastWeeks) {
+    const weeks = [];
+    for (let w = 1; w < Number(L.week); w++) weeks.push(w);
+    L.pastWeeks = (L.espn ? Promise.resolve(weeks.map((w) => L.past[w] || [])) : Promise.all(weeks.map((w) => get(`${API}/league/${L.id}/matchups/${w}`).catch(() => [])))).then((all) => ({ weeks, all }));
+  }
+  return L.pastWeeks;
+}
+async function allPlay() {
+  const { all } = await pastWeeks(), rec = {};
+  for (const ms of all) {
+    const scored = (ms || []).filter((m) => m.points > 0);
+    for (const m of scored) {
+      const r = rec[m.roster_id] = rec[m.roster_id] || { w: 0, l: 0, g: 0 };
+      r.g++;
+      for (const o of scored) if (o !== m) {
+        if (m.points > o.points) r.w++;
+        else if (m.points < o.points) r.l++;
+      }
+    }
+  }
+  return L.teams.map((t) => {
+    const r = rec[t.roster_id] || { w: 0, l: 0, g: 0 }, exp = r.w + r.l ? r.w / (r.w + r.l) * r.g : 0;
+    return { t, w: r.w, l: r.l, luck: t.wins - exp };
+  }).filter((x) => x.w + x.l).sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l));
+}
+async function headToHead(a, b) {
+  const { weeks, all } = await pastWeeks(), games = [];
+  all.forEach((ms, i) => {
+    const x = (ms || []).find((m) => m.roster_id === a.roster_id), y = (ms || []).find((m) => m.roster_id === b.roster_id);
+    if (x && y && x.matchup_id && x.matchup_id === y.matchup_id && (x.points || y.points)) games.push({ w: weeks[i], a: x.points || 0, b: y.points || 0 });
+  });
+  return games.reverse();
+}
 async function trophies() {
   if (L.trophies) return L.trophies;
-  const weeks = [];
-  for (let w = 1; w < Number(L.week); w++) weeks.push(w);
-  const all = L.espn ? weeks.map((w) => L.past[w] || []) : await Promise.all(weeks.map((w) => get(`${API}/league/${L.id}/matchups/${w}`).catch(() => [])));
+  const { weeks, all } = await pastWeeks();
   const name = (rid) => (L.teams.find((t) => t.roster_id === rid) || {}).name || `Team ${rid}`;
   let hi = null;
   const lows = {}, run = {}, best = {};
@@ -581,7 +636,7 @@ function standings() {
       el(
         "table",
         {},
-        el("tr", {}, el("th", {}, "#"), el("th", {}, "Team"), el("th", {}, "W-L"), el("th", { class: "num" }, "PF"), el("th", { class: "num" }, "Power")),
+        el("tr", {}, el("th", {}, "#"), el("th", {}, "Team"), el("th", {}, "W-L"), el("th", { class: "num" }, "PF"), el("th", { class: "num" }, "PA")),
         rows.map((t, i) => [
           el(
             "tr",
@@ -590,12 +645,27 @@ function standings() {
             el("td", {}, `${t.mine ? "\u{1F451} " : ""}${t.name}`),
             el("td", {}, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}`),
             el("td", { class: "num" }, fmt(t.fpts)),
-            el("td", { class: "num" }, `#${power.indexOf(t.roster_id) + 1}`)
+            el("td", { class: "num" }, t.fpts_against != null ? fmt(t.fpts_against) : "\u2013")
           ),
           i + 1 === po && i + 1 < rows.length ? el("tr", {}, el("td", { colspan: "5", style: "padding:1px 0;border-top:3px dashed #c9a227;font-size:11px;color:#9e7c0c;text-align:center" }, "\u2014 playoff line \u2014")) : null
         ])
       ),
-      el("p", { class: "small" }, `Power = rank by points scored this season. Top ${po} make the playoffs (from week ${poWeek}).`),
+      el("p", { class: "small" }, `Top ${po} make the playoffs (from week ${poWeek}). PF / PA = points for / against.`),
+      await (async () => {
+        const ap = await allPlay();
+        if (!ap.length) return null;
+        const luck = (x) => Math.abs(x.luck) < 0.5 ? "even" : `${x.luck > 0 ? "+" : "\u2212"}${Math.abs(x.luck).toFixed(1)} wins`;
+        return [
+          el("h3", {}, "All-play (vs everyone, every week)"),
+          el(
+            "table",
+            {},
+            el("tr", {}, el("th", {}, "Team"), el("th", {}, "All-play"), el("th", { class: "num" }, "Luck")),
+            ap.map((x) => el("tr", x.t.mine ? { class: "mine" } : {}, el("td", {}, x.t.name), el("td", {}, `${x.w}-${x.l}`), el("td", { class: "num" }, `${x.luck >= 0.5 ? "\u{1F340} " : x.luck <= -0.5 ? "\u{1F494} " : ""}${luck(x)}`)))
+          ),
+          el("p", { class: "small" }, "Luck = real wins minus the wins your all-play record would give you.")
+        ];
+      })(),
       tr.length ? [el("h3", {}, "Season trophies"), el("div", { class: "chips" }, tr.map((x) => el("span", { class: "chip" }, x)))] : null,
       L.champs.length ? [el("h3", {}, "Champions"), el("div", { class: "chips" }, L.champs.map((c) => el("span", { class: "chip gold" }, `\u{1F3C6} ${c.season}: ${c.team}`)))] : null
     ];
@@ -748,7 +818,7 @@ function sharePicture(cv, name, title) {
     toast(`\u{1F4F8} Picture saved${copied ? " \xB7 link copied" : ""}. Paste it in your league chat!`);
   });
 }
-let shareAfterPick = false;
+let shareAfterPick = false, playAfterPick = false;
 function shareMine() {
   count("share");
   const m = mine();
@@ -823,6 +893,25 @@ function matchupCard(me, opp) {
   c.fillText(stadiumLink(), W / 2, H - 70);
   sharePicture(cv, `week-${L.week}-matchup.png`, `${me.name} vs ${opp.name}`);
 }
+function drillTeaser() {
+  if (!mine() || store("st-drill-seen") || document.getElementById("recap-ready")) return;
+  store("st-drill-seen", "1");
+  const b = el(
+    "div",
+    { id: "drill-tease", style: "position:fixed;left:50%;top:150px;transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #4ade80;border-radius:10px;padding:10px 12px;font:600 14px/1.35 system-ui,sans-serif;box-shadow:0 4px 14px #0008" },
+    el("b", {}, "\u{1F3C8} New: play your matchup."),
+    " Your starters vs theirs in a 1-minute 2-Minute Drill. ",
+    el("button", { type: "button", class: "dt-go", style: "margin-left:4px;border:0;background:#4ade80;border-radius:6px;font-weight:700;padding:3px 9px" }, "Play"),
+    el("button", { type: "button", class: "dt-x", "aria-label": "Close", style: "margin-left:4px;border:0;background:none;color:#fff4d6;font-size:16px" }, "\xD7")
+  );
+  b.querySelector(".dt-go").onclick = () => {
+    b.remove();
+    playGame();
+  };
+  b.querySelector(".dt-x").onclick = () => b.remove();
+  document.body.appendChild(b);
+  setTimeout(() => b.remove(), 12e3);
+}
 function recapReady() {
   const G = Object.values(L.games || {}), k = `st-recap-${L.id}-${L.week}`;
   if (!G.length || G.some((s) => s !== "complete") || store(k)) return;
@@ -872,8 +961,8 @@ function awardsList() {
     mvp && mvp.v > 0 ? ["\u2B50 MVP", `${pname(mvp.pid)} (${mvp.t.name})`, fmt(mvp.v)] : null,
     ["\u{1F4A5} Biggest blowout", `${lead(blow)[0].name} over ${lead(blow)[1].name}`, `by ${fmt(gap(blow))}`],
     ["\u{1F62C} Closest game", `${lead(close)[0].name} over ${lead(close)[1].name}`, `by ${fmt(gap(close))}`],
-    unlucky ? ["\u{1F494} Unluckiest", `${unlucky[1].name} lost with`, fmt(unlucky[1].points)] : null,
-    lucky ? ["\u{1F340} Luckiest win", `${lucky[0].name} won with`, fmt(lucky[0].points)] : null,
+    unlucky ? ["\u{1F494} Unluckiest", unlucky[1].name, `lost \xB7 ${fmt(unlucky[1].points)}`] : null,
+    lucky && !lucky.includes(lead(blow)[0]) ? ["\u{1F340} Luckiest win", lucky[0].name, `won \xB7 ${fmt(lucky[0].points)}`] : null,
     ["\u{1F6BD} ASS Bowl", `${lead(ass)[0].name} vs ${lead(ass)[1].name}`, `${fmt(lead(ass)[0].points)} \u2013 ${fmt(lead(ass)[1].points)}`],
     ["\u{1FA91} Bench of shame", shame.name, `${fmt(bench(shame))} on the bench`],
     ["\u{1F327}\uFE0F Lowest score", low.name, fmt(low.points)]
@@ -882,7 +971,7 @@ function awardsList() {
 function awards() {
   const list = awardsList(), final = Object.values(L.games || {}).length && Object.values(L.games).every((s) => s === "complete");
   openPanel(`\u{1F3C5} Week ${L.week} awards${final ? "" : " (so far)"}`, async () => [
-    list.length ? el("table", {}, list.map(([k, who, n]) => el("tr", {}, el("td", {}, el("b", {}, k)), el("td", {}, who), el("td", { class: "num" }, n)))) : el("p", {}, "No points yet this week. Awards show up once the games start."),
+    list.length ? el("table", {}, list.map(([k, who, n]) => el("tr", {}, el("td", { style: "white-space:nowrap;font-size:13px;padding:6px 4px" }, el("b", {}, k)), el("td", {}, who), el("td", { class: "num" }, n)))) : el("p", {}, "No points yet this week. Awards show up once the games start."),
     list.length ? (() => {
       const b = el("button", { type: "button", class: "mu-share" }, "\u{1F4F8} Share as a picture");
       b.onclick = () => recap();
@@ -937,13 +1026,13 @@ function recap() {
     const room = W - 220 - c.measureText(n).width - 40;
     c.textAlign = "right";
     c.fillStyle = "#9dff7a";
-    c.fillText(n, W - 110, y + 104);
+    c.fillText(n, W - 110, y + 80);
     c.textAlign = "left";
     c.fillStyle = "#fff4d6";
     c.font = `bold 40px ${font}`;
     let w = who;
     while (c.measureText(`${w}\u2026`).width > room && w.length > 4) w = w.slice(0, -1);
-    c.fillText(w === who ? w : `${w.trim()}\u2026`, 110, y + 104);
+    c.fillText(w === who ? w : `${w.trim()}\u2026`, 110, y + 80);
   });
   c.textAlign = "center";
   c.fillStyle = "#c9a227";
@@ -975,6 +1064,10 @@ function setMine(rid) {
   if (shareAfterPick) {
     shareAfterPick = false;
     setTimeout(shareMine, 700);
+  }
+  if (playAfterPick) {
+    playAfterPick = false;
+    setTimeout(playGame, 900);
   }
 }
 const SCHEDULE = "https://api.sleeper.com/schedule/nfl/regular";
@@ -1196,6 +1289,14 @@ function askLeague(note) {
   updateProj();
   hud();
   setTimeout(recapReady, 4e3);
+  if (location.hash === "#drill") {
+    history.replaceState(null, "", location.pathname + location.search);
+    if (mine()) setTimeout(playGame, 1200);
+    else {
+      playAfterPick = true;
+      whoAreYou();
+    }
+  } else setTimeout(drillTeaser, 6e3);
   game = new Phaser.Game({
     type: (navigator.maxTouchPoints || 0) > 0 ? Phaser.AUTO : Phaser.CANVAS,
     parent: "game",

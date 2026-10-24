@@ -168,3 +168,23 @@ body.calm #st-ticker span { animation: none; padding-left: 12px; }
 .mg-end-btns button { font: inherit; font-size: 15px; min-height: 44px; border: 2px solid #6b4f2a; border-radius: 5px; background: #f1e4c3; color: #2b1d12; cursor: pointer; }
 .mg-end-btns #mg-again { font-size: 18px; font-weight: 600; color: #fff; background: #d77a35; border-width: 3px; box-shadow: 0 3px 0 rgba(0,0,0,.35); }
 #mg-down { font-variant-numeric: tabular-nums; }
+#mg-hud.mg-over { background: none; border: 0; box-shadow: none; padding: 0; } 
+#mg-hud.mg-over > :not(#mg-end) { display: none; }
+
+
+#st-rail-l, #st-rail-r { display: none; }
+@media (min-width: 1280px) {
+  #st-rail-l, #st-rail-r { display: grid; align-content: start; gap: 8px; position: fixed; top: 20px; bottom: 56px; width: clamp(220px, calc(50vw - 500px), 360px);
+    overflow: auto; z-index: 3; font: 600 15px/1.35 "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #fff4d6; }
+  #st-rail-l { left: 16px; } #st-rail-r { right: 16px; }
+  .rail-card { background: rgba(16, 19, 24, 0.85); border: 2px solid #3a3f47; border-radius: 8px; padding: 10px 12px; }
+  .rail-card b { display: block; color: #ffd84a; margin-bottom: 4px; }
+  .rail-row { display: flex; justify-content: space-between; gap: 8px; } .rail-row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .rail-row span:last-child { flex: none; } 
+  .rail-row.mine { color: #ffe08a; } .rail-cut { border-top: 2px dashed #c9a227; margin: 4px 0; font-size: 11px; color: #c9a227; text-align: center; }
+  #st-ticker { display: none; } 
+}
+@media (min-width: 1200px) {
+  #st-hud { max-width: 680px; } #st-score { font-size: 22px; } #st-league, #st-proj { font-size: 15px; }
+  .st-btns button { font-size: 16px; padding: 4px 14px; }
+  #panel { width: min(760px, calc(100vw - 32px)); } #panel-body table { font-size: 16px; } #panel-body td, #panel-body th { padding: 6px 8px; }
+}

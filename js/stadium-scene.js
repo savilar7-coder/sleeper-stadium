@@ -203,7 +203,7 @@ class StadiumScene extends World {
   }
   applyUiScale() {
     const fieldPx = (FIELD.x1 - FIELD.x0 + 3) * TILE * this.logicalZoom(), phonePx = 17 * TILE * 0.86;
-    this.uiScale = 1 / this.cameras.main.zoom * Math.min(1, Math.max(0.6, fieldPx / phonePx));
+    this.uiScale = 1 / this.cameras.main.zoom * Math.min(window.innerWidth >= 1200 ? 1.25 : 1, Math.max(0.6, fieldPx / phonePx));
     this.uiTexts = (this.uiTexts || []).filter((t) => t.active);
     for (const t of this.uiTexts) t.setScale(this.uiScale);
   }
@@ -903,7 +903,7 @@ class StadiumScene extends World {
         const was = prevSP[t.roster_id] || [], P = this.league.players || {};
         (t.starters_points || []).forEach((pts, i) => {
           const up = pts - (was[i] || 0), pid = (t.starters || [])[i];
-          if (up > 0.05 && pid) (this.league.feed = this.league.feed || []).unshift(`${P[pid] ? String(P[pid][0]).split(" ").slice(-1)[0] : pid} +${up.toFixed(1)} \u2192 ${t.name.length > 16 ? `${t.name.slice(0, 15)}\u2026` : t.name}`);
+          if (up > 0.05 && pid) (this.league.feed = this.league.feed || []).unshift(`${P[pid] ? String(P[pid][0]).replace(/^(\S)\S*\s+/, "$1. ") : pid} +${up.toFixed(1)} \u2192 ${t.name.length > 16 ? `${t.name.slice(0, 15)}\u2026` : t.name}`);
         });
         if (this.league.feed) this.league.feed.length = Math.min(this.league.feed.length, 4);
       }
@@ -1224,6 +1224,13 @@ class StadiumScene extends World {
       if (tickText.textContent === s) return;
       tickText.textContent = s;
       ticker.hidden = false;
+      const rail = document.getElementById("st-rail-r");
+      if (rail) rail.replaceChildren(...pages.filter((pg) => !/^STANDINGS/.test(pg)).map((pg) => {
+        const [h, ...ls] = pg.split("\n"), d = document.createElement("div");
+        d.className = "rail-card";
+        d.append(Object.assign(document.createElement("b"), { textContent: h }), ...ls.map((l) => Object.assign(document.createElement("div"), { textContent: l })));
+        return d;
+      }));
       tickText.style.animationDuration = `${Math.max(14, s.length * 0.16)}s`;
     } };
     this.jumboPage = 0;
@@ -1421,6 +1428,20 @@ class StadiumScene extends World {
     const pages = [];
     if ((L.feed || []).length) pages.push(`\u{1F3C8} LIVE
 ${L.feed.join("\n")}`);
+    else {
+      const P = L.players || {}, best = [];
+      for (const t of L.teams) (t.starters || []).forEach((pid, i) => {
+        const v = (t.starters_points || [])[i] || 0;
+        if (pid && pid !== "0" && v > 0) best.push({ pid, v, t });
+      });
+      const nm = (pid) => {
+        const n = P[pid] ? String(P[pid][0]).split(" ") : [pid];
+        return n.length > 1 ? `${n[0][0]}. ${n.slice(1).join(" ")}` : n[0];
+      };
+      best.sort((a, b) => b.v - a.v);
+      if (best.length) pages.push(`\u2B50 TOP PLAYS
+${best.slice(0, 3).map((x) => `${nm(x.pid)} ${x.v.toFixed(1)} \u2192 ${name(x.t)}`).join("\n")}`);
+    }
     const st = [...L.teams].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts).slice(0, 3);
     pages.push(`STANDINGS
 ${st.map((t, i) => `${i + 1}. ${name(t)}  ${t.wins}-${t.losses}`).join("\n")}`);

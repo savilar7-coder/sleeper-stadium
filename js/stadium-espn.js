@@ -37,6 +37,7 @@ async function espnLeague(id, season) {
       losses: o.losses || 0,
       ties: o.ties || 0,
       fpts: o.pointsFor || 0,
+      fpts_against: o.pointsAgainst || 0,
       points: w.points || 0,
       matchup_id: w.matchup_id || null,
       starters,
@@ -56,7 +57,7 @@ async function espnLeague(id, season) {
   for (const m of d.schedule || []) if (m.matchupPeriodId < period) {
     for (const side of ["home", "away"]) if (m[side]) (past[m.matchupPeriodId] = past[m.matchupPeriodId] || []).push({ roster_id: m[side].teamId, points: m[side].totalPoints || 0, matchup_id: m.id });
   }
-  return { name: (d.settings || {}).name || "ESPN League", season: String(d.seasonId || season), week, teams, players, proj, slots, past };
+  return { settings: { playoff_teams: ((d.settings || {}).scheduleSettings || {}).playoffTeamCount }, name: (d.settings || {}).name || "ESPN League", season: String(d.seasonId || season), week, teams, players, proj, slots, past };
 }
 export {
   espnLeague,
