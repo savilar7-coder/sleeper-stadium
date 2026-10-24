@@ -84,6 +84,7 @@ class StadiumScene extends World {
     this.thrones = new Set();
     this.tdQueue = [];
     this.nudging = false;
+    this.prevOdds = {};
     makeTextures(this);
     makeDecorTextures(this);
     this.makeFootballer();
@@ -925,6 +926,13 @@ class StadiumScene extends World {
       if (was == null || stale || !this.sys.isActive() || Math.abs(pa - was) < 0.25) continue;
       const fav = pa >= 0.5 ? a : b, now = Math.round(Math.max(pa, 1 - pa) * 100), before = Math.round((fav === a ? was : 1 - was) * 100);
       this.tdQueue = this.tdQueue || [];
+      const td = this.tdQueue.find((x) => x.rid != null && (x.rid === a.roster_id || x.rid === b.roster_id));
+      if (td) {
+        td.sub += `
+${fav.name} now ${now}% (was ${before}%)`;
+        if (td.el) td.el.querySelector("span").textContent = td.sub;
+        continue;
+      }
       if (this.tdQueue.length >= 3) continue;
       this.tdQueue.push({ text: "\u{1F4C8} BIG SWING", who: `${fav.name} now ${now}%`, sub: `was ${before}% \xB7 ${a.name} vs ${b.name}`, mine: !!(a.mine || b.mine) });
       if (this.tdQueue.length === 1) this.nextTd();
@@ -979,7 +987,7 @@ class StadiumScene extends World {
     if (!this.sys.isActive()) return;
     const q = this.tdQueue = this.tdQueue || [];
     if (q.length >= 3) return;
-    q.push({ text: `\u{1F3C8} ${jump >= 5.5 ? "TOUCHDOWN" : "BIG PLAY"}`, who, sub: `+${jump.toFixed(1)} \xB7 ${t.name}`, mine: t.mine });
+    q.push({ text: `\u{1F3C8} ${jump >= 5.5 ? "TOUCHDOWN" : "BIG PLAY"}`, who, sub: `+${jump.toFixed(1)} \xB7 ${t.name}`, mine: t.mine, rid: t.roster_id });
     const ts = this.teamSprites && this.teamSprites.get(t.roster_id);
     this.tdCheer = { left: ts ? ts.side === 0 : true, y: ts ? ts.s.y : 0, start: this.time.now, until: this.time.now + 3600 };
     if (ts) this.scoringMoment(ts, t);
@@ -1086,12 +1094,15 @@ class StadiumScene extends World {
     el2.querySelector("b").textContent = item.text;
     el2.querySelector("i").textContent = item.who || "";
     el2.querySelector("span").textContent = item.sub;
+    item.el = el2;
     document.body.appendChild(el2);
     sfx.cheer && sfx.cheer();
     setTimeout(() => {
       el2.remove();
-      q.shift();
-      this.nextTd();
+      if (q === this.tdQueue) {
+        q.shift();
+        this.nextTd();
+      }
     }, 3200);
   }
   celebrate(s, t) {
@@ -1508,9 +1519,10 @@ ${best.slice(0, 3).map((x) => `${nm(x.pid)} ${x.v.toFixed(1)} \u2192 ${name(x.t)
     {
       const G = L.games || {}, P = L.players || {};
       if (Object.values(G).some((s) => s === "pre_game")) {
-        const bad = L.teams.filter((t) => (t.starters || []).some((pid) => !pid || pid === "0" || Object.keys(G).length && P[pid] && P[pid][2] && !G[P[pid][2]]));
-        if (bad.length) pages.push(`\u26A0\uFE0F LINEUP ALERT
-${bad.slice(0, 3).map((t) => `${name(t)}: empty slot or bye`).join("\n")}`);
+        const me = L.teams.find((t) => t.mine), slots = L.slots || [];
+        const bad = me ? (me.starters || []).map((pid, i) => !pid || pid === "0" ? `${slots[i] || "slot"} empty` : P[pid] && P[pid][2] && !G[P[pid][2]] ? `${slots[i] || P[pid][1]} ${String(P[pid][0]).split(" ").slice(-1)[0]} on bye` : "").filter(Boolean) : [];
+        if (bad.length) pages.push(`\u26A0\uFE0F YOUR LINEUP
+${bad.slice(0, 3).join("\n")}`);
       }
     }
     const st = [...L.teams].sort((a, b) => b.wins - a.wins || b.fpts - a.fpts).slice(0, 3);
@@ -1857,7 +1869,11 @@ ${t.points.toFixed(1)} pts`);
   }
   playersLeft(t) {
     const G = this.league.games || {}, P = this.league.players || {};
-    return (t.starters || []).filter((pid) => pid && pid !== "0" && G[P[pid] ? P[pid][2] : pid] !== "complete").map((pid) => P[pid] ? String(P[pid][0]).split(" ").slice(-1)[0] : pid);
+    const hasG = Object.keys(G).length;
+    return (t.starters || []).filter((pid) => {
+      const st = G[P[pid] ? P[pid][2] : pid];
+      return pid && pid !== "0" && (hasG ? st && st !== "complete" : true);
+    }).map((pid) => P[pid] ? String(P[pid][0]).split(" ").slice(-1)[0] : pid);
   }
   sweatLine(a, b) {
     const la = this.playersLeft(a), lb = this.playersLeft(b);

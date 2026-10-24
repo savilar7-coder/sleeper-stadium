@@ -238,6 +238,7 @@ async function load(leagueId) {
       updateProj();
       hud();
       const sc = game && game.scene.getScene("stadium");
+      if (sc) sc.prevOdds = {};
       if (sc && sc.refreshScores && sc.sys.isActive()) sc.refreshScores();
     }
   });
@@ -278,7 +279,10 @@ function picksOf(rid) {
   return out;
 }
 const mine = () => L.teams.find((t) => t.mine);
-const toPlay = (t) => (t.starters || []).filter((pid) => pid && pid !== "0" && (L.games || {})[L.players[pid] ? L.players[pid][2] : pid] !== "complete").length;
+const toPlay = (t) => (t.starters || []).filter((pid) => {
+  const G = L.games || {}, st = G[L.players[pid] ? L.players[pid][2] : pid];
+  return pid && pid !== "0" && (Object.keys(G).length ? st && st !== "complete" : true);
+}).length;
 let sinceTxt;
 function rails() {
   for (const id of ["st-rail-l", "st-rail-r"]) if (!document.getElementById(id)) document.body.appendChild(Object.assign(document.createElement("aside"), { id }));
@@ -951,8 +955,9 @@ function matchupCard(me, opp) {
 }
 function drillTeaser() {
   if (window.__tv) return;
-  if (document.querySelector(".td-banner") || $("panel").hidden === false) {
-    setTimeout(drillTeaser, 4e3);
+  const sc = game && game.scene.getScene("stadium");
+  if (document.querySelector(".td-banner") || $("panel").hidden === false || sc && Date.now() - (sc.lastBannerAt || 0) < 1e4) {
+    setTimeout(drillTeaser, 5e3);
     return;
   }
   if (!mine() || store("st-drill-seen") || document.getElementById("recap-ready") || game && game.scene.isActive("minigame")) return;
@@ -1357,7 +1362,7 @@ function askLeague(note) {
       playAfterPick = Date.now();
       whoAreYou();
     }
-  } else setTimeout(drillTeaser, 11e3);
+  } else setTimeout(drillTeaser, 3e4);
   game = new Phaser.Game({
     type: (navigator.maxTouchPoints || 0) > 0 ? Phaser.AUTO : Phaser.CANVAS,
     parent: "game",

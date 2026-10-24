@@ -49,7 +49,7 @@
   var realFetch = window.fetch;
   window.fetch = function (u, o) {
     var url = typeof u === 'string' ? u : (u && u.url) || '';
-    if (!/\/league\/1\/matchups\/\d+$/.test(url) || !tdDone) return realFetch(u, o);
+    if (!/\/league\/1\/matchups\/\d+$/.test(url) || !tdDone || !window.__league || !url.endsWith('/matchups/' + window.__league.week)) return realFetch(u, o);
     return realFetch(u, o).then(function (r) { return r.json(); }).then(function (j) { // later refreshes keep the touchdown
       (j || []).forEach(function (m) { if (m.roster_id === 2) bump(m); });
       return new Response(JSON.stringify(j), { headers: { 'Content-Type': 'application/json' } });

@@ -200,3 +200,5 @@ body.tv .td-banner { zoom: 1.5; }
   border: 2px solid #ffd84a; border-radius: 10px; padding: 8px 12px; font: 600 14px/1.35 "Segoe UI", "Helvetica Neue", Arial, sans-serif; pointer-events: none; }
 #tv-cap b { display: block; color: #ffd84a; font-size: 22px; } #tv-cap span { font-size: 18px; }
 #mg-end-line { font: 600 14px "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #2b1d12; } 
+
+.td-banner span { white-space: pre-line; } 
