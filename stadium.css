@@ -232,3 +232,6 @@ body:has(#panel:not([hidden])) #st-hud { visibility: hidden; }
 }
 
 body:has(#panel:not([hidden])) #nudge { display: none; }
+
+
+.standings td.tm-name { max-width: 0; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

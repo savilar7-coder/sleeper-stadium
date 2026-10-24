@@ -459,6 +459,7 @@ function matchup(rid) {
         const tm = p[2], st = (L.games || {})[tm], d = (L.gameDates || {})[tm];
         if (!pts && st === "pre_game" && d) return el("div", { class: "mu-pts", style: "font-size:13px;color:#8a7a5c" }, (new Date(`${d}T12:00:00`)).toLocaleDateString("en-US", { weekday: "short" }));
         if (!pts && pid && pid !== "0" && tm && !st && Object.keys(L.games || {}).length) return el("div", { class: "mu-pts", style: "font-size:13px;color:#8a7a5c" }, "BYE");
+        if (st === "in_game") return el("div", { class: "mu-pts" }, pts == null ? "\u2013" : fmt(pts), el("small", { style: "display:block;font-size:11px;color:#2e7d32;font-weight:700" }, "\u25CF LIVE"));
         return el("div", { class: "mu-pts" }, pts == null ? "\u2013" : fmt(pts));
       })()
     );
@@ -863,7 +864,7 @@ function standings() {
             "tr",
             t.mine ? { class: "mine" } : {},
             el("td", {}, String(i + 1)),
-            el("td", {}, `${t.mine ? "\u{1F451} " : ""}${t.name}`),
+            el("td", { class: "tm-name", title: t.name }, `${t.mine ? "\u{1F451} " : ""}${t.name}`),
             el("td", {}, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}`),
             el("td", { class: "num" }, fmt(t.fpts)),
             el("td", { class: "num" }, t.fpts_against != null ? fmt(t.fpts_against) : "\u2013"),
@@ -923,6 +924,12 @@ async function tradeLedger() {
 function news() {
   const name = (rid) => (L.teams.find((t) => t.roster_id === rid) || {}).name || `Team ${rid}`;
   const trades = L.news.filter((x) => x.type === "trade"), moves = L.news.filter((x) => x.type !== "trade");
+  const when = (x) => {
+    const t = x.status_updated || x.created;
+    if (!t) return "";
+    const d = new Date(t);
+    return ` \xB7 ${Date.now() - t < 6 * 864e5 ? d.toLocaleDateString("en-US", { weekday: "short" }) : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  };
   const rows = [...trades, ...moves].slice(0, 60).map((x) => {
     const adds = Object.entries(x.adds || {}), drops = Object.entries(x.drops || {});
     if (x.type === "trade") {
@@ -931,11 +938,11 @@ function news() {
         const gotPicks = (x.draft_picks || []).filter((pk) => pk.owner_id === rid).map((pk) => `${pk.season} R${pk.round}`);
         return `${name(rid)} gets ${[...got, ...gotPicks].join(", ") || "nothing"}`;
       });
-      return el("div", { class: "need publish" }, el("b", {}, "\u{1F91D} Trade"), el("span", {}, parts.join(" \xB7 ")));
+      return el("div", { class: "need publish" }, el("b", {}, `\u{1F91D} Trade${when(x)}`), el("span", {}, parts.join(" \xB7 ")));
     }
     const who = name((x.roster_ids || [])[0]);
     const what = [...adds.map(([pid]) => `+ ${pname(pid)}`), ...drops.map(([pid]) => `\u2212 ${pname(pid)}`)].join("  ");
-    return el("div", { class: "need" }, el("b", {}, `${x.type === "waiver" ? "\u{1F4CB} Waiver" : "\u{1F193} Free agent"} \xB7 ${who}`), el("span", {}, what));
+    return el("div", { class: "need" }, el("b", {}, `${x.type === "waiver" ? "\u{1F4CB} Waiver" : "\u{1F193} Free agent"} \xB7 ${who}`, el("small", { style: "font-weight:400;color:#8a7a5c" }, when(x))), el("span", {}, what));
   });
   const won = (L.claims || []).filter((x) => x.status === "complete" && x.adds), lost = (L.claims || []).filter((x) => x.status === "failed" && x.adds);
   const faab = won.some((x) => x.settings && x.settings.waiver_bid != null);

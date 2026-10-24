@@ -1181,7 +1181,20 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     const name = mascot ? `${mascot}-${look}` : look, key = `a-ch-${name}`;
     if (this.textures.exists(key)) return name;
     const [H, HS, J, JL, JD, N, PA] = FB_KITS[(Number(look.slice(2)) || 0) % FB_KITS.length];
-    const C = { K: H, KL: JL, GOLD: HS, GL: N, PUR: J, PL: JL, PD: JD, WH: PA, WD: PA === "#f4f1ea" ? "#cfcac0" : PA, head: mascot, big: (Number(look.slice(2)) || 0) % 3 === 1 };
+    const C = {
+      K: H,
+      KL: JL,
+      GOLD: HS,
+      GL: N,
+      PUR: J,
+      PL: JL,
+      PD: JD,
+      WH: PA,
+      WD: PA === "#f4f1ea" ? "#cfcac0" : PA,
+      head: mascot,
+      big: (Number(look.slice(2)) || 0) % 3 === 1,
+      SKIN: ["#e8b48f", "#c98d68", "#9c6440", "#6f4428"][(Number(look.slice(2)) || 0) % 4]
+    };
     const ct = this.textures.createCanvas(key, 64, 112), c = ct.getContext();
     const put = (ox, oy, grid) => grid.forEach((rw, y) => rw.forEach((col, x) => {
       if (col) {
@@ -1200,7 +1213,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
   footballerGrid(dir, f, pose, C) {
     const { K = "#141018", KL = "#33293f", GOLD = "#c9a227", GL = "#ffd84a", PUR = "#3b2390", PL = "#5a3dbd", PD = "#241773", WH = "#f4f1ea", WD = "#cfcac0", head, big } = C, tw = big ? 1 : 0;
     const ARM = lum(PUR) < 60 ? GL : PL;
-    const SK = head ? mascotFur(head) : "#c98d68", MASK = Math.abs(lum(GOLD) - lum(K)) > 50 ? GOLD : "#9aa1aa", BALL = "#8a4a22", CLEAT = "#141018";
+    const SK = head ? mascotFur(head) : C.SKIN || "#c98d68", MASK = Math.abs(lum(GOLD) - lum(K)) > 50 ? GOLD : "#9aa1aa", BALL = "#8a4a22", CLEAT = "#141018";
     {
       const g = [...Array(16)].map(() => Array(16).fill(null)), px = (x, y, col) => {
         if (x >= 0 && x < 16 && y >= 0 && y < 16) g[y][x] = col;
@@ -1230,6 +1243,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
       rect((side ? 5 : 3) - tw, jy, (side ? 6 : 10) + 2 * tw, jh, PUR);
       rect((side ? 5 : 3) - tw, jy, (side ? 6 : 10) + 2 * tw, 1, PL);
       rect((side ? 10 : 12) + tw, jy + 1, 1, jh - 1, PD);
+      if (side) rect(4 - tw, jy, 8 + 2 * tw, 1, PL);
       if (side) {
         px(6 + step, 12, PUR);
         px(8 - step, 12, PD);
