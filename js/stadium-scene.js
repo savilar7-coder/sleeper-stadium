@@ -1946,7 +1946,7 @@ ${t.points.toFixed(1)} pts`);
       const pct = Math.round(Math.max(pa, 1 - pa) * 100), t = a.mine || b.mine ? `YOU ${Math.round((a.mine ? pa : 1 - pa) * 100)}%` : lead ? lead === A ? `\u25C0 ${pct}%` : `${pct}% \u25B6` : "50 / 50";
       if (o.pct.text !== t) o.pct.setText(t);
       const fs = Math.round(15 * DPR / Math.max(0.5, this.cameras.main.zoom / DPR));
-      o.pct.setFontSize(Math.round(14 * DPR)).setStroke("#0f141a", Math.round(5 * DPR)).setScale(board.scaleX).setOrigin(0.5, 1).setPosition(kx, hy - 8).setDepth(board.depth + 1);
+      o.pct.setFontSize(Math.round(14 * DPR)).setStroke("#0f141a", Math.round(5 * DPR)).setScale(board.scaleX).setOrigin(0.5, 1).setPosition(a.mine ? x1 + len * 0.22 : b.mine ? x2 - len * 0.22 : kx, hy - 8).setDepth(board.depth + 1);
       const sw = sweat || this.liveNow(a) || this.liveNow(b) ? this.sweatLine(a, b) : null, pt = sw ? sw.text : `proj ${a.proj.toFixed(1)} \u2013 ${b.proj.toFixed(1)}`;
       if (projTxt.text !== pt) projTxt.setText(pt);
       const pcol = lead ? "#9dff7a" : "#e8e2ff";

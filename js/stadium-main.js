@@ -317,7 +317,7 @@ function hud() {
   rails();
   const m = mine(), opp = m && L.teams.find((t) => t.matchup_id && t.matchup_id === m.matchup_id && t !== m);
   $("st-league").textContent = window.__tv ? `${L.name} \xB7 week ${L.week} \xB7 stadium.lamaisonwebstudio.com` : `${L.name} \xB7 week ${L.week}`;
-  $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : window.__tv ? tvLine() : "Tap \u{1F451} My team to pick your team";
+  $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : window.__tv ? tvLine() : Object.values(L.games || {}).includes("in_game") ? "\u{1F534} Live now \xB7 tap any player \xB7 \u{1F451} My team = yours" : "Tap \u{1F451} My team to pick your team";
   $("st-score").className = m && opp ? m.points >= opp.points ? "up" : "down" : "";
   const win = m && opp ? winOdds(m, opp) : null;
   if (m && opp) {
@@ -1363,6 +1363,31 @@ function awardsList() {
     ["\u{1F327}\uFE0F Lowest score", low.name, fmt(low.points)]
   ].filter(Boolean);
 }
+function passPerks() {
+  const q2 = new URLSearchParams(location.search), P = window.__pass || {};
+  const blimp = q2.get("blimp") || P.blimp || "", looks = (q2.get("looks") || P.looks || "").split(",").filter((x) => /^\d+\./.test(x));
+  const gold = (q2.get("gold") || P.gold || "").split(",").map(Number).filter(Boolean), byId = (rid) => (L.teams.find((t) => t.roster_id === rid) || {}).name;
+  const row = (icon, what, now) => el("tr", {}, el("td", { style: "font-size:20px;padding:6px 4px;vertical-align:top" }, icon), el("td", { style: "padding:6px 4px" }, el("b", {}, what), el("div", { style: "font-size:13px;color:#5a4a33" }, now)));
+  openPanel(`\u2605 ${L.name} \xB7 League Pass`, async () => [
+    el("table", {}, [
+      row("\u{1F388}", "Your blimp", blimp ? `"${blimp}"` : "Pick your line: reply to your League Pass email"),
+      row("\u{1F3AD}", "Team looks + football mascots", looks.length ? `${looks.length} team${looks.length > 1 ? "s" : ""} dressed up for the whole league` : "Tell us who plays as what: reply to your email"),
+      row("\u{1F451}", "Golden jersey", gold.length ? gold.map(byId).filter(Boolean).join(", ") : "Tell us whose team gets it"),
+      row("\u{1F6AB}", "No tip asks", "Your league never sees a tip or beer ask"),
+      row("\u{1F504}", "Every update, all season", "Plus one league request built each week")
+    ]),
+    (() => {
+      const b = el("button", { type: "button", class: "mu-share" }, "\u{1F517} Send it to your league chat");
+      b.onclick = () => {
+        closePanel();
+        $("share-btn") && $("share-btn").click();
+      };
+      return b;
+    })(),
+    el("p", { style: "font-size:13px;color:#5a4a33" }, "Everyone with this link sees the same stadium. Want a change? Reply to your League Pass email.")
+  ]);
+}
+window.__passPerks = passPerks;
 function awards() {
   const list = awardsList(), final = Object.values(L.games || {}).length && Object.values(L.games).every((s) => s === "complete");
   openPanel(`\u{1F3C5} Week ${L.week} awards${final ? "" : " (so far)"}`, async () => [
