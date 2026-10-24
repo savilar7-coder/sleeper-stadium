@@ -317,7 +317,7 @@ function hud() {
   rails();
   const m = mine(), opp = m && L.teams.find((t) => t.matchup_id && t.matchup_id === m.matchup_id && t !== m);
   $("st-league").textContent = window.__tv ? `${L.name} \xB7 week ${L.week} \xB7 stadium.lamaisonwebstudio.com` : `${L.name} \xB7 week ${L.week}`;
-  $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : window.__tv ? tvLine() : Object.values(L.games || {}).includes("in_game") ? "\u{1F534} Live now \xB7 tap any player \xB7 \u{1F451} My team = yours" : "Tap \u{1F451} My team to pick your team";
+  $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : window.__tv ? tvLine() : Object.values(L.games || {}).includes("in_game") ? "\u{1F534} Live now \xB7 tap any player \xB7 \u{1F451} My team = yours" : "\u{1F451} Tap My team to walk on the field as you";
   $("st-score").className = m && opp ? m.points >= opp.points ? "up" : "down" : "";
   const win = m && opp ? winOdds(m, opp) : null;
   if (m && opp) {
@@ -1237,10 +1237,11 @@ function matchupCard(me, opp) {
   c.fillText(location.host, W / 2, H - 62);
   sharePicture(cv, `week-${L.week}-matchup.png`, `${me.name} ${fmt(me.points)} \u2013 ${fmt(opp.points)} ${opp.name}, live in the ${L.name} stadium \u{1F3DF}\uFE0F`);
 }
+const bubbleUp = () => !!(window.__bubbleUp && window.__bubbleUp());
 function drillTeaser() {
   if (window.__tv) return;
   const sc = game && game.scene.getScene("stadium");
-  if (document.querySelector(".td-banner") || $("panel").hidden === false || sc && Date.now() - (sc.lastBannerAt || 0) < 1e4) {
+  if (bubbleUp() || document.querySelector(".td-banner") || $("panel").hidden === false || sc && Date.now() - (sc.lastBannerAt || 0) < 1e4) {
     setTimeout(drillTeaser, 5e3);
     return;
   }
@@ -1274,7 +1275,7 @@ async function weekDigest() {
   }
   const PO = await playoffOdds().catch(() => null), odds = PO && PO.odds ? PO.odds[me.roster_id] : null;
   const now = { week: Number(L.week), rid: me.roster_id, w: me.wins, l: me.losses, rank: rank(me), odds };
-  if (document.getElementById("recap-ready")) return;
+  if (document.getElementById("recap-ready") || bubbleUp()) return;
   store(k, JSON.stringify(now));
   if (!snap || snap.rid !== me.roster_id || snap.week >= now.week) return;
   const opp = L.teams.find((t) => t.matchup_id && t.matchup_id === me.matchup_id && t !== me);
@@ -1301,6 +1302,10 @@ function recapReady() {
   if (window.__tv) return;
   const G = Object.values(L.games || {}), k = `st-recap-${L.id}-${L.week}`;
   if (document.getElementById("recap-ready")) return;
+  if (bubbleUp()) {
+    setTimeout(recapReady, 6e3);
+    return;
+  }
   if (!G.length || G.some((s) => s !== "complete") || store(k) || game && game.scene.isActive("minigame")) return;
   store(k, "1");
   const b = el(

@@ -1157,6 +1157,12 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
       this.tweens.add({ targets: c, scaleX: 0.15, duration: 140 + Math.random() * 120, yoyo: true, repeat: 5 });
     }
   }
+  label(x, y, text, color) {
+    return super.label(x, y, text, color).setFontFamily('"Segoe UI", "Helvetica Neue", Arial, sans-serif').setFontStyle("bold");
+  }
+  bubble(x, y, text) {
+    return super.bubble(x, y, text).setFontFamily('"Segoe UI", "Helvetica Neue", Arial, sans-serif').setFontStyle("bold");
+  }
   makeFootballer() {
     const me = this.league.teams.find((t) => t.mine), kit = kitOf(me);
     const C = kit ? { K: kit[0], KL: kit[3], GOLD: kit[1], GL: kit[5], PUR: kit[2], PL: kit[3], PD: kit[4], WH: kit[6], WD: kit[6] === "#f4f1ea" ? "#cfcac0" : kit[6] } : {};
