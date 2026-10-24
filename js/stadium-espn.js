@@ -26,7 +26,11 @@ async function espnLeague(id, season) {
       proj[pid] = stat(p, 1, 1, week) || 0;
       pts[pid] = stat(p, 0, 1, week) || 0;
     }
-    const starters = entries.filter((e) => e.lineupSlotId !== 20 && e.lineupSlotId !== 21).sort((a, b) => ORDER.indexOf(a.lineupSlotId) - ORDER.indexOf(b.lineupSlotId)).map((e) => `e${e.playerId}`);
+    const lc = ((d.settings || {}).rosterSettings || {}).lineupSlotCounts || {};
+    const starters = ORDER.flatMap((k) => {
+      const got = entries.filter((e) => e.lineupSlotId === k).map((e) => `e${e.playerId}`);
+      return Array.from({ length: lc[k] || 0 }, (_, i) => got[i] || "0");
+    });
     const w = where[t.id] || {};
     return {
       roster_id: t.id,

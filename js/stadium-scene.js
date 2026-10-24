@@ -5,6 +5,7 @@ import { el, openPanel } from "./panel.js";
 import { drivePlayer, setupTouch } from "./touch.js";
 import { sfx } from "./sfx.js";
 import { World } from "./world.js";
+import { isMascot, mascotFur, mascotHead } from "./stadium-mascots.js";
 let ROW = 5;
 const sweatActive = (L) => {
   if (/[?&]sweat=1/.test(location.search)) return true;
@@ -74,7 +75,7 @@ class StadiumScene extends World {
   preload() {
     preloadArt(this, true);
     preloadDecor(this, true);
-    for (const t of this.league.teams) if (!["Dumpster", "Steeler", "Raven", "Shorty"].includes(t.look) && !/^FB\d+$/.test(t.look) && !this.textures.exists(`a-ch-${t.look}`)) this.load.image(`a-ch-${t.look}`, `assets/chars/${t.look}.png`);
+    for (const t of this.league.teams) if (!["Dumpster", "Steeler", "Raven", "Shorty"].includes(t.look) && !/^FB\d+$/.test(t.look) && !isMascot(t.look) && !this.textures.exists(`a-ch-${t.look}`)) this.load.image(`a-ch-${t.look}`, `assets/chars/${t.look}.png`);
   }
   create() {
     this.uiTexts = [];
@@ -85,6 +86,7 @@ class StadiumScene extends World {
     this.tdQueue = [];
     this.nudging = false;
     this.prevOdds = {};
+    document.querySelectorAll(".td-banner").forEach((x) => x.remove());
     makeTextures(this);
     makeDecorTextures(this);
     this.makeFootballer();
@@ -133,7 +135,7 @@ class StadiumScene extends World {
     fitZoom();
     this.scale.on("resize", fitZoom);
     this.events.once("shutdown", () => this.scale.off("resize", fitZoom));
-    this.keys = this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT");
+    this.keys = this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT", false);
     this.input.keyboard.on("keydown-SPACE", () => this.jump());
     this.input.keyboard.on("keydown-E", () => {
       if (!panelOpen && this.near) this.near.open();
@@ -823,6 +825,7 @@ class StadiumScene extends World {
     this.makeRaven();
     this.makeShorty();
     for (const t of this.league.teams) if (/^FB\d+$/.test(t.look)) this.makeTeamFootballer(t.look);
+    for (const t of this.league.teams) t.sheet = isMascot(t.look) ? this.makeTeamFootballer(`FB${t.roster_id * 5 % 12}`, t.look) : t.look;
     const L = this.league, T = TILE, pairs = [...L.pairs].sort((a, b) => (b.some((t) => t.mine) ? 1 : 0) - (a.some((t) => t.mine) ? 1 : 0));
     const mid = (FIELD.x0 + FIELD.x1 + 1) / 2 * T, half = Math.min((FIELD.x1 - FIELD.x0 - 4) / 2, 7) * T, xs = [mid - half, mid + half];
     this.boards = [];
@@ -832,7 +835,7 @@ class StadiumScene extends World {
       const y = (FIELD.y0 + 7 + row * ROW) * T;
       pair.forEach((t, side) => {
         const x = xs[side], key = `team-${t.roster_id}-`;
-        this.makeChar(key, t.look);
+        this.makeChar(key, t.sheet || t.look);
         const s = this.add.sprite(x, y, `${key}${side === 0 ? "right" : "left"}0`).setOrigin(0.5, 1).setDepth(y).setScale(1.5);
         if (t.gold) {
           s.setTint(16769126, 16769126, 16756736, 16756736);
@@ -876,7 +879,7 @@ class StadiumScene extends World {
   refreshScores() {
     for (const { tag, t } of this.teamSprites.values()) {
       const opp = this.league.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o.roster_id !== t.roster_id);
-      const nm = t.name.length > 22 ? `${t.name.slice(0, 21)}\u2026` : t.name, len = nm.length + (t.mine ? 2 : 0);
+      const ch = [...t.name], nm = ch.length > 22 ? `${ch.slice(0, 21).join("")}\u2026` : t.name, len = [...nm].length + (t.mine ? 2 : 0);
       tag.setFontSize(Math.round((len <= 13 ? 18 : len <= 17 ? 15 : 13) * DPR));
       tag.setText(`${t.mine ? "\u{1F451} " : ""}${t.gold ? "\u{1F3C6} " : ""}${nm}`).setColor(t.mine ? "#ffe08a" : opp && t.points > opp.points ? "#b9f5a8" : "#fff4d6");
     }
@@ -932,7 +935,7 @@ class StadiumScene extends World {
       const td = this.tdQueue.find((x) => x.rid != null && (x.rid === a.roster_id || x.rid === b.roster_id));
       if (td) {
         td.sub += `
-${fav.name} now ${now}% (was ${before}%)`;
+${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${before}%)`;
         if (td.el) td.el.querySelector("span").textContent = td.sub;
         continue;
       }
@@ -1153,11 +1156,11 @@ ${fav.name} now ${now}% (was ${before}%)`;
     put("player1", draw("down", 2));
     put("playeritem", draw("down", 0, "item"));
   }
-  makeTeamFootballer(look) {
-    const key = `a-ch-${look}`;
-    if (this.textures.exists(key)) return;
+  makeTeamFootballer(look, mascot) {
+    const name = mascot ? `${mascot}-${look}` : look, key = `a-ch-${name}`;
+    if (this.textures.exists(key)) return name;
     const [H, HS, J, JL, JD, N, PA] = FB_KITS[(Number(look.slice(2)) || 0) % FB_KITS.length];
-    const C = { K: H, KL: JL, GOLD: HS, GL: N, PUR: J, PL: JL, PD: JD, WH: PA, WD: PA === "#f4f1ea" ? "#cfcac0" : PA };
+    const C = { K: H, KL: JL, GOLD: HS, GL: N, PUR: J, PL: JL, PD: JD, WH: PA, WD: PA === "#f4f1ea" ? "#cfcac0" : PA, head: mascot };
     const ct = this.textures.createCanvas(key, 64, 112), c = ct.getContext();
     const put = (ox, oy, grid) => grid.forEach((rw, y) => rw.forEach((col, x) => {
       if (col) {
@@ -1171,10 +1174,11 @@ ${fav.name} now ${now}% (was ${before}%)`;
     });
     put(16, 96, this.footballerGrid("down", 0, "item", C));
     ct.refresh();
+    return name;
   }
   footballerGrid(dir, f, pose, C) {
-    const { K = "#141018", KL = "#33293f", GOLD = "#c9a227", GL = "#ffd84a", PUR = "#3b2390", PL = "#5a3dbd", PD = "#241773", WH = "#f4f1ea", WD = "#cfcac0" } = C;
-    const SK = "#c98d68", MASK = "#9aa1aa", BALL = "#8a4a22", CLEAT = "#141018";
+    const { K = "#141018", KL = "#33293f", GOLD = "#c9a227", GL = "#ffd84a", PUR = "#3b2390", PL = "#5a3dbd", PD = "#241773", WH = "#f4f1ea", WD = "#cfcac0", head } = C;
+    const SK = head ? mascotFur(head) : "#c98d68", MASK = "#9aa1aa", BALL = "#8a4a22", CLEAT = "#141018";
     {
       const g = [...Array(16)].map(() => Array(16).fill(null)), px = (x, y, col) => {
         if (x >= 0 && x < 16 && y >= 0 && y < 16) g[y][x] = col;
@@ -1239,39 +1243,44 @@ ${fav.name} now ${now}% (was ${before}%)`;
         rect(12, jy + 2, 2, 2, BALL);
       }
       const hy = 1 + bob;
-      rect(4, hy, 8, 7, K);
-      rect(5, hy, 6, 1, KL);
-      px(4, hy, null);
-      px(11, hy, null);
-      rect(7, hy, 2, side ? 4 : dir === "up" ? 7 : 3, GOLD);
-      px(5, hy + 1, shade(K, 0.65));
-      px(5, hy + 2, shade(K, 0.35));
-      px(6, hy + 1, shade(K, 0.35));
-      if (side) rect(4, hy + 6, 5, 1, shade(K, -0.4));
+      if (head) mascotHead(head, dir, K, GOLD).forEach((rw, y) => rw.forEach((col, x) => {
+        if (col) px(2 + x, bob + y, col);
+      }));
       else {
-        rect(11, hy + 1, 1, 5, shade(K, -0.35));
-        px(4, hy + 6, shade(K, -0.35));
-        px(11, hy + 6, shade(K, -0.35));
-      }
-      if (dir === "up") {
-        rect(4, hy + 6, 8, 1, shade(K, -0.35));
-        px(7, hy + 6, GOLD);
-        px(8, hy + 6, GOLD);
-      }
-      if (dir === "down") {
-        rect(5, hy + 3, 6, 3, SK);
-        px(6, hy + 4, CLEAT);
-        px(9, hy + 4, CLEAT);
-        rect(5, hy + 5, 6, 1, MASK);
-        rect(7, hy + 3, 1, 3, MASK);
-        rect(5, hy + 6, 6, 1, MASK);
-      } else if (side) {
-        rect(9, hy + 3, 3, 3, SK);
-        px(10, hy + 4, CLEAT);
-        rect(11, hy + 3, 2, 1, MASK);
-        rect(12, hy + 3, 1, 4, MASK);
-        rect(10, hy + 6, 3, 1, MASK);
-        px(6, hy + 4, PUR);
+        rect(4, hy, 8, 7, K);
+        rect(5, hy, 6, 1, KL);
+        px(4, hy, null);
+        px(11, hy, null);
+        rect(7, hy, 2, side ? 4 : dir === "up" ? 7 : 3, GOLD);
+        px(5, hy + 1, shade(K, 0.65));
+        px(5, hy + 2, shade(K, 0.35));
+        px(6, hy + 1, shade(K, 0.35));
+        if (side) rect(4, hy + 6, 5, 1, shade(K, -0.4));
+        else {
+          rect(11, hy + 1, 1, 5, shade(K, -0.35));
+          px(4, hy + 6, shade(K, -0.35));
+          px(11, hy + 6, shade(K, -0.35));
+        }
+        if (dir === "up") {
+          rect(4, hy + 6, 8, 1, shade(K, -0.35));
+          px(7, hy + 6, GOLD);
+          px(8, hy + 6, GOLD);
+        }
+        if (dir === "down") {
+          rect(5, hy + 3, 6, 3, SK);
+          px(6, hy + 4, CLEAT);
+          px(9, hy + 4, CLEAT);
+          rect(5, hy + 5, 6, 1, MASK);
+          rect(7, hy + 3, 1, 3, MASK);
+          rect(5, hy + 6, 6, 1, MASK);
+        } else if (side) {
+          rect(9, hy + 3, 3, 3, SK);
+          px(10, hy + 4, CLEAT);
+          rect(11, hy + 3, 2, 1, MASK);
+          rect(12, hy + 3, 1, 4, MASK);
+          rect(10, hy + 6, 3, 1, MASK);
+          px(6, hy + 4, PUR);
+        }
       }
       const out = g.map((rw) => rw.slice());
       for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (!g[y][x] && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => g[y + dy] && g[y + dy][x + dx] && g[y + dy][x + dx] !== "#1d140c")) out[y][x] = "#1d140c";

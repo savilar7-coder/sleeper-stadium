@@ -2,6 +2,7 @@ import { $, DPR } from "./core.js";
 import { closePanel, el, openPanel } from "./panel.js";
 import { sfx } from "./sfx.js";
 import { espnLeague, isEspn } from "./stadium-espn.js";
+import { MASCOT_LOOKS, isMascot, mascotFace } from "./stadium-mascots.js";
 window.__calm = /[?&]calm=1/.test(location.search) || !/[?&]calm=0/.test(location.search) && matchMedia("(prefers-reduced-motion: reduce)").matches;
 if (window.__calm) document.body.classList.add("calm");
 window.__tv = /[?&]tv=1/.test(location.search);
@@ -94,7 +95,11 @@ async function loadEspn(leagueId) {
   const state = await get(`${API}/state/nfl`), season = state.league_season || state.season;
   const [lg, sched, blimpFile] = await Promise.all([espnLeague(leagueId, season), get(`${SCHEDULE}/${season}`).catch(() => null), get("stadium-blimp.json").catch(() => null)]);
   LOOKS = (await scenes)[0].LOOKS;
-  const local = JSON.parse(store("st-looks") || "{}");
+  let local = {};
+  try {
+    local = JSON.parse(store("st-looks") || "{}") || {};
+  } catch {
+  }
   for (const t of lg.teams) {
     t.projPre = t.proj = t.starters.reduce((n, pid) => n + (lg.proj[pid] || 0), 0);
     t.look = local[t.roster_id] || guessLook(t);
@@ -193,7 +198,11 @@ async function load(leagueId) {
     };
   });
   for (const t of teams) t.projPre = t.proj = t.starters.reduce((n, pid) => n + (proj[pid] || 0), 0);
-  const local = JSON.parse(store("st-looks") || "{}");
+  let local = {};
+  try {
+    local = JSON.parse(store("st-looks") || "{}") || {};
+  } catch {
+  }
   const okLook = (v) => ALL_LOOKS.includes(v) || ["Raven", "Dumpster", "Steeler", "Shorty"].includes(v) || /^FB\d+$/.test(v);
   const urlLooks = Object.fromEntries((new URLSearchParams(location.search).get("looks") || "").split(",").map((p) => p.split(".")).filter((p) => p.length === 2 && /^\d+$/.test(p[0]) && okLook(p[1])));
   for (const t of teams) t.look = urlLooks[t.roster_id] || local[t.roster_id] || picked[t.roster_id] || guessLook(t);
@@ -515,6 +524,7 @@ function guessLook(t) {
   return m ? m[1] : LOOKS[t.roster_id * 7 % LOOKS.length];
 }
 const ALL_LOOKS = [
+  ...MASCOT_LOOKS,
   "Boy",
   "CamouflageGreen",
   "CamouflageRed",
@@ -586,7 +596,7 @@ function lookPicker(rid) {
   openPanel(`\u{1F3AD} Look for ${t.name}`, async () => [
     el("p", { class: "small" }, "Pick a character. Saved for the whole league when you are on the village (commissioner); otherwise only on this phone."),
     el("div", { class: "looks" }, ALL_LOOKS.map((look) => {
-      const b = el("button", { type: "button", class: `look${look === t.look ? " on" : ""}`, title: look }, el("span", { class: "look-face", style: `background-image:url(assets/chars/${look}.png)` }));
+      const b = el("button", { type: "button", class: `look${look === t.look ? " on" : ""}`, title: look }, el("span", { class: "look-face", style: isMascot(look) ? `background-image:url(${mascotFace(look)});background-size:48px 48px` : `background-image:url(assets/chars/${look}.png)` }));
       b.onclick = async () => {
         t.look = look;
         let shared = false;
@@ -596,7 +606,11 @@ function lookPicker(rid) {
         } catch {
         }
         if (!shared) {
-          const mine2 = JSON.parse(store("st-looks") || "{}");
+          let mine2 = {};
+          try {
+            mine2 = JSON.parse(store("st-looks") || "{}") || {};
+          } catch {
+          }
           mine2[rid] = look;
           store("st-looks", JSON.stringify(mine2));
         }
@@ -642,6 +656,7 @@ function pastWeeks() {
   if (!L.pastWeeks) {
     const weeks = [];
     for (let w = 1; w < Number(L.week); w++) weeks.push(w);
+    if (L.espn) weeks.splice(0, weeks.length, ...Object.keys(L.past || {}).map(Number).sort((a, b) => a - b));
     L.pastWeeks = (L.espn ? Promise.resolve(weeks.map((w) => L.past[w] || [])) : Promise.all(weeks.map((w) => get(`${API}/league/${L.id}/matchups/${w}`).catch(() => [])))).then((all) => ({ weeks, all }));
   }
   return L.pastWeeks;
@@ -733,7 +748,8 @@ async function playoffOdds() {
     if (m.matchup_id) (g[m.matchup_id] = g[m.matchup_id] || []).push(m.roster_id);
     return g;
   }, {})).filter((p) => p.length === 2));
-  if (L.teams.every((t) => t.wins + t.losses + t.ties >= Number(L.week))) games[0] = [];
+  const med = !!(L.settings && L.settings.league_average_match), per = med ? 2 : 1;
+  if (L.teams.every((t) => t.wins + t.losses + t.ties >= Number(L.week) * per)) games[0] = [];
   if (games.length > 1 && games.slice(1).every((g) => !g.length)) return null;
   let seed = [...`${L.id}|${L.week}|${L.teams.map((t) => t.points.toFixed(1)).join(",")}`].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
   const rnd = () => {
@@ -758,6 +774,7 @@ async function playoffOdds() {
       pf[t.roster_id] = t.fpts;
     }
     games.forEach((gs, i) => {
+      const wk = {};
       for (const [a, b] of gs) {
         const sc = (rid) => {
           const t = L.teams.find((x2) => x2.roster_id === rid), st = stat[rid];
@@ -765,10 +782,18 @@ async function playoffOdds() {
           return i === 0 && t && t.proj > 0 ? t.points + Math.max(0, t.proj - t.points) * (x / Math.max(1, st.mu)) : x;
         };
         const sa = sc(a), sb = sc(b);
+        wk[a] = sa;
+        wk[b] = sb;
         pf[a] += sa;
         pf[b] += sb;
         if (sa > sb || sa === sb && rnd() < 0.5) w[a]++;
         else w[b]++;
+      }
+      if (med) {
+        const r = Object.keys(wk).sort((x, y) => wk[y] - wk[x]);
+        r.slice(0, Math.floor(r.length / 2)).forEach((rid) => {
+          w[rid]++;
+        });
       }
     });
     L.teams.map((t) => t.roster_id).sort((x, y) => w[y] - w[x] || pf[y] - pf[x]).slice(0, po).forEach((rid) => {
@@ -829,7 +854,7 @@ function standings() {
     return [
       el(
         "table",
-        {},
+        { class: "standings" },
         el("tr", {}, el("th", {}, "#"), el("th", {}, "Team"), el("th", { style: "white-space:nowrap" }, "W-L"), el("th", { class: "num" }, "PF"), el("th", { class: "num" }, "PA"), pod ? el("th", { class: "num" }, "Playoffs") : null),
         rows.map((t, i) => [
           el(
@@ -1058,7 +1083,17 @@ function shareOffer(me, partner, give, get_, a, b) {
     el("a", { href: URL.createObjectURL(blob), download: "trade-offer.png" }).click();
   });
 }
-const stadiumLink = () => `${location.host}${location.pathname.replace(/index\.html$/, "")}${L.id && !/dynasty-stadium/.test(location.host) && !/[?&]sample=1/.test(location.search) ? `?league=${L.id}` : ""}`;
+const passParams = () => {
+  const q2 = new URLSearchParams(location.search), out = [];
+  for (const k of ["blimp", "looks", "gold"]) if (q2.get(k)) out.push(`${k}=${encodeURIComponent(q2.get(k))}`);
+  return out;
+};
+const stadiumLink = () => {
+  const base = `${location.host}${location.pathname.replace(/index\.html$/, "")}`;
+  if (/[?&]sample=1/.test(location.search)) return base;
+  const q2 = [...L.id && !/dynasty-stadium/.test(location.host) ? [`league=${L.id}`] : [], ...passParams()];
+  return q2.length ? `${base}?${q2.join("&")}` : base;
+};
 function toast(text) {
   document.querySelectorAll(".st-toast").forEach((x) => x.remove());
   const t = el("div", { class: "st-toast" }, text);
@@ -1073,8 +1108,8 @@ function sharePicture(cv, name, title) {
         await navigator.share({ files: [file], title, text: `${title} \xB7 https://${stadiumLink()}` });
         return;
       }
-    } catch {
-      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
     }
     el("a", { href: URL.createObjectURL(blob), download: name }).click();
     let copied = false;
@@ -1473,13 +1508,16 @@ function liveProj(t) {
 function updateProj() {
   for (const t of L.teams) t.proj = liveProj(t);
 }
+let refreshN = 0;
 async function refreshPoints() {
   if (!L || document.hidden && !window.__tv) return;
+  const n = ++refreshN;
   try {
     const fresh = L.espn ? (await espnLeague(L.id, L.season)).teams : await get(`${API}/league/${L.id}/matchups/${L.week}`);
+    if (n !== refreshN) return;
     for (const x of fresh) {
       const t = L.teams.find((y) => y.roster_id === x.roster_id);
-      if (t) Object.assign(t, { points: x.points || 0, starters_points: x.starters_points || [], players_points: x.players_points || {} });
+      if (t) Object.assign(t, { starters: x.starters || t.starters, points: x.points || 0, starters_points: x.starters_points || [], players_points: x.players_points || {} });
     }
     await gameStatus();
     updateProj();
@@ -1725,7 +1763,9 @@ function askLeague(note) {
     if (m) teamPanel(m.roster_id);
     else whoAreYou();
   });
-  if (!mine() && !navigator.webdriver) setTimeout(whoAreYou, 600);
+  if (!mine() && !navigator.webdriver) setTimeout(() => {
+    if ($("panel").hidden && !playAfterPick && !mine()) whoAreYou();
+  }, 600);
   setInterval(refreshPoints, 6e4);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) refreshPoints();

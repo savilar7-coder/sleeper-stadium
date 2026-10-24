@@ -52,9 +52,10 @@ class MiniGameScene extends Phaser.Scene {
     this.done = data.onExit;
   }
   create() {
-    this.W = this.scale.width / DPR;
-    this.H = this.scale.height / DPR;
-    this.cameras.main.setZoom(DPR).setBackgroundColor("#2b5c2a").setBounds(0, -140 * YPX, this.W, 168 * YPX);
+    this.Z = Phaser.Math.Clamp(this.scale.height / this.scale.width / 1.6, 1, 1.3);
+    this.W = this.scale.width / (DPR * this.Z);
+    this.H = this.scale.height / (DPR * this.Z);
+    this.cameras.main.setZoom(DPR * this.Z).setBackgroundColor("#2b5c2a").setBounds(0, -140 * YPX, this.W, 168 * YPX);
     this.drawField();
     this.T = { ...TUNE, ...window.__mgTune || {} };
     this.runoff = { ...RUNOFF, inc: this.T.incRunoff };
@@ -152,13 +153,13 @@ class MiniGameScene extends Phaser.Scene {
       g.fillRect(0, -y * YPX - 1, W, 2);
       const n = y <= 50 ? y : 100 - y;
       if (n) {
-        this.add.text(10, -y * YPX - 18, String(n), { fontFamily: NUM_FONT, fontStyle: "bold", fontSize: "14px", color: "#ffffff" }).setAlpha(0.6).setResolution(DPR);
+        this.add.text(10, -y * YPX - 18, String(n), { fontFamily: NUM_FONT, fontStyle: "bold", fontSize: "14px", color: "#ffffff" }).setAlpha(0.6).setResolution(DPR * this.Z);
       }
     }
     this.ezG = this.add.graphics().setDepth(-9);
     const big = { fontFamily: "Pixelify Sans", fontSize: "24px", fontStyle: "bold", color: "#ffffff", stroke: "#000000", strokeThickness: 3 };
-    this.ezTop = this.add.text(W / 2, -105 * YPX, "", big).setOrigin(0.5).setResolution(DPR).setDepth(-8);
-    this.ezBot = this.add.text(W / 2, 5 * YPX, "", big).setOrigin(0.5).setResolution(DPR).setDepth(-8);
+    this.ezTop = this.add.text(W / 2, -105 * YPX, "", big).setOrigin(0.5).setResolution(DPR * this.Z).setDepth(-8);
+    this.ezBot = this.add.text(W / 2, 5 * YPX, "", big).setOrigin(0.5).setResolution(DPR * this.Z).setDepth(-8);
     this.losLine = this.add.rectangle(W / 2, 0, W, 3, 7268351).setDepth(-5);
     this.firstLine = this.add.rectangle(W / 2, 0, W, 3, 16767050).setDepth(-5);
   }
@@ -229,7 +230,7 @@ class MiniGameScene extends Phaser.Scene {
           }
         } else s.setTint(14543103);
       }
-      const t = this.add.text(x, y - 44, label, { fontFamily: NUM_FONT, fontStyle: "bold", fontSize: "11px", color: "#fff", backgroundColor: "rgba(20,20,20,0.6)", padding: { x: 3, y: 1 } }).setOrigin(0.5, 1).setResolution(DPR).setDepth(9e3).setVisible(!!label);
+      const t = this.add.text(x, y - 44, label, { fontFamily: NUM_FONT, fontStyle: "bold", fontSize: "11px", color: "#fff", backgroundColor: "rgba(20,20,20,0.6)", padding: { x: 3, y: 1 } }).setOrigin(0.5, 1).setResolution(DPR * this.Z).setDepth(9e3).setVisible(!!label);
       this.objs.push(s, t);
       return { s, t, team, x, y, vx: 0, vy: 0 };
     };
@@ -239,7 +240,7 @@ class MiniGameScene extends Phaser.Scene {
     const routes = this.hail ? ROUTES.map(() => [[0, 100 - this.los + 6]]) : Phaser.Utils.Array.Shuffle(ROUTES.slice());
     const who = this.names(off), hot = Math.max(...who.map((n) => n.pts));
     this.recv = who.map((n, i) => {
-      const r = make(off, xs[i], y0, `${n.name}${n.pid ? ` ${n.proj ? "proj " : ""}${n.pts.toFixed(1)}` : ""}${hot > 0 && n.pts === hot ? " \u{1F525}" : ""}`, "up");
+      const r = make(off, xs[i], y0, `${n.name}${n.pid ? ` ${n.proj && this.W >= 400 ? "proj " : ""}${n.pts.toFixed(1)}` : ""}${hot > 0 && n.pts === hot ? " \u{1F525}" : ""}`, "up");
       r.name = n.name;
       r.pts = n.pts;
       const flip = xs[i] > W / 2 ? -1 : 1;
@@ -271,7 +272,7 @@ class MiniGameScene extends Phaser.Scene {
     }
     this.losLine.y = y0;
     this.firstLine.setAlpha(1).y = -(this.los + this.toGo) * YPX;
-    const hb = Math.ceil((this.hud.getBoundingClientRect().bottom || 0) + 4);
+    const hb = Math.ceil((this.hud.getBoundingClientRect().bottom || 0) / this.Z + 4);
     this.cameras.main.setBounds(0, -110 * YPX - hb, W, 138 * YPX + hb);
     this.cameras.main.centerOn(W / 2, y0 - this.H * 0.28);
     this.updateHud();
@@ -504,7 +505,7 @@ class MiniGameScene extends Phaser.Scene {
   }
   banner(txt, color) {
     const v = this.view(), cy = v.y - this.H * 0.12;
-    const b = this.add.text(v.x, cy - this.H * 0.4, txt, { fontFamily: "Pixelify Sans", fontSize: "40px", fontStyle: "bold", color, stroke: "#2b1d12", strokeThickness: 6 }).setOrigin(0.5).setResolution(DPR).setDepth(9900);
+    const b = this.add.text(v.x, cy - this.H * 0.4, txt, { fontFamily: "Pixelify Sans", fontSize: "40px", fontStyle: "bold", color, stroke: "#2b1d12", strokeThickness: 6 }).setOrigin(0.5).setResolution(DPR * this.Z).setDepth(9900);
     if (calm()) {
       b.y = cy;
       this.time.delayedCall(1450, () => b.destroy());

@@ -211,3 +211,19 @@ body.tv .td-banner { zoom: 1.5; }
 #mg-again { background: #b0561c; }
 .mu-team small { color: #5a4a33; }
 #gh-star { display: inline-flex; align-items: center; justify-content: center; } 
+
+#st-hud.mini #st-score { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#st-ticker { -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
+@media (max-width: 480px) { #st-hud.mini #st-score { font-size: 15px; } }
+#st-fold { font-size: 20px; line-height: 1; } 
+
+body:has(#panel:not([hidden])) #st-hud { visibility: hidden; }
+
+#panel-body td:last-child { white-space: nowrap; }
+
+@media (max-width: 440px) {
+  table.standings th:nth-child(5), table.standings td:nth-child(5) { display: none; }
+  table.standings td, table.standings th { padding: 4px 4px; }
+  table.standings td:nth-child(2) { overflow-wrap: anywhere; }
+  #st-score { font-size: clamp(14px, 4.2vw, 18px); }
+}
