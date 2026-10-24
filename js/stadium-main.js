@@ -152,7 +152,7 @@ async function load(leagueId) {
     get(`${API}/league/${leagueId}/matchups/${week}`),
     get(`${API}/league/${leagueId}/traded_picks`).catch(() => []),
     get(`${API}/league/${leagueId}/transactions/${week}`).catch(() => []),
-    get(`${API}/league/${leagueId}/transactions/${Math.max(1, week - 1)}`).catch(() => []),
+    week > 1 ? get(`${API}/league/${leagueId}/transactions/${week - 1}`).catch(() => []) : Promise.resolve([]),
     (window.__players || fetch("sleeper-players.json").then((r) => {
       if (!r.ok) throw new Error(r.status);
       return r.json();
@@ -210,6 +210,7 @@ async function load(leagueId) {
   const out = {
     id: leagueId,
     name: lg.name,
+    prevId: lg.previous_league_id,
     settings: lg.settings || {},
     season,
     week,
@@ -221,6 +222,7 @@ async function load(leagueId) {
     players,
     proj,
     picks,
+    claims: [...tx1, ...tx2].filter((x) => x.type === "waiver"),
     news: [...tx1, ...tx2].filter((x) => x.status === "complete").sort((a, b) => b.status_updated - a.status_updated),
     champs: champs || [],
     games: gamesOf(sched, week),
@@ -233,6 +235,7 @@ async function load(leagueId) {
   });
   if (proj0 === null) projP.then((pp) => {
     Object.assign(proj, pp);
+    out.poOdds = null;
     for (const t of out.teams) t.projPre = (t.starters || []).reduce((n, pid) => n + (pp[pid] || 0), 0);
     if (L === out) {
       updateProj();
@@ -466,6 +469,21 @@ function matchup(rid) {
       const won = h.filter((g) => g.a > g.b).length, lost = h.filter((g) => g.a < g.b).length;
       return el("p", { class: "small", style: "text-align:center;margin:6px 0" }, `This season: ${me.name} ${won}\u2013${lost} vs ${opp.name} \xB7 ${h.map((g) => `wk ${g.w}: ${fmt(g.a)}\u2013${fmt(g.b)}`).join(" \xB7 ")}`);
     })(),
+    !L.espn && L.prevId && L.prevId !== "0" && me.owner_id && opp.owner_id ? (() => {
+      const b = el("button", { type: "button", style: "display:block;margin:4px auto;border:1px dashed #9e7c0c;background:none;border-radius:8px;padding:4px 10px;font-weight:600;cursor:pointer" }, "\u{1F4DC} All-time record");
+      b.onclick = async () => {
+        b.disabled = true;
+        b.textContent = "Looking back\u2026";
+        try {
+          const g = await allTime(me, opp), w = g.filter((x) => x.a > x.b).length, l = g.filter((x) => x.a < x.b).length, yrs = [...new Set(g.map((x) => x.s))].sort();
+          const big = g.reduce((m, x) => x.a - x.b > (m ? m.a - m.b : 0) ? x : m, null);
+          b.replaceWith(el("p", { class: "small", style: "text-align:center;margin:4px 0;font-weight:700" }, g.length ? `All-time${yrs.length > 1 ? ` (${yrs[0]}\u2013${yrs[yrs.length - 1]})` : ""}: ${me.name} ${w}\u2013${l} vs ${opp.name}${big ? ` \xB7 biggest win ${fmt(big.a)}\u2013${fmt(big.b)} (${big.s})` : ""}` : "They have never played each other."));
+        } catch {
+          b.textContent = "Could not look back right now";
+        }
+      };
+      return b;
+    })() : null,
     el("div", { class: "mu-rows" }, rows),
     me.mine ? (() => {
       const b = el("button", { type: "button", class: "mu-play", style: "display:block;width:100%;margin:8px 0 0;min-height:44px;padding:10px;border-radius:10px;border:2px solid #1d140c;background:#2e7d32;color:#fff;font-weight:700;font-size:15px;cursor:pointer" }, "\u{1F3C8} Play this matchup \xB7 2-Minute Drill");
@@ -643,6 +661,48 @@ async function allPlay() {
     return { t, w: r.w, l: r.l, luck: t.wins - exp };
   }).filter((x) => x.w + x.l).sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l));
 }
+async function pastSeason(id) {
+  const k = `st-season-${id}`;
+  try {
+    const c = JSON.parse(store(k) || "null");
+    if (c) return c;
+  } catch {
+  }
+  const [lg, rosters] = await Promise.all([get(`${API}/league/${id}`), get(`${API}/league/${id}/rosters`)]);
+  const owner = Object.fromEntries((rosters || []).map((r) => [r.roster_id, r.owner_id]));
+  let holes = false;
+  const reg = (lg.settings && lg.settings.playoff_week_start || 15) - 1;
+  const weeks = await Promise.all(Array.from({ length: reg }, (_, i) => get(`${API}/league/${id}/matchups/${i + 1}`).catch(() => {
+    holes = true;
+    return [];
+  })));
+  const out = { season: lg.season, prev: lg.previous_league_id, games: [] };
+  weeks.forEach((ms, i) => {
+    const g = {};
+    for (const m of ms || []) if (m.matchup_id && m.points > 0) (g[m.matchup_id] = g[m.matchup_id] || []).push(m);
+    for (const pr of Object.values(g)) if (pr.length === 2) out.games.push([i + 1, owner[pr[0].roster_id], pr[0].points, owner[pr[1].roster_id], pr[1].points]);
+  });
+  if (lg.status === "complete" && !holes) store(k, JSON.stringify(out));
+  return out;
+}
+async function allTime(a, b) {
+  const games = (await headToHead(a, b)).map((g) => ({ s: L.season, a: g.a, b: g.b }));
+  let id = L.prevId;
+  for (let i = 0; id && id !== "0" && i < 3; i++) {
+    let ps;
+    try {
+      ps = await pastSeason(id);
+    } catch {
+      break;
+    }
+    for (const [, o1, p1, o2, p2] of ps.games) {
+      if (o1 === a.owner_id && o2 === b.owner_id) games.push({ s: ps.season, a: p1, b: p2 });
+      else if (o1 === b.owner_id && o2 === a.owner_id) games.push({ s: ps.season, a: p2, b: p1 });
+    }
+    id = ps.prev;
+  }
+  return games;
+}
 async function headToHead(a, b) {
   const { weeks, all } = await pastWeeks(), games = [];
   all.forEach((ms, i) => {
@@ -650,6 +710,81 @@ async function headToHead(a, b) {
     if (x && y && x.matchup_id && x.matchup_id === y.matchup_id && (x.points || y.points)) games.push({ w: weeks[i], a: x.points || 0, b: y.points || 0 });
   });
   return games.reverse();
+}
+async function playoffOdds() {
+  if (L.espn || L.preseason) return null;
+  if (L.poOdds) return L.poOdds;
+  const po = L.settings && L.settings.playoff_teams || 6, last = (L.settings && L.settings.playoff_week_start || 15) - 1;
+  if (Number(L.week) > last) return null;
+  const { all } = await pastWeeks(), scores = {};
+  for (const ms of all) for (const m of ms || []) if (m.points > 0) (scores[m.roster_id] = scores[m.roster_id] || []).push(m.points);
+  const stat = {};
+  for (const t of L.teams) {
+    const xs = scores[t.roster_id] || [], n = xs.length, mu = n ? xs.reduce((a, b) => a + b, 0) / n : 100;
+    stat[t.roster_id] = { mu, sd: n > 1 ? Math.max(12, Math.sqrt(xs.reduce((a, b) => a + (b - mu) ** 2, 0) / (n - 1))) : 20 };
+  }
+  const weeks = [];
+  for (let w = Number(L.week); w <= last; w++) weeks.push(w);
+  const sched = await Promise.all(weeks.map((w) => w === Number(L.week) ? Promise.resolve(L.teams.map((t) => ({ roster_id: t.roster_id, matchup_id: t.matchup_id, points: t.points }))) : get(`${API}/league/${L.id}/matchups/${w}`).catch(() => [])));
+  const games = sched.map((ms) => Object.values((ms || []).reduce((g, m) => {
+    if (m.matchup_id) (g[m.matchup_id] = g[m.matchup_id] || []).push(m.roster_id);
+    return g;
+  }, {})).filter((p) => p.length === 2));
+  if (L.teams.every((t) => t.wins + t.losses + t.ties >= Number(L.week))) games[0] = [];
+  if (games.length > 1 && games.slice(1).every((g) => !g.length)) return null;
+  let seed = [...`${L.id}|${L.week}|${L.teams.map((t) => t.points.toFixed(1)).join(",")}`].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+  const rnd = () => {
+    seed = seed + 1831565813 >>> 0;
+    let t = seed;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+  const gauss = () => {
+    let u = 0, v = 0;
+    while (!u) u = rnd();
+    while (!v) v = rnd();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  const N = 2e3, made = {};
+  for (const t of L.teams) made[t.roster_id] = 0;
+  for (let k = 0; k < N; k++) {
+    const w = {}, pf = {};
+    for (const t of L.teams) {
+      w[t.roster_id] = t.wins + t.ties / 2;
+      pf[t.roster_id] = t.fpts;
+    }
+    games.forEach((gs, i) => {
+      for (const [a, b] of gs) {
+        const sc = (rid) => {
+          const t = L.teams.find((x2) => x2.roster_id === rid), st = stat[rid];
+          const x = st.mu + st.sd * gauss();
+          return i === 0 && t && t.proj > 0 ? t.points + Math.max(0, t.proj - t.points) * (x / Math.max(1, st.mu)) : x;
+        };
+        const sa = sc(a), sb = sc(b);
+        pf[a] += sa;
+        pf[b] += sb;
+        if (sa > sb || sa === sb && rnd() < 0.5) w[a]++;
+        else w[b]++;
+      }
+    });
+    L.teams.map((t) => t.roster_id).sort((x, y) => w[y] - w[x] || pf[y] - pf[x]).slice(0, po).forEach((rid) => {
+      made[rid]++;
+    });
+  }
+  const odds = {};
+  for (const rid of Object.keys(made)) odds[rid] = made[rid] / N;
+  let prev = null;
+  try {
+    prev = JSON.parse(store(`st-po-${L.id}`) || "null");
+  } catch {
+  }
+  const before = prev && prev.week < Number(L.week) ? prev.odds : prev && prev.week === Number(L.week) ? prev.before : null;
+  try {
+    store(`st-po-${L.id}`, JSON.stringify({ week: Number(L.week), odds, before }));
+  } catch {
+  }
+  return L.poOdds = { odds, before };
 }
 async function trophies() {
   if (L.trophies) return L.trophies;
@@ -683,12 +818,16 @@ function standings() {
   const power = [...L.teams].sort((a, b) => b.fpts - a.fpts).map((t) => t.roster_id);
   const po = L.settings && L.settings.playoff_teams || 6, poWeek = L.settings && L.settings.playoff_week_start || 15;
   openPanel(`\u{1F3C6} ${L.name}`, async () => {
-    const tr = await trophies();
+    const tr = await trophies(), PO = await playoffOdds(), pod = PO && PO.odds;
+    const oddsCell = (t) => {
+      const o = pod[t.roster_id] || 0, was = PO.before && PO.before[t.roster_id], d = was != null ? Math.round((o - was) * 100) : 0;
+      return `${o >= 0.995 ? ">99" : o < 5e-3 ? "<1" : Math.round(o * 100)}%${d ? ` ${d > 0 ? "\u25B2" : "\u25BC"}${Math.abs(d)}` : ""}`;
+    };
     return [
       el(
         "table",
         {},
-        el("tr", {}, el("th", {}, "#"), el("th", {}, "Team"), el("th", {}, "W-L"), el("th", { class: "num" }, "PF"), el("th", { class: "num" }, "PA")),
+        el("tr", {}, el("th", {}, "#"), el("th", {}, "Team"), el("th", { style: "white-space:nowrap" }, "W-L"), el("th", { class: "num" }, "PF"), el("th", { class: "num" }, "PA"), pod ? el("th", { class: "num" }, "Playoffs") : null),
         rows.map((t, i) => [
           el(
             "tr",
@@ -697,12 +836,13 @@ function standings() {
             el("td", {}, `${t.mine ? "\u{1F451} " : ""}${t.name}`),
             el("td", {}, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}`),
             el("td", { class: "num" }, fmt(t.fpts)),
-            el("td", { class: "num" }, t.fpts_against != null ? fmt(t.fpts_against) : "\u2013")
+            el("td", { class: "num" }, t.fpts_against != null ? fmt(t.fpts_against) : "\u2013"),
+            pod ? el("td", { class: "num" }, oddsCell(t)) : null
           ),
-          i + 1 === po && i + 1 < rows.length ? el("tr", {}, el("td", { colspan: "5", style: "padding:1px 0;border-top:3px dashed #c9a227;font-size:11px;color:#9e7c0c;text-align:center" }, "\u2014 playoff line \u2014")) : null
+          i + 1 === po && i + 1 < rows.length ? el("tr", {}, el("td", { colspan: pod ? "6" : "5", style: "padding:1px 0;border-top:3px dashed #c9a227;font-size:11px;color:#9e7c0c;text-align:center" }, "\u2014 playoff line \u2014")) : null
         ])
       ),
-      el("p", { class: "small" }, `Top ${po} make the playoffs (from week ${poWeek}). PF / PA = points for / against.`),
+      el("p", { class: "small" }, `Top ${po} make the playoffs (from week ${poWeek}). PF / PA = points for / against.${pod && rows.some((t, i) => i >= po && rows.slice(0, po).some((u) => (pod[t.roster_id] || 0) > (pod[u.roster_id] || 0))) ? " A team below the line can have better odds: they weigh points scored and the schedule left, not only W-L." : ""}${pod ? " Playoffs = 2,000 simulated rest-of-seasons from this season's scores (\u25B2\u25BC vs last week)." : ""}`),
       await (async () => {
         const ap = await allPlay();
         if (!ap.length) return null;
@@ -726,7 +866,7 @@ function standings() {
 function news() {
   const name = (rid) => (L.teams.find((t) => t.roster_id === rid) || {}).name || `Team ${rid}`;
   const trades = L.news.filter((x) => x.type === "trade"), moves = L.news.filter((x) => x.type !== "trade");
-  const rows = [...trades, ...moves].slice(0, 40).map((x) => {
+  const rows = [...trades, ...moves].slice(0, 60).map((x) => {
     const adds = Object.entries(x.adds || {}), drops = Object.entries(x.drops || {});
     if (x.type === "trade") {
       const parts = (x.roster_ids || []).map((rid) => {
@@ -740,11 +880,34 @@ function news() {
     const what = [...adds.map(([pid]) => `+ ${pname(pid)}`), ...drops.map(([pid]) => `\u2212 ${pname(pid)}`)].join("  ");
     return el("div", { class: "need" }, el("b", {}, `${x.type === "waiver" ? "\u{1F4CB} Waiver" : "\u{1F193} Free agent"} \xB7 ${who}`), el("span", {}, what));
   });
-  openPanel("\u{1F4F0} League news", async () => [
-    L.news.length ? el("p", { class: "small" }, `${trades.length} trade${trades.length === 1 ? "" : "s"} \xB7 ${moves.length} waiver / free-agent move${moves.length === 1 ? "" : "s"} (last 2 weeks)`) : null,
-    rows.length ? el("div", { class: "needs" }, rows) : el("div", { class: "empty" }, L.espn ? "ESPN trades and waivers aren\u2019t shown here yet." : "Quiet week."),
-    el("p", { class: "small" }, `Weeks ${Math.max(1, L.week - 1)}\u2013${L.week}.`)
-  ]);
+  const won = (L.claims || []).filter((x) => x.status === "complete" && x.adds), lost = (L.claims || []).filter((x) => x.status === "failed" && x.adds);
+  const faab = won.some((x) => x.settings && x.settings.waiver_bid != null);
+  const board = won.map((x) => {
+    const pid = Object.keys(x.adds)[0], rid = x.adds[pid], by = {};
+    for (const f of lost) if (f.adds[pid] != null) {
+      const r = (f.roster_ids || [])[0];
+      if (r != null && r !== rid) by[r] = Math.max(by[r] || 0, (f.settings || {}).waiver_bid || 0);
+    }
+    const losers = Object.entries(by).map(([r, b]) => ({ rid: Number(r), bid: b })).sort((p, q2) => q2.bid - p.bid);
+    return { pid, rid, bid: (x.settings || {}).waiver_bid, losers };
+  }).sort((a, b) => (b.bid || 0) - (a.bid || 0) || b.losers.length - a.losers.length).filter((x) => faab ? x.bid > 0 : x.losers.length > 0).slice(0, 5);
+  const meRid = (mine() || {}).roster_id, budget = L.settings && L.settings.waiver_budget;
+  const waiverBoard = board.length ? [
+    el("h3", {}, faab ? `\u{1F4B0} Waiver board${budget ? ` (budget $${budget})` : ""}` : "\u{1F4CB} Contested waivers"),
+    el("div", { class: "needs" }, board.map((x) => el(
+      "div",
+      { class: `need${x.losers.some((l) => l.rid === meRid) ? " publish" : ""}` },
+      el("b", {}, `${faab ? `$${x.bid} ` : ""}${pname(x.pid)} \u2192 ${name(x.rid)}`),
+      el("span", {}, x.losers.length ? `beat ${x.losers.map((l) => `${l.rid === meRid ? "you" : name(l.rid)}${faab ? ` $${l.bid}` : ""}`).join(", ")}` : "no other claims")
+    )))
+  ] : null;
+  const shown = trades.length + 10, more = rows.length > shown ? rows.splice(shown) : [];
+  const moreBtn = more.length ? (() => {
+    const b = el("button", { type: "button", style: "display:block;margin:8px auto;border:1px dashed #9e7c0c;background:none;border-radius:8px;padding:4px 10px;font-weight:600;cursor:pointer" }, `Show all ${more.length + 10} moves`);
+    b.onclick = () => b.replaceWith(el("div", { class: "needs" }, more));
+    return b;
+  })() : null;
+  openPanel("\u{1F4F0} League news", async () => [waiverBoard, L.news.length ? el("p", { class: "small" }, `${trades.length} trade${trades.length === 1 ? "" : "s"} \xB7 ${moves.length} waiver / free-agent move${moves.length === 1 ? "" : "s"} (last 2 weeks)`) : null, rows.length ? el("div", { class: "needs" }, rows) : el("div", { class: "empty" }, L.espn ? "ESPN trades and waivers aren\u2019t shown here yet." : "Quiet week."), moreBtn]);
 }
 function tradeMaker(partnerId) {
   const me = mine();
@@ -978,9 +1141,43 @@ function drillTeaser() {
   document.body.appendChild(b);
   setTimeout(() => b.remove(), 12e3);
 }
+async function weekDigest() {
+  const me = mine();
+  if (!me || window.__tv || L.preseason) return;
+  const k = `st-snap-${L.id}`, rank = (t) => [...L.teams].sort((a, b2) => b2.wins - a.wins || b2.fpts - a.fpts).indexOf(t) + 1;
+  let snap = null;
+  try {
+    snap = JSON.parse(store(k) || "null");
+  } catch {
+  }
+  const PO = await playoffOdds().catch(() => null), odds = PO && PO.odds ? PO.odds[me.roster_id] : null;
+  const now = { week: Number(L.week), rid: me.roster_id, w: me.wins, l: me.losses, rank: rank(me), odds };
+  if (document.getElementById("recap-ready")) return;
+  store(k, JSON.stringify(now));
+  if (!snap || snap.rid !== me.roster_id || snap.week >= now.week) return;
+  const opp = L.teams.find((t) => t.matchup_id && t.matchup_id === me.matchup_id && t !== me);
+  const bits = [
+    `${snap.w}\u2013${snap.l} \u2192 ${now.w}\u2013${now.l}`,
+    snap.rank !== now.rank ? `${now.rank < snap.rank ? "up" : "down"} to ${now.rank}${["th", "st", "nd", "rd"][now.rank % 10 > 3 || [11, 12, 13].includes(now.rank % 100) ? 0 : now.rank % 10]}` : `still ${now.rank}${["th", "st", "nd", "rd"][now.rank % 10 > 3 || [11, 12, 13].includes(now.rank % 100) ? 0 : now.rank % 10]}`,
+    odds != null && snap.odds != null ? `playoffs ${Math.round(odds * 100)}% (${odds >= snap.odds ? "+" : "\u2212"}${Math.abs(Math.round((odds - snap.odds) * 100))} since wk ${snap.week})` : odds != null ? `playoffs ${Math.round(odds * 100)}%` : null,
+    opp ? `this week: ${opp.name}` : null
+  ].filter(Boolean);
+  const b = el(
+    "div",
+    { id: "recap-ready", style: "position:fixed;left:50%;top:150px;transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:10px;padding:10px 12px;font:600 14px/1.4 system-ui,sans-serif;box-shadow:0 4px 14px #0008" },
+    el("b", {}, `\u{1F4C5} Week ${now.week}, ${me.name}: `),
+    bits.join(" \xB7 "),
+    " ",
+    el("button", { type: "button", class: "rr-x", "aria-label": "Close", style: "margin-left:4px;border:0;background:none;color:#fff4d6;font-size:16px" }, "\xD7")
+  );
+  b.querySelector(".rr-x").onclick = () => b.remove();
+  document.body.appendChild(b);
+  setTimeout(() => b.remove(), 12e3);
+}
 function recapReady() {
   if (window.__tv) return;
   const G = Object.values(L.games || {}), k = `st-recap-${L.id}-${L.week}`;
+  if (document.getElementById("recap-ready")) return;
   if (!G.length || G.some((s) => s !== "complete") || store(k) || game && game.scene.isActive("minigame")) return;
   store(k, "1");
   const b = el(
@@ -1355,6 +1552,8 @@ function askLeague(note) {
   updateProj();
   hud();
   setTimeout(recapReady, 4e3);
+  setTimeout(() => weekDigest().catch(() => {
+  }), 2500);
   if (location.hash === "#drill") {
     history.replaceState(null, "", location.pathname + location.search);
     if (mine()) setTimeout(playWhenReady, 600);
