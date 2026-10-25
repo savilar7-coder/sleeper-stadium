@@ -289,4 +289,13 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
 }
 
 
+@media (max-width: 519px) {
+  #inj-btn { left: calc(max(10px, env(safe-area-inset-left)) + 230px); right: auto; padding: 0 10px; }
+  #inj-btn .inj-t { display: none; }
+  #gh-star[data-pass] { font-size: 0 !important; padding: 0 14px !important; }
+  #gh-star[data-pass]::before { content: "★ Perks"; font: 700 14px/1 "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+}
+@media (max-width: 380px) { #gh-star[data-pass] { min-width: 44px; padding: 0 !important; } #gh-star[data-pass]::before { content: "★"; font-size: 18px; } } 
+@media (max-width: 340px) { #share-btn { font-size: 0 !important; min-width: 48px; } #share-btn::before { content: "📸"; font-size: 18px; } #inj-btn { left: calc(max(10px, env(safe-area-inset-left)) + 196px); } } 
+
 #mg-hud.mg-bottom { top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); }

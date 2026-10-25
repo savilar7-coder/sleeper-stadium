@@ -176,7 +176,7 @@ function injBadge() {
   const b = $("inj-btn");
   if (!b) return;
   const seen = injViewed(), n = newInjuries().filter((h) => !seen.has(injKey(h))).length;
-  b.replaceChildren("\u{1F691} Injuries", n ? el("b", { class: "n" }, String(n)) : "");
+  b.replaceChildren("\u{1F691}", el("span", { class: "inj-t" }, " Injuries"), n ? el("b", { class: "n" }, String(n)) : "");
   b.classList.toggle("new", n > 0);
 }
 function injuriesBox() {
