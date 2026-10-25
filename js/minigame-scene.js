@@ -81,6 +81,7 @@ class MiniGameScene extends Phaser.Scene {
     this.tally = { picks: 0, sacks: 0, downs: 0, clock: 0 };
     this.hud = $("mg-hud");
     this.hud.hidden = false;
+    this.hud.classList.toggle("mg-bottom", /[?&]drillhud=bottom/.test(location.search));
     this.msg = $("mg-msg");
     $("mg-end").hidden = true;
     this.msg.hidden = false;
@@ -201,6 +202,7 @@ class MiniGameScene extends Phaser.Scene {
     this.firstPlay = true;
     this.updateHud();
     this.setupPlay();
+    this.banner(`${kind === "off" ? "YOUR BALL" : "DEFENSE"} ${this.di + 1}/${DRIVES.length}`, kind === "off" ? "#ffd84a" : "#93c5fd");
   }
   ptsOf(team, i, pid) {
     const got = (team.starters_points || [])[i] || 0, r = (x) => Math.round(x * 10) / 10;
@@ -299,9 +301,9 @@ class MiniGameScene extends Phaser.Scene {
     }
     this.losLine.y = y0;
     this.firstLine.setAlpha(1).y = -(this.los + this.toGo) * YPX;
-    const hb = Math.ceil((this.hud.getBoundingClientRect().bottom || 0) / this.Z + 4);
+    const hb = this.hud.classList.contains("mg-bottom") ? 4 : Math.ceil((this.hud.getBoundingClientRect().bottom || 0) / this.Z + 4);
     this.cameras.main.setBounds(0, -110 * YPX - hb, W, 138 * YPX + hb);
-    this.cameras.main.centerOn(W / 2, y0 - this.H * 0.28);
+    this.cameras.main.centerOn(W / 2, y0 - this.H * (this.hud.classList.contains("mg-bottom") ? 0.2 : 0.28));
     this.updateHud();
     if (this.hail) {
       this.banner("HAIL MARY", "#ffffff");

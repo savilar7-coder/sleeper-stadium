@@ -288,3 +288,5 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
   body.st-out .rail-row.mine { color: #ffe08a; } body.st-out .rail-cut { border-top: 2px dashed #c9a227; margin: 4px 0; font-size: 10px; color: #c9a227; text-align: center; }
 }
 
+
+#mg-hud.mg-bottom { top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); }
