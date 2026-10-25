@@ -299,7 +299,8 @@
 <script>
 (function () {
   var pnl = document.getElementById('panel'); if (!pnl || !window.MutationObserver) return;
-  var sync = function () { var open = !pnl.hidden; ['gh-star', 'share-lg', 'tip-pill'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.visibility = open ? 'hidden' : ''; }); };
+  // round 77 (tester on a laptop): Play closes the Matchup panel; that un-hid Star / Pass perks / Tip (and the footer) inside the drill
+  var sync = function () { var hud = document.getElementById('st-hud'), open = !pnl.hidden || !!(hud && hud.style.display === 'none'); /* the drill hides the top bar at once */ ['gh-star', 'share-lg', 'tip-pill'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.visibility = open ? 'hidden' : ''; }); };
   new MutationObserver(sync).observe(pnl, { attributes: true, attributeFilter: ['hidden'] }); sync();
 })();
 </script>

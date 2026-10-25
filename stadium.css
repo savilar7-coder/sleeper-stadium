@@ -247,3 +247,8 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
 }
 
 #jump-btn, #prompt, .hud-title, .panel-head h2, #panel-body h3, #hud-company b { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+
+#panel-close { border: 0; border-image: none; border-radius: 50%; background: rgba(43,29,18,0.08); color: #3b2a1a; font-size: 20px; line-height: 1; width: 44px; height: 44px; padding: 0; }
+#panel-close:hover, #panel-close:focus-visible { border-image: none; background: rgba(43,29,18,0.16); }
+#panel-close:active { border-image: none; background: rgba(43,29,18,0.24); color: #3b2a1a; }
+#panel:not([hidden]) ~ #tip, #panel:not([hidden]) ~ #nudge { display: none !important; }

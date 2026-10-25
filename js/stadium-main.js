@@ -1555,11 +1555,19 @@ function whoAreYou() {
         closePanel();
       };
       return b;
-    }))
+    })),
+    typeof askLeague === "function" ? (() => {
+      const b = el("button", { type: "button", class: "st-wide st-ghost" }, "Not in this league? Open yours");
+      b.onclick = () => {
+        location.href = `${location.pathname}?new=1`;
+      };
+      return b;
+    })() : null
   ]);
 }
 function setMine(rid) {
   store(`st-me-${L.id}`, String(rid));
+  if (!/[?&]sample=1/.test(location.search)) store("st-league-id", String(L.id));
   for (const t of L.teams) t.mine = t.roster_id === rid;
   hud();
   if (game) game.scene.getScene("stadium").scene.restart({ league: L });
@@ -1715,6 +1723,10 @@ function askLeague(note) {
   trust.style.cssText = "margin:6px auto 0;font:13px system-ui,sans-serif;color:#7a6a50;text-align:center";
   trust.innerHTML = '<b style="font-size:14px;color:#5a4a33">Sleeper @username or a public ESPN league link</b><br><span style="color:#5a4a33">Reads the same public data your leaguemates see \xB7 no login \xB7 free &amp; open source \xB7 not affiliated with Sleeper</span>';
   const go = (id) => {
+    try {
+      sessionStorage.setItem("st-own", "1");
+    } catch (x) {
+    }
     location.search = `?league=${id}`;
   };
   box.onsubmit = async (e) => {
@@ -1816,12 +1828,17 @@ function askLeague(note) {
   const fontReady = Promise.race([document.fonts.load('13px "Pixelify Sans"'), new Promise((r) => setTimeout(r, 2500))]);
   fontReady.catch(() => {
   });
-  const rawId = q.get("league") || store("st-league-id") || "", leagueId = /^espn-\d+$/.test(rawId) ? rawId : rawId.replace(/[^0-9]/g, "");
+  let own = "";
+  try {
+    own = sessionStorage.getItem("st-own") || "";
+  } catch (x) {
+  }
+  const rawId = q.get("league") || (q.get("new") ? "" : store("st-league-id")) || "", leagueId = /^espn-\d+$/.test(rawId) ? rawId : rawId.replace(/[^0-9]/g, "");
   if (!leagueId) {
     askLeague();
     return;
   }
-  if (!q.get("sample")) store("st-league-id", leagueId);
+  if (!q.get("sample") && (own || store("st-me-" + leagueId) || !q.get("league"))) store("st-league-id", leagueId);
   try {
     L = await load(leagueId);
   } catch (err) {
