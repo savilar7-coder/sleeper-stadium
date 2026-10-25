@@ -299,3 +299,6 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
 @media (max-width: 340px) { #share-btn { font-size: 0 !important; min-width: 48px; } #share-btn::before { content: "📸"; font-size: 18px; } #inj-btn { left: calc(max(10px, env(safe-area-inset-left)) + 196px); } } 
 
 #mg-hud.mg-bottom { top: auto; bottom: calc(12px + env(safe-area-inset-bottom)); }
+
+@keyframes mg-pop { 0% { transform: scale(1); } 35% { transform: scale(1.22); color: #b0561c; } 100% { transform: scale(1); } }
+#mg-score.mg-pop { animation: mg-pop 0.5s ease-out; }

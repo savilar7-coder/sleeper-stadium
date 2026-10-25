@@ -655,7 +655,15 @@ class MiniGameScene extends Phaser.Scene {
   }
   updateHud() {
     const ord = ["", "1st", "2nd", "3rd", "4th"][Math.min(4, this.down)] || "4th", c = Math.ceil(this.clock || 0);
-    $("mg-score").textContent = `${this.me.name} ${this.score.me} \u2013 ${this.score.opp} ${this.opp.name}`;
+    const sc = `${this.me.name} ${this.score.me} \u2013 ${this.score.opp} ${this.opp.name}`, se = $("mg-score");
+    if (se.textContent !== sc) {
+      se.textContent = sc;
+      if (this.score.me + this.score.opp > 0 && !calm()) {
+        se.classList.remove("mg-pop");
+        void se.offsetWidth;
+        se.classList.add("mg-pop");
+      }
+    }
     const t = this.state === "end" ? "Final" : this.los >= 100 ? `\u{1F389} Touchdown \xB7 drive ${this.di + 1}/${DRIVES.length}` : `\u23F1 ${Math.floor(c / 60)}:${String(c % 60).padStart(2, "0")} \xB7 ${this.kind === "off" ? "\u{1F3C8} Offense" : "\u{1F6E1} Defense"} \xB7 ${ord} & ${this.toGo >= 100 - this.los ? "goal" : this.toGo} \xB7 ${this.los <= 50 ? `own ${this.los}` : `opp ${100 - this.los}`} \xB7 drive ${this.di + 1}/${DRIVES.length}`;
     if (t !== this.hudTxt) {
       this.hudTxt = t;
@@ -734,8 +742,9 @@ class MiniGameScene extends Phaser.Scene {
     }
     const pg = this.pocketG;
     pg.clear();
-    if (this.state === "live" && this.kind === "off") {
-      const left = Phaser.Math.Clamp(1 - (time - this.t0) / (this.hail ? 5500 : this.T.sackMs), 0, 1), col = left > 0.5 ? 4906624 : left > 0.25 ? 16436245 : 15680580;
+    if (this.state === "live") {
+      const left = this.kind === "off" ? Phaser.Math.Clamp(1 - (time - this.t0) / (this.hail ? 5500 : this.T.sackMs), 0, 1) : Phaser.Math.Clamp((this.aiThrowAt - time) / Math.max(1, this.aiThrowAt - this.t0), 0, 1);
+      const col = this.kind === "def" ? 9684477 : left > 0.5 ? 4906624 : left > 0.25 ? 16436245 : 15680580;
       pg.lineStyle(4, 0, 0.35).strokeCircle(this.qb.s.x, this.qb.s.y - 18, 22);
       pg.lineStyle(4, col, 0.95).beginPath().arc(this.qb.s.x, this.qb.s.y - 18, 22, -Math.PI / 2, -Math.PI / 2 + left * Math.PI * 2, false).strokePath();
     }
