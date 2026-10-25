@@ -81,6 +81,18 @@ const sfx = (() => {
     },
     cheer() {
       [523, 659, 784, 1047, 1319].forEach((f, i) => note(f, i * 0.08, 0.4, "triangle", 0.08));
+    },
+    throwBall() {
+      noise(0, 0.18, 0.05);
+      note(330, 0, 0.12, "sine", 0.03);
+    },
+    catchBall() {
+      note(659, 0, 0.1, "square", 0.04);
+      note(988, 0.07, 0.16, "square", 0.04);
+    },
+    thud() {
+      note(110, 0, 0.12, "triangle", 0.08);
+      noise(0, 0.08, 0.04);
     }
   };
 })();

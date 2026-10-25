@@ -253,6 +253,14 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
 #panel-close:active { border-image: none; background: rgba(43,29,18,0.24); color: #3b2a1a; }
 #panel:not([hidden]) ~ #tip, #panel:not([hidden]) ~ #nudge { display: none !important; }
 
+#mg-hud { gap: 2px; padding: 6px 12px 7px; }
+#mg-score { font-size: 17px; line-height: 1.2; }
+#mg-down { font-size: 12.5px; color: #5a4a35; line-height: 1.2; }
+#mg-msg { font-size: 15px; line-height: 1.25; min-height: 19px; }
+#mg-hud .mg-btns { position: absolute; right: -10px; top: -8px; }
+#mg-hud:not(.mg-over) #mg-exit { width: 44px; min-width: 44px; height: 44px; padding: 0; border-radius: 22px; border-width: 3px; font-size: 18px; font-weight: 600; line-height: 1; white-space: nowrap; box-shadow: 0 2px 0 rgba(0,0,0,.35); color: #2b1d12; }
+#mg-hud:not(.mg-over) #mg-exit[data-armed="1"] { width: auto; padding: 0 12px; font-size: 14px; background: #ffe4b8; }
+
 .aw-row { padding: 8px 2px; border-bottom: 1px solid rgba(43,29,18,0.12); }
 .aw-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 14px; }
 .aw-n { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
