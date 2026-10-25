@@ -64,6 +64,8 @@ const lum = (hex) => {
   return 0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255);
 };
 const CELL = typeof location !== "undefined" && /[?&]art24=0/.test(location.search) ? 16 : 24;
+const SIDE_CARDS = typeof location === "undefined" || !/[?&]sidecards=0/.test(location.search);
+const sidewaysPhone = () => SIDE_CARDS && window.innerWidth < 1280 && window.innerWidth > window.innerHeight;
 const shade = (hex, f) => "#" + [1, 3, 5].map((i) => {
   const v = parseInt(hex.slice(i, i + 2), 16), t = f > 0 ? 255 : 0;
   return Math.round(v + (t - v) * Math.abs(f)).toString(16).padStart(2, "0");
@@ -266,15 +268,16 @@ class StadiumScene extends World {
     this.sideCards(z);
   }
   sideCards(z) {
-    const vw = window.innerWidth, on = vw < 1280 && vw > window.innerHeight && /[?&]sidecards=1/.test(location.search);
-    const field = (FIELD.x1 - FIELD.x0 + 3) * TILE * z, side = (vw - field) / 2 - 8, show = on && side >= 86;
+    const vw = window.innerWidth, on = sidewaysPhone();
+    const field = (FIELD.x1 - FIELD.x0 + 3) * TILE * z, side = (vw - field) / 2 - 24, show = on && side >= 120;
     document.body.classList.toggle("st-out", show);
     if (!show) return;
-    const hud = document.getElementById("st-hud"), jb = document.getElementById("jump-btn");
-    const top = (hud && hud.getClientRects().length ? hud.getBoundingClientRect().bottom : 0) + 8;
-    const bottom = jb && jb.getClientRects().length ? window.innerHeight - jb.getBoundingClientRect().top + 8 : 72;
+    const hud = document.getElementById("st-hud"), vis = (e) => e && e.getClientRects().length && getComputedStyle(e).visibility !== "hidden";
+    const top = (vis(hud) ? hud.getBoundingClientRect().bottom : 0) + 14;
+    const low = ["jump-btn", "share-btn", "gh-star", "pass-foot"].map((id) => document.getElementById(id)).filter(vis).map((e) => e.getBoundingClientRect().top);
+    const bottom = window.innerHeight - (low.length ? Math.min(...low) : window.innerHeight - 72) + 14;
     const st = document.body.style;
-    st.setProperty("--rail-w", `${Math.min(220, Math.floor(side))}px`);
+    st.setProperty("--rail-w", `${Math.min(210, Math.floor(side))}px`);
     st.setProperty("--rail-top", `${Math.round(top)}px`);
     st.setProperty("--rail-bottom", `${Math.round(bottom)}px`);
   }
@@ -1623,14 +1626,14 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
       if (rail && this.tradesCard) rail.append(this.tradesCard);
       tickText.style.animationDuration = `${Math.max(14, s.length * 0.16)}s`;
     } };
-    if (!L.espn && L.id && window.innerWidth >= 1280 && !window.__tv && !/[?&]sample=1/.test(location.search)) (async () => {
+    if (!L.espn && L.id && (window.innerWidth >= 1280 || sidewaysPhone()) && !window.__tv && !/[?&]sample=1/.test(location.search)) (async () => {
       const n = {}, weeks = [...Array(Math.max(1, L.week || 1)).keys()].map((i) => i + 1);
       const tx = (await Promise.all(weeks.map((w) => fetch(`https://api.sleeper.app/v1/league/${L.id}/transactions/${w}`).then((r) => r.ok ? r.json() : []).catch(() => [])))).flat();
       for (const x of tx) if (x && x.type === "trade" && x.status === "complete") for (const rid of x.roster_ids || []) n[rid] = (n[rid] || 0) + 1;
       const top = Object.entries(n).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([rid, c]) => [(L.teams.find((t) => t.roster_id === Number(rid)) || {}).name, c]).filter(([nm]) => nm);
       if (!top.length || !this.sys.isActive()) return;
       const d = document.createElement("div");
-      d.className = "rail-card";
+      d.className = "rail-card rail-trades";
       d.append(Object.assign(document.createElement("b"), { textContent: "\u{1F501} MOST TRADES" }), ...top.map(([nm, c]) => Object.assign(document.createElement("div"), { textContent: `${nm} \xB7 ${c}` })));
       this.tradesCard = d;
       const rail = document.getElementById("st-rail-r");

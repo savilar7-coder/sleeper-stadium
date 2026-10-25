@@ -241,7 +241,7 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
 
 @media (orientation: landscape) and (max-height: 500px) {
   #st-hud { padding-top: 4px !important; padding-bottom: 6px !important; }
-  #st-hud #st-league, #st-hud #st-proj { display: none; }
+  #st-hud #st-league, #st-hud #st-proj:not(:has(#lg-id)) { display: none; } 
   #st-hud #st-score { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0 0 4px; }
   #st-hud .st-btns button { min-height: 44px; padding: 4px 10px; font-size: 13px; } 
 }
@@ -259,12 +259,16 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
 .aw-who { margin-top: 2px; font-size: 14px; color: #5a4a33; overflow-wrap: anywhere; }
 
 @media (max-width: 1279px) {
-  body.st-out #st-rail-l, body.st-out #st-rail-r { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 6px; position: fixed; z-index: 3;
-    top: var(--rail-top, 120px); bottom: var(--rail-bottom, 72px); width: var(--rail-w, 100px); overflow: auto; overscroll-behavior: contain;
-    font: 600 11px/1.3 "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #fff4d6; }
-  body.st-out #st-rail-l { left: 6px; } body.st-out #st-rail-r { right: 6px; }
-  body.st-out .rail-card { background: rgba(16, 19, 24, 0.88); border: 1px solid #3a3f47; border-radius: 8px; padding: 6px 7px; overflow-wrap: anywhere; }
-  body.st-out .rail-card b { display: block; color: #ffd84a; margin-bottom: 2px; }
-  body.st-out .rail-row { display: flex; justify-content: space-between; gap: 4px; } body.st-out .rail-row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; } body.st-out .rail-row span:last-child { white-space: nowrap; flex-shrink: 0; }
-  body.st-out .rail-row.mine { color: #ffe08a; } body.st-out .rail-cut { border-top: 2px dashed #c9a227; margin: 3px 0; font-size: 10px; color: #c9a227; text-align: center; }
+  body.st-out #st-rail-l, body.st-out #st-rail-r { display: flex; flex-direction: column; gap: 12px; position: fixed; z-index: 3;
+    top: var(--rail-top, 120px); bottom: var(--rail-bottom, 72px); width: var(--rail-w, 160px); overflow: auto; overscroll-behavior: contain;
+    font: 600 11.5px/1.3 "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #fff4d6;
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent); padding-bottom: 18px; }
+  body.st-out #st-rail-l { left: 12px; } body.st-out #st-rail-r { right: 12px; }
+  body.st-out .rail-card { background: rgba(16, 19, 24, 0.82); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 8px 11px; flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); overflow-wrap: anywhere; }
+  body.st-out #st-rail-r .rail-card:nth-child(n+2):not(.rail-trades) { display: none; } 
+  body.st-out .rail-card b { display: block; color: #ffd84a; margin-bottom: 4px; font-size: 11px; letter-spacing: 0.04em; }
+  body.st-out .rail-row { display: flex; justify-content: space-between; gap: 6px; padding: 1px 0; } body.st-out .rail-row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; } body.st-out .rail-row span:last-child { white-space: nowrap; flex-shrink: 0; }
+  body.st-out .rail-row.mine { color: #ffe08a; } body.st-out .rail-cut { border-top: 2px dashed #c9a227; margin: 4px 0; font-size: 10px; color: #c9a227; text-align: center; }
 }
+

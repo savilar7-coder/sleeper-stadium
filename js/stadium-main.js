@@ -1418,8 +1418,9 @@ function awardsList() {
     return m;
   }, {})).filter((p) => p.length === 2 && p[0].points > 0 && p[1].points > 0);
   const live = pairs.flat();
-  if (!pairs.length) return [];
-  const top = [...live].sort((a, b) => b.points - a.points)[0], low = [...live].sort((a, b) => a.points - b.points)[0];
+  const scored = L.teams.filter((t) => t.points > 0);
+  if (!scored.length) return [];
+  const top = [...scored].sort((a, b) => b.points - a.points)[0], low = live.length ? [...live].sort((a, b) => a.points - b.points)[0] : null;
   const gap = (p) => Math.abs(p[0].points - p[1].points), byGap = [...pairs].sort((a, b) => gap(b) - gap(a));
   const over = (t) => (t.starters || []).every((pid) => {
     const st = (L.games || {})[L.players[pid] ? L.players[pid][2] : pid];
@@ -1432,9 +1433,9 @@ function awardsList() {
   }, {})).filter((p) => p.length === 2);
   const ass = [...all2].sort((a, b) => pct(a[0]) + pct(a[1]) - (pct(b[0]) + pct(b[1])) || a[0].fpts + a[1].fpts - (b[0].fpts + b[1].fpts))[0];
   const bench = (t) => Object.entries(t.players_points || {}).filter(([pid]) => !(t.starters || []).includes(pid)).reduce((n, [, v]) => n + (v || 0), 0);
-  const shame = [...live].sort((a, b) => bench(b) - bench(a))[0];
+  const shame = [...scored].sort((a, b) => bench(b) - bench(a))[0];
   let mvp = null;
-  for (const t of live) (t.starters || []).forEach((pid, i) => {
+  for (const t of scored) (t.starters || []).forEach((pid, i) => {
     const v = (t.starters_points || [])[i] || 0;
     if (pid && pid !== "0" && (!mvp || v > mvp.v)) mvp = { pid, v, t };
   });
@@ -1443,13 +1444,13 @@ function awardsList() {
   return [
     ["\u{1F525} Top score", top.name, fmt(top.points)],
     mvp && mvp.v > 0 ? ["\u2B50 MVP", `${pname(mvp.pid)} (${mvp.t.name})`, fmt(mvp.v)] : null,
-    ["\u{1F4A5} Biggest blowout", `${lead(blow)[0].name} over ${lead(blow)[1].name}`, `by ${fmt(gap(blow))}`],
-    ["\u{1F62C} Closest game", `${lead(close)[0].name} over ${lead(close)[1].name}`, `by ${fmt(gap(close))}`],
+    blow ? ["\u{1F4A5} Biggest blowout", `${lead(blow)[0].name} over ${lead(blow)[1].name}`, `by ${fmt(gap(blow))}`] : null,
+    close && close !== blow ? ["\u{1F62C} Closest game", `${lead(close)[0].name} over ${lead(close)[1].name}`, `by ${fmt(gap(close))}`] : null,
     unlucky ? ["\u{1F494} Unluckiest", unlucky[1].name, `lost \xB7 ${fmt(unlucky[1].points)}`] : null,
-    lucky && !lucky.includes(lead(blow)[0]) ? ["\u{1F340} Luckiest win", lucky[0].name, `won \xB7 ${fmt(lucky[0].points)}`] : null,
+    lucky && !(blow && lucky.includes(lead(blow)[0])) ? ["\u{1F340} Luckiest win", lucky[0].name, `won \xB7 ${fmt(lucky[0].points)}`] : null,
     ass && (ass[0].points || ass[1].points) ? ["\u{1F6BD} ASS Bowl", `${lead(ass)[0].name} vs ${lead(ass)[1].name}`, `${fmt(lead(ass)[0].points)} \u2013 ${fmt(lead(ass)[1].points)}`] : null,
     ["\u{1FA91} Bench of shame", shame.name, `${fmt(bench(shame))} on the bench`],
-    ["\u{1F327}\uFE0F Lowest score", low.name, fmt(low.points)]
+    low ? ["\u{1F327}\uFE0F Lowest score", low.name, fmt(low.points)] : null
   ].filter(Boolean);
 }
 function passPerks() {
