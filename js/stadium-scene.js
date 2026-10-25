@@ -134,7 +134,8 @@ class StadiumScene extends World {
     const picked = this.league.teams.some((t) => t.mine);
     this.youRing.setVisible(picked);
     this.youTag.setVisible(picked).setDepth(99990);
-    this.youOn = picked && mineTS && ((navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window || matchMedia("(pointer: coarse)").matches) ? mineTS.s : null;
+    this.touchUI = (navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window || matchMedia("(pointer: coarse)").matches;
+    this.youOn = null;
     this.player.setVisible(picked && !this.youOn);
     this.homeTS = this.youOn ? mineTS : null;
     this.walkAs = null;
@@ -150,14 +151,17 @@ class StadiumScene extends World {
     const fitZoom = () => this.setZoom(villageZoom || this.fitZoom());
     fitZoom();
     if (mineTS && !window.__tv) {
-      this.time.delayedCall(60, () => this.alignMine(mineTS));
+      for (const ms of [60, 600, 1500]) this.time.delayedCall(ms, () => this.alignMine(mineTS));
       const hudEl = document.getElementById("st-hud"), ro = hudEl && window.ResizeObserver ? new ResizeObserver(() => this.time.delayedCall(30, () => this.alignMine(mineTS))) : null;
       if (ro) ro.observe(hudEl);
       const onRs = () => this.time.delayedCall(30, () => this.alignMine(mineTS));
       this.scale.on("resize", onRs);
+      const vv = window.visualViewport;
+      if (vv) vv.addEventListener("resize", onRs);
       this.events.once("shutdown", () => {
         if (ro) ro.disconnect();
         this.scale.off("resize", onRs);
+        if (vv) vv.removeEventListener("resize", onRs);
       });
     }
     this.scale.on("resize", fitZoom);
@@ -214,7 +218,8 @@ class StadiumScene extends World {
     if (!this.spawnOffset || !mineTS || !mineTS.tag || !this.sys.isActive()) return;
     const cam = this.cameras.main, opp = [...this.teamSprites.values()].find((x) => x !== mineTS && x.s.y === mineTS.s.y && Math.abs(x.s.x - mineTS.s.x) > TILE);
     const rowTop = Math.min(mineTS.tag.getBounds().top, opp && opp.tag ? opp.tag.getBounds().top : Infinity, mineTS.s.y - mineTS.s.displayHeight) - 0.4 * TILE;
-    const hud = document.getElementById("st-hud"), hudB = hud && hud.getClientRects().length ? hud.getBoundingClientRect().bottom * this.scale.height / window.innerHeight : 0;
+    const hud = document.getElementById("st-hud"), cr = this.game.canvas.getBoundingClientRect(), k = this.scale.height / (cr.height || window.innerHeight);
+    const hudB = hud && hud.getClientRects().length ? (hud.getBoundingClientRect().bottom - cr.top + 12) * k : 0;
     const vh = cam.height / cam.zoom, midY = rowTop - hudB / cam.zoom + vh / 2;
     if (this.player.y - this.spawnOffY <= midY + 0.5) return;
     this.spawnOffY = this.player.y - midY;
@@ -2350,7 +2355,7 @@ ${r1(t.points)} pts`);
       }
     }
     this.near = best;
-    const key = best && !panelOpen && !this.spawnOffset && !this.homeTS ? best.name : "";
+    const key = best && !panelOpen && !this.spawnOffset && !this.touchUI ? best.name : "";
     if (key !== this.promptKey) {
       this.promptKey = key;
       const p = $("prompt");
