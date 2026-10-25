@@ -13,7 +13,7 @@ const ROUTES = [
 const DRIVES = ["off", "def", "off", "def"];
 const EDGE = 30;
 const OPEN_PX = 34;
-const TUNE = { offStart: 58, defStart: 65, toGo: 12, sackMs: 3e3, coverMs: 900, incRunoff: 5, yacMin: 3, yacRange: 8, cpuOpenCatch: 0.65, cpuYac: 1, meOpenCatch: 0.55, youPick: 0.25, youCatch: 0.3 };
+const TUNE = { offStart: 58, defStart: 65, toGo: 12, sackMs: 3e3, coverMs: 900, incRunoff: 5, yacMin: 3, yacRange: 8, cpuOpenCatch: 0.65, cpuYac: 1, meOpenCatch: 0.7, youPick: 0.25, youCatch: 0.3 };
 const CLOCK = 45, RUNOFF = { catch: 8, inc: 2, sack: 5 };
 const TOP_Y = -107 * YPX;
 const FB_KITS = [
@@ -35,6 +35,19 @@ const kitOf = (t) => {
   return n == null ? null : FB_KITS[n % FB_KITS.length];
 };
 const hex = (s) => parseInt(s.slice(1), 16);
+const hue = (h) => {
+  const r = parseInt(h.slice(1, 3), 16) / 255, g = parseInt(h.slice(3, 5), 16) / 255, b = parseInt(h.slice(5, 7), 16) / 255, M = Math.max(r, g, b), m = Math.min(r, g, b), d = M - m;
+  if (d < 0.08) return null;
+  const x = M === r ? (g - b) / d % 6 : M === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (x * 60 + 360) % 360;
+};
+const closeKits = (a, b) => {
+  if (!a || !b) return false;
+  const ha = hue(a[2]), hb = hue(b[2]);
+  if (ha == null || hb == null) return ha == null && hb == null;
+  const d = Math.abs(ha - hb);
+  return Math.min(d, 360 - d) < 40;
+};
 const calm = () => !!window.__calm;
 const buzz = (ms) => {
   try {
@@ -68,6 +81,7 @@ class MiniGameScene extends Phaser.Scene {
     this.drawField();
     this.T = { ...TUNE, ...window.__mgTune || {} };
     this.runoff = { ...RUNOFF, inc: this.T.incRunoff };
+    this.away = this.T.away != null ? !!this.T.away : closeKits(kitOf(this.me), kitOf(this.opp));
     this.score = { me: 0, opp: 0 };
     this.di = -1;
     this.hudTxt = "";
@@ -257,13 +271,14 @@ class MiniGameScene extends Phaser.Scene {
       const s = this.add.sprite(x, y, `team-${team.roster_id}-`, `${facing}0`).setOrigin(0.5, 1).setDepth(1e3 + y);
       s.setScale(1.3 * 32 / s.frame.width);
       if (team === this.opp) {
+        const k = this.away ? 6 : 2;
         if (glow) {
           try {
-            s.preFX.addGlow(16777215, 2, 0, false, 0.1, 3);
+            s.preFX.addGlow(16777215, k, 0, false, 0.1, k + 2);
           } catch {
-            s.setTint(14543103);
+            s.setTint(this.away ? 12570879 : 14543103);
           }
-        } else s.setTint(14543103);
+        } else s.setTint(this.away ? 12570879 : 14543103);
       }
       const t = this.add.text(x, y - 44, label, { fontFamily: NUM_FONT, fontStyle: "bold", fontSize: "11px", color: "#fff", backgroundColor: "rgba(20,20,20,0.6)", padding: { x: 3, y: 1 } }).setOrigin(0.5, 1).setResolution(this.RES).setDepth(9e3).setVisible(!!label);
       this.objs.push(s, t);
@@ -306,6 +321,7 @@ class MiniGameScene extends Phaser.Scene {
       this.you.man = null;
       this.you.goal = { x: this.you.s.x, y: this.you.s.y };
       this.you.speed = 7.5 * YPX;
+      this.you.tagUp = 30;
       this.youRing = this.add.ellipse(this.you.s.x, this.you.s.y + 2, 38, 15, 16769162, 0.25).setStrokeStyle(4, 16769162).setDepth(1999 + this.you.s.y);
       this.objs.push(this.youRing);
     }
@@ -319,12 +335,9 @@ class MiniGameScene extends Phaser.Scene {
       this.banner("HAIL MARY", "#ffffff");
       this.say("\u{1F64F} Last play of the drive! Throw it up.");
     }
-    if (this.firstPlay && this.di <= 1 && !this.hail) {
-      this.say(this.kind === "off" ? "\u{1F446} Tap to snap \xB7 then tap a receiver in a GREEN ring" : "\u{1F446} Tap to snap \xB7 you are the YOU corner, tap where he runs");
-      return;
-    }
-    const id = this.playId;
-    this.time.delayedCall(700, () => {
+    const id = this.playId, howto = this.firstPlay && this.di <= 1 && !this.hail;
+    if (howto) this.say(this.kind === "off" ? "\u{1F446} TAP TO SNAP \xB7 then tap a receiver in a GREEN ring" : "\u{1F446} TAP TO SNAP \xB7 you are the YOU corner, tap where he runs");
+    this.time.delayedCall(howto ? 3e3 : 700, () => {
       if (this.playId === id) this.snap();
     });
   }

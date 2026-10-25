@@ -305,3 +305,7 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
 
 @media (min-width: 1280px) { #st-rail-r { bottom: 100px; }
   #st-rail-r { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); padding-bottom: 22px; } }
+
+@media (max-width: 400px) { #mg-score { font-size: 15px; padding: 0 26px 0 2px; } #mg-down { font-size: 11.5px; } }
+
+@media (orientation: landscape) and (max-height: 500px) { #mg-hud { right: auto; left: 10px; width: 350px; margin: 0; } #mg-score { font-size: 15px; padding: 0 26px 0 2px; } #mg-down { font-size: 11.5px; } }
