@@ -385,10 +385,29 @@ function rosterCards(pids, t, withPts) {
   }));
 }
 let myLeaguesP = null, canSwitch = false;
+const RECENT = "st-recent", demoLink = () => /[?&]sample=1/.test(location.search) || window.__tv;
+const recents = () => {
+  try {
+    const r = JSON.parse(store(RECENT) || "[]");
+    return Array.isArray(r) ? r.filter((x) => x && x.id && x.name) : [];
+  } catch {
+    return [];
+  }
+};
+const rememberLeague = () => {
+  if (!L || demoLink()) return;
+  store(RECENT, JSON.stringify([{ id: String(L.id), name: L.name, app: L.espn ? "espn" : "sleeper" }, ...recents().filter((x) => String(x.id) !== String(L.id))].slice(0, 8)));
+};
 const myLeagues = () => {
+  if (!L || demoLink()) return Promise.resolve([]);
   const uid = store("st-user-id");
-  if (!uid || !L || L.espn || /[?&]sample=1/.test(location.search)) return Promise.resolve([]);
-  return myLeaguesP || (myLeaguesP = get(`${API}/user/${uid}/leagues/nfl/${L.season}`).then((x) => Array.isArray(x) ? x : []).catch(() => []));
+  const fromUser = uid && !L.espn ? get(`${API}/user/${uid}/leagues/nfl/${L.season}`).then((x) => Array.isArray(x) ? x : []).catch(() => []) : Promise.resolve([]);
+  return myLeaguesP || (myLeaguesP = fromUser.then((sl) => {
+    const out = sl.map((l) => ({ id: String(l.league_id), name: l.name, sub: `${l.total_rosters || ""} teams` }));
+    for (const r of recents()) if (!out.some((x) => x.id === String(r.id))) out.push({ id: String(r.id), name: r.name, sub: r.app === "espn" ? "ESPN \xB7 opened on this phone" : "opened on this phone" });
+    if (!out.some((x) => x.id === String(L.id))) out.unshift({ id: String(L.id), name: L.name, sub: "" });
+    return out;
+  }));
 };
 function switchLeague() {
   openPanel("\u{1F500} Your leagues", async () => {
@@ -396,13 +415,13 @@ function switchLeague() {
     return [
       el("p", {}, "Pick a league. Your team in each one is remembered."),
       el("div", { class: "who" }, lgs.map((l) => {
-        const here = String(l.league_id) === String(L.id), b = el("button", { type: "button", class: "who-btn" }, el("b", {}, `${here ? "\u2713 " : ""}${l.name}`), el("span", {}, here ? "open now" : `${l.total_rosters || ""} teams`));
+        const here = l.id === String(L.id), b = el("button", { type: "button", class: "who-btn" }, el("b", {}, `${here ? "\u2713 " : ""}${l.name}`), el("span", {}, here ? "open now" : l.sub));
         b.onclick = () => {
           if (here) {
             closePanel();
             return;
           }
-          location.href = `${location.pathname}?league=${l.league_id}`;
+          location.href = `${location.pathname}?league=${encodeURIComponent(l.id)}`;
         };
         return b;
       }))
@@ -1673,6 +1692,15 @@ function askLeague(note) {
   $("st-score").textContent = "Your fantasy league as a live pixel football stadium";
   const btns = document.querySelector(".st-btns");
   if (btns) btns.style.display = "none";
+  const hudL = document.getElementById("st-hud");
+  if (hudL) {
+    hudL.style.maxHeight = "calc(100vh - 16px)";
+    hudL.style.maxHeight = "calc(100svh - 16px)";
+    hudL.style.overflowY = "auto";
+    hudL.style.touchAction = "pan-y";
+    hudL.style.overscrollBehavior = "contain";
+    hudL.style.webkitOverflowScrolling = "touch";
+  }
   const fr = document.createElement("style");
   fr.textContent = ".lg-in:focus-visible,.lg-in+button:focus-visible{outline:3px solid #24292f;outline-offset:2px}";
   document.head.appendChild(fr);
@@ -1747,7 +1775,7 @@ function askLeague(note) {
   look.alt = "A live league on the field";
   look.width = 300;
   look.height = 420;
-  look.style.cssText = "display:block;margin:4px auto 0;width:min(440px,88vw,calc((100vh - 340px) * 300 / 420));height:auto;border-radius:12px;border:2px solid #9e7c0c;image-rendering:pixelated;cursor:pointer";
+  look.style.cssText = "display:block;margin:4px auto 0;width:min(440px,88vw,calc((100vh - 340px) * 300 / 420));width:min(440px,80vw,calc((100svh - 330px) * 300 / 420));height:auto;border-radius:12px;border:2px solid #9e7c0c;image-rendering:pixelated;cursor:pointer";
   look.title = "Open the sample league";
   look.onclick = demo.onclick;
   const tap = document.createElement("div");
@@ -1812,6 +1840,7 @@ function askLeague(note) {
     store(`st-me-${L.id}`, String(saved));
   }
   for (const t of L.teams) t.mine = t.roster_id === saved;
+  rememberLeague();
   leagueSwitcher();
   try {
     await fontReady;
@@ -1846,6 +1875,25 @@ function askLeague(note) {
   window.__village = game;
   window.__league = L;
   window.__hud = hud;
+  if (/[?&]debug=1/.test(location.search)) {
+    const box = el("pre", { id: "st-debug", style: "position:fixed;left:4px;bottom:120px;z-index:99;margin:0;padding:6px 8px;max-width:calc(100vw - 8px);background:rgba(0,0,0,.8);color:#9ef59e;font:11px/1.35 ui-monospace,Menlo,monospace;border-radius:6px;pointer-events:none;white-space:pre-wrap" });
+    document.body.appendChild(box);
+    const r = (n) => Math.round(n);
+    setInterval(() => {
+      const sc = game.scene.getScene("stadium"), cam = sc && sc.cameras && sc.cameras.main, vv = window.visualViewport, hb = $("st-hud").getBoundingClientRect();
+      const cr = game.canvas.getBoundingClientRect(), k = cr.height / game.scale.height, mt = sc && sc.teamSprites && [...sc.teamSprites.values()].find((x) => x.t.mine);
+      const css = (y) => cam ? r(cr.top + (y - cam.worldView.y) * cam.zoom * k) : "-";
+      box.textContent = [
+        `build round 71 \xB7 ${document.lastModified}`,
+        `inner ${innerWidth}x${innerHeight} \xB7 dpr ${devicePixelRatio}`,
+        `visualVp ${vv ? `${r(vv.width)}x${r(vv.height)} top ${r(vv.offsetTop)}` : "none"} \xB7 standalone ${!!(navigator.standalone || matchMedia("(display-mode: standalone)").matches)}`,
+        `canvas css ${r(cr.width)}x${r(cr.height)} top ${r(cr.top)} \xB7 px ${game.scale.width}x${game.scale.height}`,
+        `renderer ${game.renderer.type === Phaser.WEBGL ? "WEBGL" : "CANVAS"} \xB7 cam y ${cam ? r(cam.scrollY) : "-"} zoom ${cam ? cam.zoom.toFixed(2) : "-"}`,
+        `header bottom ${r(hb.bottom)} \xB7 my tag top ${mt ? css(mt.tag.getBounds().top) : "no team"} \xB7 walker ${sc && sc.player && sc.player.visible ? `yes y ${css(sc.player.y)}` : "no"}`,
+        `ua ${navigator.userAgent.slice(0, 90)}`
+      ].join("\n");
+    }, 1e3);
+  }
   if (window.ResizeObserver) new ResizeObserver(() => {
     const s = game.scene.getScene("stadium");
     if (s && s.cameras && s.cameras.main && s.applyZoom && s.logicalZoom && s.sys.isActive()) s.applyZoom(s.logicalZoom());

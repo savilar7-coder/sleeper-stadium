@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <script>window.__bubbleUp = function () { return ['nudge', 'tip', 'live-tip', 'a2hs', 'drill-tease', 'recap-ready'].some(function (i) { var e = document.getElementById(i); return !!e && !e.hidden && e.getClientRects().length > 0; }); };</script>
-  <script>window.__PASSES={"1378121024721158144":{"code":"P1","blimp":"","looks":"","gold":"","extras":[]}};window.__pass=window.__PASSES[new URLSearchParams(location.search).get('league')]||null;</script>
+  <script>window.__PASSES={"1313348860042571776":{"code":"P0","blimp":"","looks":"","gold":"","extras":["tanking","trade-addicts"]},"1378121024721158144":{"code":"P1","blimp":"","looks":"","gold":"","extras":[]}};window.__pass=window.__PASSES[new URLSearchParams(location.search).get('league')]||null;</script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Sleeper Stadium</title>
@@ -170,7 +170,7 @@
 <a class="star-a" href="https://github.com/savilar7-coder/sleeper-stadium" target="_blank" rel="noopener" style="display:block;margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#24292f;color:#fff;text-decoration:none;font-weight:700;font-size:16px;text-align:center">&#11088; Star it on GitHub</a><button id="nudge-share" type="button" style="margin-top:8px;padding:6px 10px;border-radius:10px;border:1px solid #9e7c0c;background:#ffd84a;font-weight:600">&#128279; Share with your league</button>
 <div style="margin-top:8px;font-size:14px">&#127866; <a class="tip-a" href="https://ko-fi.com/lamaisonstudio" target="_blank" rel="noopener" style="font-weight:700;color:#7a4b00">Buy a beer on Ko-fi</a> (Apple Pay, card): your team gets a golden jersey &#127942; &middot; <a class="tip-a" href="https://paypal.me/lamaisonstudio" target="_blank" rel="noopener" style="color:#7a4b00">PayPal</a></div>
 <div class="tip-thanks" hidden style="margin-top:4px;font-size:13px;color:#7a4b00;font-weight:600"></div>
-<div style="margin-top:4px;font-size:12px;color:#5a4a33">Built by <a href="https://lamaisonwebstudio.com/" target="_blank" rel="noopener" style="color:#5a4a33">lamaisonwebstudio.com</a>. Podcast, Discord or business? <a href="https://lamaisonwebstudio.com/stadium/#custom" target="_blank" rel="noopener" style="color:#7a4b00;font-weight:700">Let's talk</a></div>
+<div style="margin-top:6px;font-size:13px;color:#5a4a33">Want a custom one for your league? <a class="lp-a" href="https://lamaisonwebstudio.com/stadium/make/" target="_blank" rel="noopener" style="color:#7a4b00;font-weight:700">&#9733; League Pass</a></div>
 </div>
 <div id="tip" hidden style="position:fixed;left:50%;bottom:calc(108px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;width:min(320px,calc(100vw - 32px));background:#1d140c;color:#fff4d6;border:2px solid #ffd84a;border-radius:12px;padding:10px 12px;font:14px system-ui,sans-serif;box-shadow:0 6px 18px #0008">
 <b>Tip:</b> &#127941; <b>Awards</b> (top bar) and <b>Matchup &rarr; Share</b> make pictures for your group chat. <button id="tip-x" type="button" style="margin-left:4px;border:0;background:#ffd84a;border-radius:6px;font-weight:700;padding:2px 8px">Got it</button>
@@ -320,9 +320,10 @@
 <style>@media (max-height:500px){#pass-foot{display:none!important}}</style>
 <script>
 (function () {
-  if (!(/[?&](blimp|looks|gold)=/.test(location.search) || window.__pass) || /[?&]sample=1/.test(location.search)) return;
+  var isPass = /[?&](blimp|looks|gold)=/.test(location.search) || !!window.__pass;
+  if (/[?&]sample=1/.test(location.search)) return;
   var f = document.getElementById('pass-foot');
-  var wait = setInterval(function () {
+  var wait = isPass && setInterval(function () {
     var L = window.__league; if (!L || !L.name) return;
     clearInterval(wait);
     document.getElementById('pass-foot-n').textContent = L.name;
@@ -331,6 +332,22 @@
     var star = document.getElementById('gh-star'); // the drill and TV mode hide the bottom buttons: the line goes with them
     if (star) new MutationObserver(function () { f.style.visibility = star.style.visibility; }).observe(star, { attributes: true, attributeFilter: ['style'] });
   }, 500);
+  // Oct 24 2026 (round 74, Sunday's post has no $5 link): a free league (not the demo, not a Pass) gets the same quiet strip with
+  // "★ Get a League Pass for your league", after 60 s or once a team is picked, and never while a card is up. Taps = demo-passfoot.
+  if (!isPass && /[?&]league=/.test(location.search)) {
+    var t0 = Date.now(), freeWait = setInterval(function () {
+      var L = window.__league; if (!L || !L.name || document.body.classList.contains('tv')) return;
+      var picked = (L.teams || []).some(function (t) { return t.mine; });
+      if ((!picked && Date.now() - t0 < 60000) || (window.__bubbleUp && window.__bubbleUp())) return;
+      clearInterval(freeWait);
+      var fa = document.getElementById('pass-foot-a'); f.firstChild.style.display = 'none'; f.children[1].style.display = 'none';
+      fa.innerHTML = '&#9733; Get a League Pass for your league'; f.style.display = 'flex';
+      var st = document.getElementById('gh-star'); if (st) new MutationObserver(function () { f.style.visibility = st.style.visibility; }).observe(st, { attributes: true, attributeFilter: ['style'] });
+    }, 1000);
+    fa0Count();
+  }
+  function fa0Count() { document.getElementById('pass-foot-a').addEventListener('click', function () { try { var day = new Date().toISOString().slice(0, 10); if (localStorage.getItem('ev-demo-passfoot') !== day) { localStorage.setItem('ev-demo-passfoot', day); navigator.sendBeacon('https://philosophers-trail.pages.dev/e?k=demo-passfoot'); } } catch (x) {} }); }
+  if (!isPass) return;
   document.getElementById('pass-foot-a').addEventListener('click', function () { try { var day = new Date().toISOString().slice(0, 10); if (localStorage.getItem('ev-demo-passfoot') !== day) { localStorage.setItem('ev-demo-passfoot', day); navigator.sendBeacon('https://philosophers-trail.pages.dev/e?k=demo-passfoot'); } var c = window.__pass && /^P\d{1,3}$/.test(window.__pass.code) && 'lgf-' + window.__pass.code.toLowerCase(); if (c && localStorage.getItem('ev-' + c) !== day) { localStorage.setItem('ev-' + c, day); navigator.sendBeacon('https://philosophers-trail.pages.dev/e?k=' + c); } } catch (x) {} });
 })();
 </script>
