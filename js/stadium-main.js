@@ -1868,6 +1868,8 @@ function askLeague(note) {
   const btns = document.querySelector(".st-btns");
   if (btns) btns.style.display = "none";
   const hudL = document.getElementById("st-hud");
+  const projL = document.getElementById("st-proj");
+  if (projL) projL.style.minWidth = "0";
   if (hudL) {
     hudL.style.maxHeight = "calc(100vh - 16px)";
     hudL.style.maxHeight = "calc(100svh - 16px)";
@@ -1881,7 +1883,7 @@ function askLeague(note) {
   document.head.appendChild(fr);
   const box = document.createElement("form");
   box.style.cssText = "display:flex;gap:6px;justify-content:center;margin-top:6px";
-  box.innerHTML = '<input id="lg-id" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Sleeper @username" enterkeyhint="go" class="lg-in" aria-label="Sleeper username, league ID, Sleeper or ESPN league link" style="font:16px sans-serif;padding:8px 10px;width:min(260px,58vw);border:2px solid #9e7c0c;border-radius:8px;background:#fff"><button type="submit" style="font:700 16px sans-serif;padding:8px 16px;background:#24292f;color:#fff;border:0;border-radius:8px;cursor:pointer">Open</button>';
+  box.innerHTML = '<input id="lg-id" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Sleeper @username" enterkeyhint="go" class="lg-in" aria-label="Sleeper username, league ID, Sleeper or ESPN league link" style="font:16px sans-serif;padding:8px 10px;width:min(260px,58vw);flex:0 1 auto;min-width:0;box-sizing:border-box;border:2px solid #9e7c0c;border-radius:8px;background:#fff"><button type="submit" style="font:700 16px sans-serif;padding:8px 16px;background:#24292f;color:#fff;border:0;border-radius:8px;cursor:pointer">Open</button>';
   const msg = document.createElement("div");
   msg.style.cssText = "margin:6px auto 0;font:14px system-ui,sans-serif;color:#5a4a33;max-width:340px;text-align:center";
   const trust = document.createElement("div");
@@ -1966,7 +1968,7 @@ function askLeague(note) {
   star.href = "https://github.com/savilar7-coder/sleeper-stadium";
   star.target = "_blank";
   star.rel = "noopener";
-  star.style.cssText = "display:block;width:max-content;margin:10px auto 0;padding:7px 14px;border-radius:10px;background:#24292f;color:#fff;text-decoration:none;font:700 14px system-ui,sans-serif";
+  star.style.cssText = "display:block;width:max-content;max-width:100%;box-sizing:border-box;margin:10px auto 0;padding:7px 14px;border-radius:10px;background:#24292f;color:#fff;text-decoration:none;font:700 14px system-ui,sans-serif";
   star.textContent = "\u2B50 Star it on GitHub \xB7 free & open source";
   const by = document.createElement("p");
   by.style.cssText = "margin:8px auto 0;font:13px system-ui,sans-serif;color:#5a4a33;max-width:320px;text-align:center";
@@ -2158,5 +2160,5 @@ function askLeague(note) {
   $("play-btn").addEventListener("click", playGame);
   $("mg-exit").addEventListener("click", exitGame);
   $("mg-again").addEventListener("click", playGame);
-  window.__stadium = { teamPanel, standings, news, tradeMaker, whoAreYou, setMine, matchup, playGame, exitGame, lookPicker, injuriesBox };
+  window.__stadium = { teamPanel, standings, news, tradeMaker, whoAreYou, setMine, matchup, playGame, exitGame, lookPicker, injuriesBox, sharePicture, stadiumLink };
 })();

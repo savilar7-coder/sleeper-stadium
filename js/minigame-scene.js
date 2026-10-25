@@ -115,6 +115,7 @@ class MiniGameScene extends Phaser.Scene {
     bx.title = "Back to stadium";
     this.hud.classList.remove("mg-over");
     const sh = $("mg-share");
+    sh.mgScene = this;
     if (!sh.dataset.on) {
       sh.dataset.on = "1";
       sh.addEventListener("click", () => {
@@ -125,6 +126,14 @@ class MiniGameScene extends Phaser.Scene {
           }, 1500);
         };
         const url = location.origin + location.pathname + location.search + "#drill";
+        const sc = sh.mgScene, st = window.__stadium;
+        if (sc && st && st.sharePicture && navigator.canShare) {
+          try {
+            st.sharePicture(sc.resultCard(), "drill.png", text.replace(/\s*👇$/, ""));
+            return;
+          } catch {
+          }
+        }
         if (navigator.share) navigator.share({ title: "2-Minute Drill", text, url }).catch(() => {
         });
         else if (navigator.clipboard) navigator.clipboard.writeText(`${text} ${url}`).then(() => done("Copied!"), () => done("Could not copy"));
@@ -649,6 +658,68 @@ class MiniGameScene extends Phaser.Scene {
     const oppWho = !this.L.espn && this.opp.owner && this.opp.owner !== "open slot" ? `@${this.opp.owner}` : this.opp.name;
     $("mg-share").dataset.text = tie ? `Tied ${oppWho}'s starters ${me}\u2013${opp} in the 2-Minute Drill. Break it \u{1F447}` : win ? `I beat ${oppWho}'s starters ${me}\u2013${opp} in the 2-Minute Drill${top ? ` (${$("mg-end-stat").textContent.replace(/^⭐ /, "")})` : ""}. Bet you can't \u{1F447}` : `${oppWho}'s starters got me ${opp}\u2013${me} in the 2-Minute Drill. Run it back? \u{1F447}`;
     if (win) sfx.cheer && sfx.cheer();
+  }
+  resultCard() {
+    const W = 1080, H = 1080, cv = document.createElement("canvas");
+    cv.width = W;
+    cv.height = H;
+    const c = cv.getContext("2d"), font = 'system-ui, "Segoe UI", Arial, sans-serif';
+    const { me, opp } = this.score, win = me > opp, tie = me === opp;
+    const g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#163d1c");
+    g.addColorStop(1, "#07140a");
+    c.fillStyle = g;
+    c.fillRect(0, 0, W, H);
+    c.fillStyle = "rgba(255,255,255,0.08)";
+    for (let y = 140; y < H; y += 90) c.fillRect(0, y, W, 6);
+    const fit = (t, px, max, weight = "bold") => {
+      c.font = `${weight} ${px}px ${font}`;
+      let w = String(t);
+      while (c.measureText(w).width > max && w.length > 4) w = w.slice(0, -1);
+      return w === String(t) ? String(t) : `${w.trim()}\u2026`;
+    };
+    c.textAlign = "center";
+    c.fillStyle = "#ffd84a";
+    c.font = `900 34px ${font}`;
+    c.fillText("\u{1F3C8} 2-MINUTE DRILL", W / 2, 70);
+    c.fillStyle = "#c9a227";
+    c.font = `bold 26px ${font}`;
+    c.fillText(`${this.L.name || ""} \xB7 WEEK ${this.L.week || ""}`.toUpperCase().slice(0, 44), W / 2, 110);
+    const km = kitOf(this.me), ko = kitOf(this.opp);
+    const side = (t, k, x, pts, mine) => {
+      c.fillStyle = k ? k[2] : mine ? "#b8402f" : "#241773";
+      c.fillRect(x - 200, 200, 400, 260);
+      c.strokeStyle = "#fff";
+      c.lineWidth = 6;
+      c.strokeRect(x - 200, 200, 400, 260);
+      c.fillStyle = "#fff";
+      c.font = `900 150px ${font}`;
+      c.fillText(String(pts), x, 380);
+      c.fillStyle = k ? k[5] : "#ffe08a";
+      c.fillText(fit(t.name, 36, 380), x, 520);
+    };
+    side(this.me, km, 290, me, true);
+    side(this.opp, ko, 790, opp, false);
+    c.fillStyle = "#fff";
+    c.font = `bold 44px ${font}`;
+    c.fillText(win ? "\u{1F3C6} WINNER" : tie ? "\u{1F91D} TIE" : "\u{1F624} REMATCH TIME", W / 2, 620);
+    c.fillStyle = "#ffe08a";
+    c.font = `bold 34px ${font}`;
+    c.fillText(fit($("mg-end-stat").textContent, 34, W - 120), W / 2, 700);
+    c.fillStyle = "#cfe8c8";
+    c.font = `bold 30px ${font}`;
+    c.fillText(fit($("mg-end-line").textContent, 30, W - 120), W / 2, 760);
+    c.fillStyle = "#fff";
+    c.font = `900 40px ${font}`;
+    c.fillText(win ? "Bet you can\u2019t beat my starters." : tie ? "Break the tie?" : "Run it back?", W / 2, 880);
+    c.fillStyle = "#9ad68f";
+    c.font = `bold 28px ${font}`;
+    const st = window.__stadium;
+    c.fillText(fit(`${st && st.stadiumLink ? st.stadiumLink() : location.host}#drill`, 28, W - 120), W / 2, 960);
+    c.fillStyle = "#c9a227";
+    c.font = `24px ${font}`;
+    c.fillText("your real starters vs theirs \xB7 free \xB7 Sleeper Stadium", W / 2, 1030);
+    return cv;
   }
   say(t) {
     this.msg.textContent = t;
