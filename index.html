@@ -308,6 +308,12 @@
 <a id="gh-star" class="star-a" href="https://github.com/savilar7-coder/sleeper-stadium" target="_blank" rel="noopener" style="position:fixed;right:10px;bottom:48px;z-index:50;font:600 13px system-ui,sans-serif;color:#fff;background:#24292f;border:1px solid #57606a;border-radius:16px;padding:6px 11px;text-decoration:none;box-shadow:0 2px 6px #0006">&#11088; Star on GitHub &middot; free &amp; open source</a>
 <script>
 (function () {
+  var q = location.search; if (!/[?&]league=/.test(q) || /[?&]sample=1/.test(q) || /[?&](blimp|looks|gold)=/.test(q) || window.__pass) return;
+  var st = document.createElement('style'); st.textContent = '#gh-star{display:none!important}#tip-pill{right:10px!important}#share-lg{right:92px!important}@media (max-width:400px){#tip-pill{right:4px!important}}'; document.head.appendChild(st);
+})();
+</script>
+<script>
+(function () {
   if (!(/[?&](blimp|looks|gold)=/.test(location.search) || window.__pass) || /[?&]sample=1/.test(location.search)) return;
   var b = document.getElementById('gh-star'); if (!b) return;
   b.dataset.pass = '1'; b.classList.remove('star-a'); b.removeAttribute('href'); b.removeAttribute('target'); b.setAttribute('role', 'button'); b.tabIndex = 0;
