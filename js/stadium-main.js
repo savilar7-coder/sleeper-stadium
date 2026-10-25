@@ -324,7 +324,7 @@ function tvLine() {
 function hud() {
   rails();
   const m = mine(), opp = m && L.teams.find((t) => t.matchup_id && t.matchup_id === m.matchup_id && t !== m);
-  $("st-league").textContent = window.__tv ? `${L.name} \xB7 week ${L.week} \xB7 stadium.lamaisonwebstudio.com` : `${L.name} \xB7 week ${L.week}`;
+  $("st-league").textContent = window.__tv ? `${L.name} \xB7 week ${L.week} \xB7 stadium.lamaisonwebstudio.com` : `${L.name} \xB7 week ${L.week}${canSwitch ? " \u25BE" : ""}`;
   $("st-score").textContent = m ? `\u{1F451} ${m.name} ${fmt(m.points)}${opp ? `  \u2013  ${fmt(opp.points)} ${opp.name}` : ""}` : window.__tv ? tvLine() : Object.values(L.games || {}).includes("in_game") ? "\u{1F534} Live now \xB7 tap any player \xB7 \u{1F451} My team = yours" : "\u{1F451} Tap My team to walk on the field as you";
   $("st-score").className = m && opp ? m.points >= opp.points ? "up" : "down" : "";
   const win = m && opp ? winOdds(m, opp) : null;
@@ -384,11 +384,61 @@ function rosterCards(pids, t, withPts) {
     );
   }));
 }
+let myLeaguesP = null, canSwitch = false;
+const myLeagues = () => {
+  const uid = store("st-user-id");
+  if (!uid || !L || L.espn || /[?&]sample=1/.test(location.search)) return Promise.resolve([]);
+  return myLeaguesP || (myLeaguesP = get(`${API}/user/${uid}/leagues/nfl/${L.season}`).then((x) => Array.isArray(x) ? x : []).catch(() => []));
+};
+function switchLeague() {
+  openPanel("\u{1F500} Your leagues", async () => {
+    const lgs = await myLeagues();
+    return [
+      el("p", {}, "Pick a league. Your team in each one is remembered."),
+      el("div", { class: "who" }, lgs.map((l) => {
+        const here = String(l.league_id) === String(L.id), b = el("button", { type: "button", class: "who-btn" }, el("b", {}, `${here ? "\u2713 " : ""}${l.name}`), el("span", {}, here ? "open now" : `${l.total_rosters || ""} teams`));
+        b.onclick = () => {
+          if (here) {
+            closePanel();
+            return;
+          }
+          location.href = `${location.pathname}?league=${l.league_id}`;
+        };
+        return b;
+      }))
+    ];
+  });
+}
+async function leagueSwitcher() {
+  if ((await myLeagues()).length < 2) return;
+  canSwitch = true;
+  const e = $("st-league");
+  e.style.cursor = "pointer";
+  e.setAttribute("role", "button");
+  e.title = "Switch league";
+  e.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    switchLeague();
+  });
+  hud();
+  const sw = el("button", { id: "st-switch", type: "button", "aria-label": "Switch league", title: "Switch league" }, "\u{1F500}");
+  sw.onclick = (ev) => {
+    ev.stopPropagation();
+    switchLeague();
+  };
+  $("st-hud").appendChild(sw);
+  $("st-hud").classList.add("can-switch");
+}
 function teamPanel(rid) {
   const t = L.teams.find((x) => x.roster_id === rid);
   const bench = t.players.filter((p) => !t.starters.includes(p) && !t.taxi.includes(p) && !t.reserve.includes(p));
   const pk = picksOf(rid);
   openPanel(`${t.mine ? "\u{1F451} " : ""}${t.name}`, async () => [
+    t.mine && canSwitch ? (() => {
+      const b = el("button", { type: "button", class: "st-wide st-ghost" }, "\u{1F500} Switch league");
+      b.onclick = () => switchLeague();
+      return b;
+    })() : null,
     t.mine ? el("button", { type: "button", class: "st-wide st-ghost st-who" }, "\u{1F64B} Not you? Pick your team") : null,
     el(
       "div",
@@ -1762,6 +1812,7 @@ function askLeague(note) {
     store(`st-me-${L.id}`, String(saved));
   }
   for (const t of L.teams) t.mine = t.roster_id === saved;
+  leagueSwitcher();
   try {
     await fontReady;
   } catch {

@@ -122,6 +122,9 @@
 .st-toast { position: fixed; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 70; max-width: calc(100vw - 32px);
   background: #1d140c; color: #fff4d6; border: 2px solid #ffd84a; border-radius: 10px; padding: 8px 12px; font: 600 14px system-ui, sans-serif; box-shadow: 0 6px 18px #0008; }
 #st-fold { position: absolute; top: 2px; right: 4px; font: 700 14px/1 sans-serif; padding: 4px 8px; border: 0; background: none; color: #6b4f2a; cursor: pointer; }
+#st-switch { display: none; position: absolute; top: 50%; transform: translateY(-50%); left: 2px; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; } 
+#st-hud.mini.can-switch #st-switch { display: block; }
+#st-hud.mini.can-switch #st-score { padding-left: 40px; }
 #st-hud.mini #st-league, #st-hud.mini #st-proj, #st-hud.mini .st-btns { display: none; }
 #st-hud.mini { padding-top: 4px; padding-bottom: 4px; }
 
