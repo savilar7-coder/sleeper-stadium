@@ -323,8 +323,10 @@ class MiniGameScene extends Phaser.Scene {
       d.trail = this.hail ? 30 + Math.random() * 20 : 18 + Math.random() * 10;
       return d;
     });
-    const safety = make(def, W / 2, y0 - (this.hail ? 30 : 16) * YPX, "", "down");
+    this.shade = Math.random() < 0.5 ? -1 : 1;
+    const safety = make(def, W / 2 + this.shade * W * 0.18, y0 - (this.hail ? 30 : 16) * YPX, "", "down");
     safety.speed = 5.4 * YPX;
+    safety.zone = true;
     this.defs.push(safety);
     this.you = this.kind === "def" ? this.defs[1] : null;
     if (this.you) {
@@ -869,8 +871,14 @@ class MiniGameScene extends Phaser.Scene {
     for (const r of this.recv) {
       const w = r.path[0];
       if (w) {
-        move(r, w.x, w.y, r.speed);
-        if (Phaser.Math.Distance.Between(r.s.x, r.s.y, w.x, w.y) < 3) r.path.shift();
+        move(r, w.x, w.y, r.speed * (r.cutUntil > time ? 1.3 : 1));
+        if (Phaser.Math.Distance.Between(r.s.x, r.s.y, w.x, w.y) < 3) {
+          r.path.shift();
+          if (r.path.length) {
+            r.cutUntil = time + 350;
+            if (!calm()) this.burst(r.s.x, r.s.y, 14075809, 3);
+          }
+        }
       } else if (r.drift && r.s.y > TOP_Y + 3 * YPX && this.state !== "over") move(r, r.s.x, r.s.y - 40, r.speed * 0.3);
       else move(r, r.s.x, r.s.y, 0);
     }
@@ -881,7 +889,8 @@ class MiniGameScene extends Phaser.Scene {
         if (this.youRing) this.youRing.setPosition(d.s.x, d.s.y + 2).setDepth(1999 + d.s.y);
         continue;
       }
-      const target = d.man || this.recv.reduce((a, b) => b.s.y < a.s.y ? b : a);
+      const side = d.zone ? this.recv.filter((r) => (r.s.x - this.W / 2) * this.shade > -20) : null;
+      const target = d.man || (side && side.length ? side : this.recv).reduce((a, b) => b.s.y < a.s.y ? b : a);
       const lagX = target.s.x - target.vx * d.lag, lagY = Math.max(TOP_Y, target.s.y - target.vy * d.lag - (d.man ? d.trail : 50));
       move(d, lagX, lagY, d.speed);
     }
@@ -895,9 +904,10 @@ class MiniGameScene extends Phaser.Scene {
       }
     }
     if (this.state === "aim" && this.target) {
-      const g = this.aimG, x0 = this.qb.s.x, y0 = this.qb.s.y - 24, x1 = this.target.s.x, y1 = this.target.s.y - 16, n = Math.max(2, Math.floor(Math.hypot(x1 - x0, y1 - y0) / 8));
+      const g = this.aimG, x0 = this.qb.s.x, y0 = this.qb.s.y - 24, lp = this.leadPoint(this.target, 0.35 + Phaser.Math.Distance.Between(x0, y0, this.target.s.x, this.target.s.y) / (290 + (this.qb.pts || 0) * 3)), x1 = lp.x, y1 = lp.y - 16, n = Math.max(2, Math.floor(Math.hypot(x1 - x0, y1 - y0) / 8));
       g.clear().fillStyle(16777215, 0.9);
       for (let i = 0; i <= n; i++) g.fillCircle(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, 1.5);
+      g.lineStyle(2, 16777215, 0.9).strokeEllipse(lp.x, lp.y + 2, 26, 10);
     }
     const pg = this.pocketG;
     pg.clear();
