@@ -150,11 +150,12 @@ class StadiumScene extends World {
     this.spawnOffset = true;
     const fitZoom = () => this.setZoom(villageZoom || this.fitZoom());
     fitZoom();
-    if (mineTS && !window.__tv) {
-      for (const ms of [60, 600, 1500]) this.time.delayedCall(ms, () => this.alignMine(mineTS));
-      const hudEl = document.getElementById("st-hud"), ro = hudEl && window.ResizeObserver ? new ResizeObserver(() => this.time.delayedCall(30, () => this.alignMine(mineTS))) : null;
+    const alignTS = this._alignTS = mineTS || [...this.teamSprites.values()].sort((a, b) => a.s.y - b.s.y)[0];
+    if (alignTS && !window.__tv) {
+      for (const ms of [60, 600, 1500]) this.time.delayedCall(ms, () => this.alignMine(alignTS));
+      const hudEl = document.getElementById("st-hud"), ro = hudEl && window.ResizeObserver ? new ResizeObserver(() => this.time.delayedCall(30, () => this.alignMine(alignTS))) : null;
       if (ro) ro.observe(hudEl);
-      const onRs = () => this.time.delayedCall(30, () => this.alignMine(mineTS));
+      const onRs = () => this.time.delayedCall(30, () => this.alignMine(alignTS));
       this.scale.on("resize", onRs);
       const vv = window.visualViewport;
       if (vv) vv.addEventListener("resize", onRs);
@@ -217,7 +218,8 @@ class StadiumScene extends World {
   alignMine(mineTS) {
     if (!this.spawnOffset || !mineTS || !mineTS.tag || !this.sys.isActive()) return;
     const cam = this.cameras.main, opp = [...this.teamSprites.values()].find((x) => x !== mineTS && x.s.y === mineTS.s.y && Math.abs(x.s.x - mineTS.s.x) > TILE);
-    const rowTop = Math.min(mineTS.tag.getBounds().top, opp && opp.tag ? opp.tag.getBounds().top : Infinity, mineTS.s.y - mineTS.s.displayHeight) - 0.4 * TILE;
+    const top = (x) => x ? Math.min(x.tag ? x.tag.getBounds().top : Infinity, x.extra && x.extra.active ? x.extra.getBounds().top : Infinity) : Infinity;
+    const rowTop = Math.min(top(mineTS), top(opp), mineTS.s.y - mineTS.s.displayHeight) - 0.4 * TILE;
     const hud = document.getElementById("st-hud"), cr = this.game.canvas.getBoundingClientRect(), k = this.scale.height / (cr.height || window.innerHeight);
     const hudB = hud && hud.getClientRects().length ? (hud.getBoundingClientRect().bottom - cr.top + 12) * k : 0;
     const vh = cam.height / cam.zoom, midY = rowTop - hudB / cam.zoom + vh / 2;
@@ -968,6 +970,7 @@ ADDICT \xD7${c}`)
       S.extra = this.label(S.s.x, S.s.y, ls.join("\n"), "#ffe9a8").setOrigin(S.side === 0 ? 0 : 1, 1).setFontSize(Math.round(12 * DPR));
       S.extra.setStyle({ backgroundColor: "rgba(40,48,60,0.92)", align: "center", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
     }
+    if (this._alignTS && !window.__tv) this.time.delayedCall(80, () => this.alignMine(this._alignTS));
   }
   refreshScores() {
     for (const { tag, t } of this.teamSprites.values()) {
