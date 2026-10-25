@@ -309,3 +309,5 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
 @media (max-width: 400px) { #mg-score { font-size: 15px; padding: 0 26px 0 2px; } #mg-down { font-size: 11.5px; } }
 
 @media (orientation: landscape) and (max-height: 500px) { #mg-hud { right: auto; left: 10px; width: 350px; margin: 0; } #mg-score { font-size: 15px; padding: 0 26px 0 2px; } #mg-down { font-size: 11.5px; } }
+
+@media (max-width: 440px) { table.standings th:last-child, table.standings td:last-child { padding-left: 2px; padding-right: 2px; width: 1%; white-space: nowrap; } table.standings td.num, table.standings th.num { white-space: nowrap; } }

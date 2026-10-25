@@ -1004,49 +1004,44 @@ class StadiumScene extends World {
     this.placeExtras();
   }
   async placeExtras() {
-    const ex = window.__pass && window.__pass.extras || [], L = this.league, lines = {};
-    const add = (rid, txt) => {
-      (lines[rid] = lines[rid] || []).push(txt);
+    const ex = window.__pass && window.__pass.extras || [], L = this.league, got = {};
+    const add = (rid, pri, emoji, words) => {
+      (got[rid] = got[rid] || []).push({ pri, emoji, words });
     };
     if (ex.includes("tanking") && L.week > 4 && !L.preseason) {
       const t = L.teams.filter((x) => !x.wins && !x.ties && x.losses).sort((a, b) => a.fpts - b.fpts)[0];
-      if (t) add(t.roster_id, "\u{1F3F3}\uFE0F TANKING");
-    }
-    if (ex.includes("trade-addicts") && !L.espn && L.id) {
-      const n = {}, weeks = [...Array(Math.max(1, L.week || 1)).keys()].map((i) => i + 1);
-      const tx = (await Promise.all(weeks.map((w) => fetch(`https://api.sleeper.app/v1/league/${L.id}/transactions/${w}`).then((r) => r.json()).catch(() => [])))).flat();
-      for (const x of tx) if (x && x.type === "trade" && x.status === "complete") for (const rid of x.roster_ids || []) n[rid] = (n[rid] || 0) + 1;
-      Object.entries(n).filter(([, c]) => c >= 5).sort((a, b) => b[1] - a[1]).slice(0, 2).forEach(
-        ([rid, c]) => add(Number(rid), `\u{1F501} TRADE
-ADDICT \xD7${c}`)
-        /* two short lines: one long line reached the ASS BOWL sign */
-      );
+      if (t) add(t.roster_id, 0, "\u{1F3F3}\uFE0F", "\u{1F3F3}\uFE0F Tanking: winless with the fewest points");
     }
     if (ex.includes("cancun") && L.week > 5 && window.__playoffOdds) {
       const PO = await window.__playoffOdds().catch(() => null), odds = PO && PO.odds || {};
       for (const t of L.teams) {
         const o = odds[t.roster_id];
         if (o == null) continue;
-        if (o < 0.05) add(t.roster_id, "\u{1F3D6}\uFE0F SEE YOU\nIN CANC\xDAN");
-        else if (o < 0.15) add(t.roster_id, "\u2708\uFE0F checking flights\nto Canc\xFAn");
+        if (o < 0.05) add(t.roster_id, 1, "\u{1F3D6}\uFE0F", "\u{1F3D6}\uFE0F See you in Canc\xFAn (under 5% playoff odds)");
+        else if (o < 0.15) add(t.roster_id, 1, "\u2708\uFE0F", "\u2708\uFE0F Checking flights to Canc\xFAn (under 15% playoff odds)");
       }
     }
     if (!this.sys.isActive()) return;
-    for (const [rid, ls] of Object.entries(lines)) {
+    for (const [rid, js] of Object.entries(got)) {
       const S = this.teamSprites.get(Number(rid));
       if (!S) continue;
-      S.extra = this.label(S.s.x, S.s.y, ls.join("\n"), "#ffe9a8").setOrigin(S.side === 0 ? 0 : 1, 1).setFontSize(Math.round(12 * DPR));
-      S.extra.setStyle({ backgroundColor: "rgba(40,48,60,0.92)", align: "center", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
+      js.sort((a, b) => a.pri - b.pri);
+      S.t.joke = js[0].emoji;
+      S.t.jokes = js.map((j) => j.words);
+      S.t.jokeMarks = js.map((j) => j.emoji).join("");
+      const { size, text } = this.tagLook(S.t);
+      S.tag.setText(text);
+      if (S.tag.style.fontSize !== size) S.tag.setFontSize(size);
     }
     if (this._alignTS && !window.__tv) this.time.delayedCall(80, () => this.alignMine(this._alignTS));
   }
   tagLook(t) {
     const opp = this.league.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o.roster_id !== t.roster_id);
-    const ch = [...t.name], nm = ch.length > 22 ? `${ch.slice(0, 21).join("")}\u2026` : t.name, len = [...nm].length + (t.mine ? 2 : 0);
+    const ch = [...t.name], nm = ch.length > 22 ? `${ch.slice(0, 21).join("")}\u2026` : t.name, len = [...nm].length + (t.mine ? 2 : 0) + (t.joke ? [...t.joke].length + 1 : 0);
     return {
       size: `${Math.round((len <= 13 ? 18 : len <= 17 ? 15 : 13) * DPR)}px`,
       color: t.mine ? "#ffe08a" : opp && t.points > opp.points ? "#b9f5a8" : "#fff4d6",
-      text: `${t.mine ? "\u{1F451} " : ""}${t.gold ? "\u{1F3C6} " : ""}${nm}`
+      text: `${t.joke ? `${t.joke} ` : ""}${t.mine ? "\u{1F451} " : ""}${t.gold ? "\u{1F3C6} " : ""}${nm}`
     };
   }
   refreshScores() {

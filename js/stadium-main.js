@@ -638,6 +638,7 @@ function teamPanel(rid) {
       return b;
     })() : null,
     t.mine ? el("button", { type: "button", class: "st-wide st-ghost st-who" }, "\u{1F64B} Not you? Pick your team") : null,
+    t.jokes && t.jokes.length ? el("div", { class: "tp-jokes", style: "margin:0 0 8px;font-weight:700;color:#7a4b00" }, t.jokes.map((j) => el("div", {}, j))) : null,
     el(
       "div",
       { class: "tp-head" },
@@ -1110,7 +1111,8 @@ function standings() {
   const power = [...L.teams].sort((a, b) => b.fpts - a.fpts).map((t) => t.roster_id);
   const po = L.settings && L.settings.playoff_teams || 6, poWeek = L.settings && L.settings.playoff_week_start || 15;
   openPanel(`\u{1F3C6} ${L.name}`, async () => {
-    const tr = await trophies(), PO = await playoffOdds(), pod = PO && PO.odds;
+    const tr = await trophies(), PO = await playoffOdds(), pod = PO && PO.odds, TN = await tradeCounts().catch(() => null);
+    const marks = rows.some((t) => t.jokeMarks);
     const oddsCell = (t) => {
       const o = pod[t.roster_id] || 0, was = PO.before && PO.before[t.roster_id], d = was != null ? Math.round((o - was) * 100) : 0;
       return `${o >= 0.995 ? ">99" : o < 5e-3 ? "<1" : Math.round(o * 100)}%${d ? ` ${d > 0 ? "\u25B2" : "\u25BC"}${Math.abs(d)}` : ""}`;
@@ -1119,21 +1121,23 @@ function standings() {
       el(
         "table",
         { class: "standings" },
-        el("tr", {}, el("th", {}, "#"), el("th", {}, "Team"), el("th", { style: "white-space:nowrap" }, "W-L"), el("th", { class: "num" }, "PF"), el("th", { class: "num" }, "PA"), pod ? el("th", { class: "num" }, "Playoffs") : null),
+        el("tr", {}, el("th", {}, "#"), el("th", {}, "Team"), el("th", { style: "white-space:nowrap" }, "W-L"), el("th", { class: "num" }, "PF"), el("th", { class: "num" }, "PA"), pod ? el("th", { class: "num" }, matchMedia("(max-width: 440px)").matches ? "Odds" : "Playoffs") : null, TN ? el("th", { class: "num", title: "Completed trades this season" }, "\u{1F501}") : null),
         rows.map((t, i) => [
           el(
             "tr",
             t.mine ? { class: "mine" } : {},
             el("td", {}, String(i + 1)),
-            el("td", { class: "tm-name", title: t.name }, `${t.mine ? "\u{1F451} " : ""}${t.name}`),
+            el("td", { class: "tm-name", title: t.name }, `${t.jokeMarks ? `${t.jokeMarks} ` : ""}${t.mine ? "\u{1F451} " : ""}${t.name}`),
             el("td", {}, `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}`),
             el("td", { class: "num" }, fmt(t.fpts)),
             el("td", { class: "num" }, t.fpts_against != null ? fmt(t.fpts_against) : "\u2013"),
-            pod ? el("td", { class: "num" }, oddsCell(t)) : null
+            pod ? el("td", { class: "num" }, oddsCell(t)) : null,
+            TN ? el("td", { class: "num" }, String(TN[t.roster_id] || 0)) : null
           ),
-          i + 1 === po && i + 1 < rows.length ? el("tr", {}, el("td", { colspan: pod ? "6" : "5", style: "padding:1px 0;border-top:3px dashed #c9a227;font-size:11px;color:#7a5f08;text-align:center" }, "\u2014 playoff line \u2014")) : null
+          i + 1 === po && i + 1 < rows.length ? el("tr", {}, el("td", { colspan: String(5 + (pod ? 1 : 0) + (TN ? 1 : 0)), style: "padding:1px 0;border-top:3px dashed #c9a227;font-size:11px;color:#7a5f08;text-align:center" }, "\u2014 playoff line \u2014")) : null
         ])
       ),
+      TN || marks ? el("p", { class: "small" }, [TN ? "\u{1F501} = completed trades this season" : "", marks ? "\u{1F3F3}\uFE0F tanking \xB7 \u{1F3D6}\uFE0F see you in Canc\xFAn (under 5% playoff odds) \xB7 \u2708\uFE0F checking flights (under 15%)" : ""].filter(Boolean).join(". ") + ".") : null,
       el("p", { class: "small" }, `Top ${po} make the playoffs (from week ${poWeek}). ${matchMedia("(max-width: 440px)").matches ? "PF = points for." : "PF / PA = points for / against."}${pod && rows.some((t, i) => i >= po && rows.slice(0, po).some((u) => (pod[t.roster_id] || 0) > (pod[u.roster_id] || 0))) ? " A team below the line can have better odds: they weigh points scored and the schedule left, not only W-L." : ""}${pod ? " Playoffs = 2,000 simulated rest-of-seasons from this season's scores (\u25B2\u25BC vs last week)." : ""}`),
       await (async () => {
         const ap = await allPlay();
@@ -1154,6 +1158,15 @@ function standings() {
       L.champs.length ? [el("h3", {}, "Champions"), el("div", { class: "chips" }, L.champs.map((c) => el("span", { class: "chip gold" }, `\u{1F3C6} ${c.season}: ${c.team}`)))] : null
     ];
   });
+}
+async function tradeCounts() {
+  if (L.tradeN) return L.tradeN;
+  if (L.espn || !L.id || /[?&]sample=1/.test(location.search)) return null;
+  const weeks = [];
+  for (let w = 1; w <= Number(L.week); w++) weeks.push(w);
+  const tx = (await Promise.all(weeks.map((w) => get(`${API}/league/${L.id}/transactions/${w}`).catch(() => [])))).flat(), n = {};
+  for (const x of tx) if (x && x.type === "trade" && x.status === "complete") for (const rid of x.roster_ids || []) n[rid] = (n[rid] || 0) + 1;
+  return L.tradeN = n;
 }
 async function tradeLedger() {
   const weeks = [];
