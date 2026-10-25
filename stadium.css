@@ -252,3 +252,19 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
 #panel-close:hover, #panel-close:focus-visible { border-image: none; background: rgba(43,29,18,0.16); }
 #panel-close:active { border-image: none; background: rgba(43,29,18,0.24); color: #3b2a1a; }
 #panel:not([hidden]) ~ #tip, #panel:not([hidden]) ~ #nudge { display: none !important; }
+
+.aw-row { padding: 8px 2px; border-bottom: 1px solid rgba(43,29,18,0.12); }
+.aw-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 14px; }
+.aw-n { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.aw-who { margin-top: 2px; font-size: 14px; color: #5a4a33; overflow-wrap: anywhere; }
+
+@media (max-width: 1279px) {
+  body.st-out #st-rail-l, body.st-out #st-rail-r { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 6px; position: fixed; z-index: 3;
+    top: var(--rail-top, 120px); bottom: var(--rail-bottom, 72px); width: var(--rail-w, 100px); overflow: auto; overscroll-behavior: contain;
+    font: 600 11px/1.3 "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #fff4d6; }
+  body.st-out #st-rail-l { left: 6px; } body.st-out #st-rail-r { right: 6px; }
+  body.st-out .rail-card { background: rgba(16, 19, 24, 0.88); border: 1px solid #3a3f47; border-radius: 8px; padding: 6px 7px; overflow-wrap: anywhere; }
+  body.st-out .rail-card b { display: block; color: #ffd84a; margin-bottom: 2px; }
+  body.st-out .rail-row { display: flex; justify-content: space-between; gap: 4px; } body.st-out .rail-row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; } body.st-out .rail-row span:last-child { white-space: nowrap; flex-shrink: 0; }
+  body.st-out .rail-row.mine { color: #ffe08a; } body.st-out .rail-cut { border-top: 2px dashed #c9a227; margin: 3px 0; font-size: 10px; color: #c9a227; text-align: center; }
+}

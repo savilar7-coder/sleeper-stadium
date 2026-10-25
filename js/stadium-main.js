@@ -961,7 +961,7 @@ function standings() {
             "table",
             {},
             el("tr", {}, el("th", {}, "Team"), el("th", {}, "All-play"), el("th", { class: "num" }, "Luck")),
-            ap.map((x) => el("tr", x.t.mine ? { class: "mine" } : {}, el("td", {}, x.t.name), el("td", {}, `${x.w}-${x.l}`), el("td", { class: "num" }, `${x.luck >= 0.5 ? "\u{1F340} " : x.luck <= -0.5 ? "\u{1F494} " : ""}${luck(x)}`)))
+            ap.map((x) => el("tr", x.t.mine ? { class: "mine" } : {}, el("td", {}, x.t.name), el("td", { style: "white-space:nowrap" }, `${x.w}-${x.l}`), el("td", { class: "num", style: "white-space:nowrap" }, `${x.luck >= 0.5 ? "\u{1F340} " : x.luck <= -0.5 ? "\u{1F494} " : ""}${luck(x)}`)))
           ),
           el("p", { class: "small" }, "Luck = real wins minus the wins your all-play record would give you.")
         ];
@@ -1482,7 +1482,12 @@ window.__playoffOdds = playoffOdds;
 function awards() {
   const list = awardsList(), final = Object.values(L.games || {}).length && Object.values(L.games).every((s) => s === "complete");
   openPanel(`\u{1F3C5} Week ${L.week} awards${final ? "" : " (so far)"}`, async () => [
-    list.length ? el("table", {}, list.map(([k, who, n]) => el("tr", {}, el("td", { style: "white-space:nowrap;font-size:13px;padding:6px 4px" }, el("b", {}, k)), el("td", {}, who), el("td", { class: "num" }, n)))) : el("p", {}, "No points yet this week. Awards show up once the games start."),
+    list.length ? el("div", { class: "aw-list" }, list.map(([k, who, n]) => el(
+      "div",
+      { class: "aw-row" },
+      el("div", { class: "aw-top" }, el("b", {}, k), el("span", { class: "aw-n" }, n)),
+      el("div", { class: "aw-who" }, who)
+    ))) : el("p", {}, "No points yet this week. Awards show up once the games start."),
     list.length ? (() => {
       const b = el("button", { type: "button", class: "mu-share" }, "\u{1F4F8} Share as a picture");
       b.onclick = () => recap();
