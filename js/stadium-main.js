@@ -1459,11 +1459,12 @@ function passPerks() {
   const row = (icon, what, now) => el("tr", {}, el("td", { style: "font-size:20px;padding:6px 4px;vertical-align:top" }, icon), el("td", { style: "padding:6px 4px" }, el("b", {}, what), el("div", { style: "font-size:13px;color:#5a4a33" }, now)));
   openPanel(`\u2605 ${L.name} \xB7 League Pass`, async () => [
     el("table", {}, [
-      row("\u{1F388}", "Your blimp", blimp ? `"${blimp}"` : "Pick your line: reply to your League Pass email"),
-      row("\u{1F3AD}", "Team looks + football mascots", looks.length ? `${looks.length} team${looks.length > 1 ? "s" : ""} dressed up for the whole league` : "Tell us who plays as what: reply to your email"),
-      row("\u{1F451}", "Golden jersey", gold.length ? gold.map(byId).filter(Boolean).join(", ") : "Tell us whose team gets it"),
-      row("\u{1F6AB}", "No tip asks", "Your league never sees a tip or beer ask"),
-      row("\u{1F504}", "Every update, all season", "Plus one league request built each week")
+      row("\u{1F6E0}\uFE0F", "You ask, I build", "Your requests first, one built every week"),
+      row("\u{1F602}", "Your league's inside jokes on the field", "Tanking, trade addict, Canc\xFAn, yours"),
+      row("\u{1F388}", "Blimp text, football mascots, golden jersey for the commish", [blimp ? `Blimp: "${blimp}"` : "Blimp: reply to your League Pass email", looks.length ? `${looks.length} team${looks.length > 1 ? "s" : ""} dressed up` : null, gold.length ? `Gold: ${gold.map(byId).filter(Boolean).join(", ")}` : null].filter(Boolean).join(" \xB7 ")),
+      row("\u{1F6AB}", "No tip asks on your league, ever", "Your league never sees a tip or beer ask"),
+      row("\u{1F504}", "Every update all season, the day it ships", "New features land on your link automatically"),
+      el("tr", {}, el("td", { style: "font-size:20px;padding:6px 4px;vertical-align:top" }, "\u{1F52D}"), el("td", { style: "padding:6px 4px" }, el("b", {}, "See what's coming: "), el("a", { href: "https://lamaisonwebstudio.com/stadium/make/#ideas", target: "_blank", rel: "noopener", style: "color:#7a4b00;font-weight:700" }, "ideas list")))
     ]),
     (() => {
       const b = el("button", { type: "button", class: "mu-share" }, "\u{1F517} Send it to your league chat");
@@ -1477,6 +1478,7 @@ function passPerks() {
   ]);
 }
 window.__passPerks = passPerks;
+window.__playoffOdds = playoffOdds;
 function awards() {
   const list = awardsList(), final = Object.values(L.games || {}).length && Object.values(L.games).every((s) => s === "complete");
   openPanel(`\u{1F3C5} Week ${L.week} awards${final ? "" : " (so far)"}`, async () => [

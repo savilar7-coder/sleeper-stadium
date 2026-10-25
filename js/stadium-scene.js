@@ -931,6 +931,43 @@ class StadiumScene extends World {
       sign.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
     }
     this.refreshScores();
+    this.placeExtras();
+  }
+  async placeExtras() {
+    const ex = window.__pass && window.__pass.extras || [], L = this.league, lines = {};
+    const add = (rid, txt) => {
+      (lines[rid] = lines[rid] || []).push(txt);
+    };
+    if (ex.includes("tanking") && L.week > 4 && !L.preseason) {
+      const t = L.teams.filter((x) => !x.wins && !x.ties && x.losses).sort((a, b) => a.fpts - b.fpts)[0];
+      if (t) add(t.roster_id, "\u{1F3F3}\uFE0F TANKING");
+    }
+    if (ex.includes("trade-addicts") && !L.espn && L.id) {
+      const n = {}, weeks = [...Array(Math.max(1, L.week || 1)).keys()].map((i) => i + 1);
+      const tx = (await Promise.all(weeks.map((w) => fetch(`https://api.sleeper.app/v1/league/${L.id}/transactions/${w}`).then((r) => r.json()).catch(() => [])))).flat();
+      for (const x of tx) if (x && x.type === "trade" && x.status === "complete") for (const rid of x.roster_ids || []) n[rid] = (n[rid] || 0) + 1;
+      Object.entries(n).filter(([, c]) => c >= 5).sort((a, b) => b[1] - a[1]).slice(0, 2).forEach(
+        ([rid, c]) => add(Number(rid), `\u{1F501} TRADE
+ADDICT \xD7${c}`)
+        /* two short lines: one long line reached the ASS BOWL sign */
+      );
+    }
+    if (ex.includes("cancun") && L.week > 5 && window.__playoffOdds) {
+      const PO = await window.__playoffOdds().catch(() => null), odds = PO && PO.odds || {};
+      for (const t of L.teams) {
+        const o = odds[t.roster_id];
+        if (o == null) continue;
+        if (o < 0.05) add(t.roster_id, "\u{1F3D6}\uFE0F SEE YOU\nIN CANC\xDAN");
+        else if (o < 0.15) add(t.roster_id, "\u2708\uFE0F checking flights\nto Canc\xFAn");
+      }
+    }
+    if (!this.sys.isActive()) return;
+    for (const [rid, ls] of Object.entries(lines)) {
+      const S = this.teamSprites.get(Number(rid));
+      if (!S) continue;
+      S.extra = this.label(S.s.x, S.s.y, ls.join("\n"), "#ffe9a8").setOrigin(S.side === 0 ? 0 : 1, 1).setFontSize(Math.round(12 * DPR));
+      S.extra.setStyle({ backgroundColor: "rgba(40,48,60,0.92)", align: "center", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
+    }
   }
   refreshScores() {
     for (const { tag, t } of this.teamSprites.values()) {
@@ -1550,10 +1587,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
       });
       ct.refresh();
     };
-    this.spot = {
-      beam: this.add.triangle(0, 0, 0, 0, 60, 0, 30, 150, 16774080, 0.16).setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setDepth(99990).setVisible(false),
-      pool: this.add.image(0, 0, "soft-glow").setScale(1.8, 0.8).setTint(16773296).setBlendMode(Phaser.BlendModes.ADD).setVisible(false)
-    };
+    this.spot = {};
     const ticker = document.getElementById("st-ticker"), tickText = ticker && ticker.firstElementChild;
     this.jumbo = { setText: () => {
     }, setAll: (pages) => {
@@ -1728,12 +1762,6 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     if (!this.spot) return;
     const teams = [...this.teamSprites.values()];
     const top = teams.filter((x) => x.t.points > 0).sort((a, b) => b.t.points - a.t.points)[0];
-    this.spot.beam.setVisible(!!top);
-    this.spot.pool.setVisible(!!top);
-    if (top) {
-      this.spot.beam.setPosition(top.s.x, top.s.y);
-      this.spot.pool.setPosition(top.s.x, top.s.y - 2).setDepth(top.s.y - 3);
-    }
     this.spotId = top ? top.t.roster_id : null;
     const benchPts = (t) => (t.players || []).filter((p) => !(t.starters || []).includes(p)).reduce((n, p) => n + ((t.players_points || {})[p] || 0), 0);
     const shame = teams.map((x) => ({ ...x, b: benchPts(x.t) })).filter((x) => x.b >= 5).sort((a, b) => b.b - a.b)[0];
@@ -2245,6 +2273,11 @@ ${r1(t.points)} pts`);
       const half = x.tag.displayWidth * x.tag.originX, lo = wv.x + pad + half, hi = wv.right - pad - (x.tag.displayWidth - half);
       const bx = x === this.walkAs ? x.home.x : x.s.x;
       x.tag.x = lo > hi ? bx : Math.min(hi, Math.max(lo, bx));
+      if (x.extra) {
+        const bt = this.benchTag && this.benchTag.visible && Math.abs(this.benchTag.x - x.s.x) < 2 ? this.benchTag.getBounds().top : Infinity;
+        const tb = x.tag.getBounds();
+        x.extra.setPosition(x.side === 0 ? tb.left : tb.right, Math.min(tb.top, bt) - 2).setDepth(x.tag.depth);
+      }
     }
   }
   walkMine(time) {
