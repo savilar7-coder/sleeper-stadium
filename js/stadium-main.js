@@ -1101,7 +1101,7 @@ function standings() {
           i + 1 === po && i + 1 < rows.length ? el("tr", {}, el("td", { colspan: pod ? "6" : "5", style: "padding:1px 0;border-top:3px dashed #c9a227;font-size:11px;color:#7a5f08;text-align:center" }, "\u2014 playoff line \u2014")) : null
         ])
       ),
-      el("p", { class: "small" }, `Top ${po} make the playoffs (from week ${poWeek}). PF / PA = points for / against.${pod && rows.some((t, i) => i >= po && rows.slice(0, po).some((u) => (pod[t.roster_id] || 0) > (pod[u.roster_id] || 0))) ? " A team below the line can have better odds: they weigh points scored and the schedule left, not only W-L." : ""}${pod ? " Playoffs = 2,000 simulated rest-of-seasons from this season's scores (\u25B2\u25BC vs last week)." : ""}`),
+      el("p", { class: "small" }, `Top ${po} make the playoffs (from week ${poWeek}). ${matchMedia("(max-width: 440px)").matches ? "PF = points for." : "PF / PA = points for / against."}${pod && rows.some((t, i) => i >= po && rows.slice(0, po).some((u) => (pod[t.roster_id] || 0) > (pod[u.roster_id] || 0))) ? " A team below the line can have better odds: they weigh points scored and the schedule left, not only W-L." : ""}${pod ? " Playoffs = 2,000 simulated rest-of-seasons from this season's scores (\u25B2\u25BC vs last week)." : ""}`),
       await (async () => {
         const ap = await allPlay();
         if (!ap.length) return null;
@@ -1261,7 +1261,7 @@ function tradeMaker(partnerId) {
     share.onclick = () => shareOffer(me, partner, [...give].map(labelOf), [...get_].map(labelOf), a, b);
     body.replaceChildren(
       el("div", { class: "tm-head" }, el("span", {}, "Trade with"), sel),
-      el("div", { class: "tm-bar" }, el("i", { style: `width:${a / sum * 100}%` }), el("em", {}, `${a} you give \xB7 you get ${b}`)),
+      el("div", { class: "tm-bar" }, el("i", { style: `width:${a / sum * 100}%` }), el("em", {}, `You give ${a} \xB7 you get ${b}`)),
       el("div", { class: "tm-verdict" }, verdict),
       el(
         "div",

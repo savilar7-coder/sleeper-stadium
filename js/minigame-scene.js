@@ -60,6 +60,7 @@ class MiniGameScene extends Phaser.Scene {
   }
   create() {
     this.Z = Phaser.Math.Clamp(this.scale.height / this.scale.width / 1.6, 1, 1.3);
+    this.Z = Math.max(this.Z, Phaser.Math.Clamp(this.scale.width / DPR / 560, 1, 1.8));
     this.W = this.scale.width / (DPR * this.Z);
     this.H = this.scale.height / (DPR * this.Z);
     this.RES = this.sys.renderer && this.sys.renderer.type === Phaser.WEBGL ? DPR * this.Z : 1;
