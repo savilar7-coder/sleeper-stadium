@@ -2082,15 +2082,20 @@ function gateLeague(id) {
   const houseG = Object.keys(window.__PASSES || {}).find((k) => window.__PASSES[k].code === "P0");
   card.querySelector("#gate-real").href = location.pathname + (houseG ? "?league=" + houseG : "?league=1&sample=1");
   card.querySelector("#gate-other").href = location.pathname + "?new=1";
-  card.querySelector("#gate-go").addEventListener("click", function() {
+  const beat = function(k) {
     try {
       var day = (new Date()).toISOString().slice(0, 10);
-      if (localStorage.getItem("ev-demo-passfoot") !== day) {
-        localStorage.setItem("ev-demo-passfoot", day);
-        navigator.sendBeacon("https://philosophers-trail.pages.dev/e?k=demo-passfoot");
+      if (localStorage.getItem("ev-" + k) !== day) {
+        localStorage.setItem("ev-" + k, day);
+        navigator.sendBeacon("https://philosophers-trail.pages.dev/e?k=" + k);
       }
     } catch (x) {
     }
+  };
+  beat("gate-view");
+  card.querySelector("#gate-go").addEventListener("click", function() {
+    beat("gate-click");
+    beat("demo-passfoot");
   });
   $("st-proj").replaceChildren(card);
 }
