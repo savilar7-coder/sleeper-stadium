@@ -24,6 +24,7 @@ async function espnLeague(id, season) {
     for (const e of entries) {
       const p = (e.playerPoolEntry || {}).player || {}, pid = `e${e.playerId}`;
       players[pid] = [p.fullName || "Unknown", POS[p.defaultPositionId] || "", PRO[p.proTeamId] || "", null, stat(p, 1, 0, 0) || 0];
+      if (p.injuryStatus && p.injuryStatus !== "ACTIVE") players[pid].push([p.injuryStatus, ""]);
       proj[pid] = stat(p, 1, 1, week) || 0;
       pts[pid] = stat(p, 0, 1, week) || 0;
     }

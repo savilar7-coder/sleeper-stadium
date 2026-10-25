@@ -133,7 +133,8 @@
   <div id="stick" hidden><div id="stick-knob"></div></div>
   <div id="zoom-ctl"><button id="zoom-in" type="button" aria-label="Zoom in">＋</button><button id="zoom-out" type="button" aria-label="Zoom out">－</button></div>
   <button id="jump-btn" type="button" aria-label="Matchup" hidden>⚔️ Matchup</button> 
-  <button id="share-btn" type="button" aria-label="Share my matchup" hidden>📸 Share</button> 
+  <button id="share-btn" type="button" aria-label="Share my matchup" hidden>📸 Share</button>
+  <button id="inj-btn" type="button" aria-label="Injuries" hidden>🚑 Injuries</button>  
   <button id="play-btn" type="button" hidden>🏈 Play</button> 
   <div id="mg-hud" hidden><div id="mg-score"></div><div id="mg-down"></div><div id="mg-msg"></div><div class="mg-btns"><button id="mg-exit" type="button">✕ Back to stadium</button></div>
     <div id="mg-end" hidden><div id="mg-end-title"></div><div id="mg-end-stat"></div><div id="mg-end-why"></div><div id="mg-end-line"></div><div id="mg-end-best"></div><div class="mg-end-btns"><button id="mg-again" type="button">↻ Rematch</button><button id="mg-share" type="button">📸 Share</button><button id="mg-end-exit" type="button">Back to stadium</button></div></div></div> 
@@ -288,7 +289,7 @@
 (function () {
   var fold = function () { var b = document.getElementById('gh-star'); if (b && !b.dataset.pass) { b.innerHTML = '&#11088; Star'; b.style.padding = '5px 9px'; } }; // a Pass league's button stays "Pass perks"
   var hits = function () { var b = document.getElementById('gh-star'); if (!b) return false; var r = b.getBoundingClientRect();
-    return ['jump-btn', 'share-btn'].some(function (id) { var e = document.getElementById(id); if (!e || !e.getClientRects().length) return false; var q = e.getBoundingClientRect();
+    return ['jump-btn', 'share-btn', 'inj-btn'].some(function (id) { var e = document.getElementById(id); if (!e || !e.getClientRects().length) return false; var q = e.getBoundingClientRect();
       return r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top; }); };
   var check = function () { if (hits()) fold(); };
   // Oct 24 2026 (round 65, QA cold load: the 300 ms layout check cost ~156 ms during boot): phones fold at once (the long pill

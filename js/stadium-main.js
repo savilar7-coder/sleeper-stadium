@@ -48,6 +48,152 @@ const store = (k, v) => {
 };
 const fmt = (n) => (Math.round(n * 10) / 10).toFixed(1);
 let game = null, L = null;
+const INJ_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries";
+const INJ_ST = { Questionable: "Q", Doubtful: "D", Out: "O", "Injured Reserve": "IR", IR: "IR", PUP: "IR", QUESTIONABLE: "Q", DOUBTFUL: "D", OUT: "O", INJURY_RESERVE: "IR" };
+const INJ_LONG = { Q: "Questionable", D: "Doubtful", O: "Out", IR: "IR" };
+const injNorm = (s) => String(s || "").toLowerCase().replace(/\b(jr|sr|ii|iii|iv|v)\b/g, "").replace(/[^a-z]/g, "");
+const dayStr = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const injPart = (p) => String(p || "").split(" - ")[0].toLowerCase();
+let injAt = 0, injBusy = false;
+function injBaseline() {
+  L.inj = L.inj || {};
+  for (const [pid, p] of Object.entries(L.players || {})) {
+    const x = p && p[5];
+    if (x && INJ_ST[x[0]] && !L.inj[pid]) L.inj[pid] = { st: INJ_ST[x[0]], part: injPart(x[1]), at: null, fresh: false };
+  }
+}
+async function fetchInjuries(force) {
+  if (!L || injBusy || !force && Date.now() - injAt < 9 * 6e4) return;
+  injBusy = true;
+  try {
+    let d = null;
+    try {
+      const c = JSON.parse(sessionStorage.getItem("st-inj-feed") || "null");
+      if (c && Date.now() - c.at < 9 * 6e4) d = c.d;
+    } catch {
+    }
+    if (!d) {
+      const r = await fetch(INJ_URL);
+      if (!r.ok) throw new Error(r.status);
+      const raw = await r.json();
+      d = [];
+      for (const tm of raw.injuries || []) for (const i of tm.injuries || []) {
+        const a = i.athlete || {}, eid = (((a.headshot || {}).href || "").match(/\/(\d+)\.png/) || [])[1] || null;
+        d.push({ n: a.displayName || `${a.firstName || ""} ${a.lastName || ""}`.trim(), tm: ((a.team || {}).abbreviation || "").replace("WSH", "WAS"), eid, st: i.status, part: (i.details || {}).type || "", date: i.date || null });
+      }
+      try {
+        sessionStorage.setItem("st-inj-feed", JSON.stringify({ at: Date.now(), d }));
+      } catch {
+      }
+    }
+    injAt = Date.now();
+    applyInjuries(d);
+  } catch {
+  } finally {
+    injBusy = false;
+  }
+}
+function applyInjuries(d) {
+  const P = L.players || {}, idx = {};
+  if (!L.espn) {
+    for (const [pid, p] of Object.entries(P)) if (p && p[2]) idx[`${injNorm(p[0])}|${p[2]}`] = pid;
+  }
+  const pidOf = (x) => L.espn ? x.eid ? `e${x.eid}` : null : idx[`${injNorm(x.n)}|${x.tm}`];
+  const seenK = `st-inj-seen-${L.id}`;
+  let seen = {};
+  try {
+    seen = JSON.parse(store(seenK) || "{}") || {};
+  } catch {
+    seen = {};
+  }
+  const today = dayStr(), inj = {}, active = new Set(), was = L.inj || {};
+  for (const x of d) {
+    const pid = pidOf(x);
+    if (!pid || !P[pid]) continue;
+    const st = INJ_ST[x.st];
+    if (!st) {
+      if (x.st === "Active") active.add(pid);
+      continue;
+    }
+    const day = x.date ? dayStr(new Date(x.date)) : null, changed = seen[pid] != null && seen[pid] !== st, old = was[pid];
+    const fresh = day === today || changed || !!(old && old.fresh);
+    const ts = x.date ? Date.parse(x.date) : changed ? Date.now() : old && old.st === st ? old.ts : null;
+    const worse = (a, b) => ["Q", "D", "O", "IR"].indexOf(a) > ["Q", "D", "O", "IR"].indexOf(b);
+    inj[pid] = { st, part: injPart(x.part), at: day, fresh, ts, up: changed && !worse(st, seen[pid]) && seen[pid] != null ? true : old && old.st === st ? !!old.up : false };
+  }
+  for (const [pid, v] of Object.entries(was)) if (!inj[pid] && !active.has(pid)) inj[pid] = v;
+  L.inj = inj;
+  const now = {};
+  for (const [pid, v] of Object.entries(inj)) now[pid] = v.st;
+  store(seenK, JSON.stringify(now));
+  const s = game && game.scene.getScene("stadium");
+  if (s && s.sys.isActive() && s.injuriesChanged) s.injuriesChanged();
+  injBadge();
+  if (!$("panel").hidden && /^🚑/.test($("panel-title").textContent)) injuriesBox();
+  if (!$("panel").hidden && /⚔️/.test($("panel-title").textContent)) {
+    const m = mine();
+    const rid = window.__muRid != null ? window.__muRid : m && m.roster_id;
+    if (rid != null) matchup(rid);
+  }
+}
+const hurt = (t) => (t.starters || []).map((pid, i) => pid && pid !== "0" && L.inj && L.inj[pid] ? { pid, i, ...L.inj[pid] } : null).filter(Boolean);
+const oppOf = (t) => L.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o !== t);
+const slotRole = (t, i) => {
+  const lab = (x) => String(x || "").replace("SUPER_FLEX", "SF").replace("REC_FLEX", "FLX"), all = (L.slots || []).map(lab), me = all[i];
+  if (!me) return "";
+  const total = all.filter((x) => x === me).length;
+  return total > 1 ? `${me}${all.slice(0, i + 1).filter((x) => x === me).length}` : me;
+};
+const newInjuries = () => L.teams.flatMap((t) => hurt(t).filter((h) => h.fresh).map((h) => ({ ...h, t, opp: oppOf(t), role: slotRole(t, h.i) }))).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+const injKey = (h) => `${h.pid}:${h.st}`;
+const injLast = (pid) => L.players[pid] ? String(L.players[pid][0]).split(" ").slice(-1)[0] : pid;
+const ago = (ts) => {
+  if (!ts) return "";
+  const d = Date.now() - ts;
+  if (d < 9e4) return "just now";
+  if (d < 36e5) return `${Math.round(d / 6e4)} min ago`;
+  if (d < 864e5) return `${Math.round(d / 36e5)} h ago`;
+  return new Date(ts).toLocaleDateString("en-US", { weekday: "short" });
+};
+const injLine = (h) => `${h.up ? `${injLast(h.pid)} upgraded to ${INJ_LONG[h.st] || h.st}` : `${injLast(h.pid)} went down`}`;
+const injHits = (h) => `${INJ_LONG[h.st] || h.st}${h.part ? ` \xB7 ${h.part}` : ""} \xB7 that's ${h.t.name}${/s$/i.test(h.t.name) ? "\u2019" : "\u2019s"} ${h.role || "starter"}${h.opp ? ` (vs ${h.opp.name})` : ""}`;
+function injViewed(set) {
+  const k = `st-inj-viewed-${L.id}`;
+  if (set) {
+    try {
+      store(k, JSON.stringify([...set].slice(-200)));
+    } catch {
+    }
+    return set;
+  }
+  try {
+    return new Set(JSON.parse(store(k) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+function injBadge() {
+  const b = $("inj-btn");
+  if (!b) return;
+  const seen = injViewed(), n = newInjuries().filter((h) => !seen.has(injKey(h))).length;
+  b.replaceChildren("\u{1F691} Injuries", n ? el("b", { class: "n" }, String(n)) : "");
+  b.classList.toggle("new", n > 0);
+}
+function injuriesBox() {
+  const rows = newInjuries(), seen = injViewed();
+  for (const h of rows) seen.add(injKey(h));
+  injViewed(seen);
+  injBadge();
+  openPanel("\u{1F691} Injuries", async () => [
+    rows.length ? el("div", { class: "needs" }, rows.map((h) => el(
+      "div",
+      { class: `need${h.up ? "" : " failed"}` },
+      el("b", {}, `\u{1F691} ${injLine(h)}`, el("small", { style: "font-weight:400;color:#8a7a5c" }, h.ts ? ` \xB7 ${ago(h.ts)}` : "")),
+      el("span", {}, injHits(h))
+    ))) : el("div", { class: "empty" }, "No new injuries today."),
+    el("p", { class: "small" }, `${rows.length ? "New since you last looked. The \u{1F691} on a board marks the team it hits." : "When a starter goes down during the games it shows here within minutes, and the \u{1F691} on the board marks the team it hits."} ${injAt ? `Checked ${ago(injAt)}` : "Checking the injury report\u2026"}${Object.values(L.games || {}).includes("in_game") ? " \xB7 every 10 min while games are on." : "."}`)
+  ]);
+}
 async function weekProjections(season, week) {
   const key = `st-proj-${season}-${week}`;
   try {
@@ -510,6 +656,7 @@ function lineupFlag(t, i) {
 }
 function matchup(rid) {
   const me = L.teams.find((t) => t.roster_id === rid) || mine() || L.teams[0];
+  window.__muRid = me.roster_id;
   const opp = L.teams.find((t) => t.matchup_id && t.matchup_id === me.matchup_id && t !== me);
   if (!opp) {
     teamPanel(me.roster_id);
@@ -530,6 +677,10 @@ function matchup(rid) {
         (() => {
           const f = lineupFlag(t, i);
           return f ? el("small", { style: "color:#b23a2a;font-weight:700" }, ` \u26A0\uFE0F ${f}`) : null;
+        })(),
+        (() => {
+          const j = L.inj && pid && L.inj[pid];
+          return j ? el("small", { style: "color:#b23a2a;font-weight:700", title: INJ_LONG[j.st] }, ` \u{1F691} ${j.st}${j.part ? ` (${j.part})` : ""}`) : null;
         })()
       ),
       (() => {
@@ -709,7 +860,7 @@ function playGame() {
   }
   const opp = L.teams.find((t) => t.matchup_id && t.matchup_id === me.matchup_id && t !== me) || L.teams.find((t) => t !== me);
   closePanel();
-  for (const id of ["st-hud", "zoom-ctl", "jump-btn", "share-btn", "play-btn", "prompt"]) $(id).style.display = "none";
+  for (const id of ["st-hud", "zoom-ctl", "jump-btn", "share-btn", "inj-btn", "play-btn", "prompt"]) $(id).style.display = "none";
   for (const id of ["drill-tease", "recap-ready"]) {
     const e = document.getElementById(id);
     if (e) e.remove();
@@ -725,7 +876,7 @@ function playGame() {
 function exitGame() {
   game.scene.stop("minigame");
   $("mg-hud").hidden = true;
-  for (const id of ["st-hud", "zoom-ctl", "jump-btn", "share-btn", "play-btn", "prompt"]) $(id).style.display = "";
+  for (const id of ["st-hud", "zoom-ctl", "jump-btn", "share-btn", "inj-btn", "play-btn", "prompt"]) $(id).style.display = "";
   for (const id of ["st-rail-l", "st-rail-r", "st-ticker", "gh-star", "tip-pill", "share-lg"]) {
     const e = document.getElementById(id);
     if (e) e.style.visibility = "";
@@ -1294,7 +1445,8 @@ function matchupCard(me, opp) {
   }) && Object.keys(L.games || {}).length;
   const who = fit(handle(opp), 60, 560), pct = Math.round(winOdds(me, opp) * 100);
   const head = !me.points && !opp.points ? "WHO YOU GOT? \u{1F447}" : done ? d >= 0 ? `BEAT ${who} BY ${fmt(d)} \u{1F60E}` : `LOST TO ${who} BY ${fmt(-d)} \u{1F624}` : `${d >= 0 ? "UP" : "DOWN"} ${fmt(Math.abs(d))} ${d >= 0 ? "ON" : "TO"} ${who}`;
-  const sub = !me.points && !opp.points ? `${pct}% to win \xB7 kickoff soon` : done ? "FINAL" : `${pct}% TO WIN \xB7 ${toPlay(me)} v ${toPlay(opp)} TO PLAY`;
+  const hit = newInjuries().find((h) => h.t === me || h.t === opp), hitShort = hit && (hit.t.name.length > 14 ? `${hit.t.name.slice(0, 13)}\u2026` : hit.t.name);
+  const sub = !me.points && !opp.points ? `${pct}% to win \xB7 kickoff soon` : done ? "FINAL" : hit && !hit.up ? `${injLast(hit.pid).toUpperCase()} WENT DOWN \xB7 ${hitShort.toUpperCase()} ${hit.t.points < (hit.t === me ? opp : me).points ? `NEEDS ${fmt((hit.t === me ? opp : me).points - hit.t.points)}` : `UP ${fmt(hit.t.points - (hit.t === me ? opp : me).points)}`}` : `${pct}% TO WIN \xB7 ${toPlay(me)} v ${toPlay(opp)} TO PLAY`;
   let hp = 84;
   c.font = `900 ${hp}px ${font}`;
   while (c.measureText(head).width > W - 80 && hp > 24) {
@@ -1303,8 +1455,13 @@ function matchupCard(me, opp) {
   }
   c.fillStyle = d >= 0 || !me.points ? "#fff4d6" : "#ffb4a8";
   c.fillText(head, W / 2, 770);
-  c.fillStyle = "#9dff7a";
-  c.font = `900 44px ${font}`;
+  c.fillStyle = hit && !hit.up && me.points + opp.points ? "#ffb4a8" : "#9dff7a";
+  let sp = 44;
+  c.font = `900 ${sp}px ${font}`;
+  while (c.measureText(sub).width > W - 80 && sp > 24) {
+    sp -= 2;
+    c.font = `900 ${sp}px ${font}`;
+  }
   c.fillText(sub, W / 2, 836);
   c.fillStyle = "#c9a227";
   c.font = `bold 30px ${font}`;
@@ -1665,9 +1822,11 @@ async function refreshPoints() {
     }
     await gameStatus();
     updateProj();
+    if (r && full) injBaseline();
     const s = game && game.scene.getScene("stadium");
     if (s && s.refreshScores) s.refreshScores();
     hud();
+    if (Object.values(L.games || {}).includes("in_game")) fetchInjuries(false);
   } catch {
   }
 }
@@ -1855,6 +2014,7 @@ function askLeague(note) {
     askLeague(err.message === "private" ? "That ESPN league is private. The commissioner can open it: ESPN League Settings > Basic Settings > Make league viewable to public." : /ESPN/.test(err.message) ? "No ESPN league with that ID. Paste the link from your ESPN league page." : /^404/.test(err.message) || err instanceof TypeError ? "No Sleeper league with that ID. Check it, or type your Sleeper username." : `Could not reach Sleeper (${err.message}). Try again in a minute.`);
     return;
   }
+  injBaseline();
   count("league");
   if (L.espn) count("espn");
   countLeague(L.id);
@@ -1947,6 +2107,10 @@ function askLeague(note) {
   });
   $("share-btn").hidden = false;
   $("share-btn").addEventListener("click", shareMine);
+  if (!/[?&]sample=1/.test(location.search)) $("inj-btn").hidden = false;
+  $("inj-btn").addEventListener("click", injuriesBox);
+  injBadge();
+  window.__injBadge = injBadge;
   $("st-table").addEventListener("click", standings);
   $("st-news").addEventListener("click", news);
   $("st-recap").addEventListener("click", awards);
@@ -1968,6 +2132,7 @@ function askLeague(note) {
     if ($("panel").hidden && !playAfterPick && !mine()) whoAreYou();
   }, 600);
   setInterval(refreshPoints, 6e4);
+  setTimeout(() => fetchInjuries(true), 2500);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) refreshPoints();
   });
@@ -1993,5 +2158,5 @@ function askLeague(note) {
   $("play-btn").addEventListener("click", playGame);
   $("mg-exit").addEventListener("click", exitGame);
   $("mg-again").addEventListener("click", playGame);
-  window.__stadium = { teamPanel, standings, news, tradeMaker, whoAreYou, setMine, matchup, playGame, exitGame, lookPicker };
+  window.__stadium = { teamPanel, standings, news, tradeMaker, whoAreYou, setMine, matchup, playGame, exitGame, lookPicker, injuriesBox };
 })();

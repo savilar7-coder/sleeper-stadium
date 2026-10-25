@@ -1067,6 +1067,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
   tickBoard(B) {
     const cur = B.cur || (B.cur = { a: B.a.points, b: B.b.points });
     const ko = this.kickoffText(B.a, B.b);
+    const ba = this.hurt(B.a).length ? "\u{1F691} " : "", bb = this.hurt(B.b).length ? " \u{1F691}" : "";
     if (ko) {
       if (B.tick) {
         B.tick.stop();
@@ -1074,10 +1075,10 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
       }
       cur.a = B.a.points;
       cur.b = B.b.points;
-      B.board.setText(ko);
+      B.board.setText(`${ba}${ko}${bb}`);
       return;
     }
-    const f1 = (n) => (Math.round(n * 10) / 10).toFixed(1), put = () => B.board.setText(`${f1(cur.a)}  :  ${f1(cur.b)}`);
+    const f1 = (n) => (Math.round(n * 10) / 10).toFixed(1), put = () => B.board.setText(`${ba}${f1(cur.a)}  :  ${f1(cur.b)}${bb}`);
     if (B.tick) {
       B.tick.stop();
       B.tick = null;
@@ -1623,6 +1624,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
         d.append(Object.assign(document.createElement("b"), { textContent: h }), ...ls.map((l) => Object.assign(document.createElement("div"), { textContent: l })));
         return d;
       }));
+      if (rail && this.injCard) rail.append(this.injCard);
       if (rail && this.tradesCard) rail.append(this.tradesCard);
       tickText.style.animationDuration = `${Math.max(14, s.length * 0.16)}s`;
     } };
@@ -2217,6 +2219,61 @@ ${r1(t.points)} pts`);
     const G = this.league.games || {}, P = this.league.players || {};
     return (t.starters || []).some((pid) => pid && pid !== "0" && G[P[pid] ? P[pid][2] : pid] === "in_game");
   }
+  hurt(t) {
+    const I = this.league.inj || {};
+    return (t.starters || []).filter((pid) => pid && pid !== "0" && I[pid]).map((pid) => ({ pid, ...I[pid] }));
+  }
+  injLine(a, b) {
+    const fr = [a, b].flatMap((t) => this.hurt(t).filter((h2) => h2.fresh).map((h2) => ({ ...h2, t })));
+    if (!fr.length) return null;
+    const P = this.league.players || {}, h = fr[0], last = P[h.pid] ? String(P[h.pid][0]).split(" ").slice(-1)[0] : h.pid;
+    const short = (n) => {
+      n = String(n || "");
+      return n.length > 16 ? `${n.slice(0, 15)}\u2026` : n;
+    };
+    return `\u{1F691} ${last} ${h.st}${h.part ? ` (${h.part})` : ""} \xB7 ${short(h.t.name)}${fr.length > 1 ? ` +${fr.length - 1}` : ""}`;
+  }
+  injuriesChanged() {
+    for (const B of this.boards || []) this.tickBoard(B);
+    this.injuriesCard();
+    if (window.__injBadge) window.__injBadge();
+  }
+  injuriesCard() {
+    const rail = document.getElementById("st-rail-r");
+    if (!rail || window.__tv) return;
+    const L = this.league, P = L.players || {}, opp = (t) => L.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o !== t);
+    const rows = L.teams.flatMap((t) => this.hurt(t).filter((h) => h.fresh).map((h) => ({ ...h, t }))).sort((x, y) => (y.ts || 0) - (x.ts || 0));
+    const old = this.injCard, d = document.createElement("div");
+    d.className = "rail-card";
+    d.style.cursor = "pointer";
+    d.title = "Open the injuries box";
+    d.onclick = () => {
+      const b = document.getElementById("inj-btn");
+      if (b) b.click();
+    };
+    const short = (n) => {
+      n = String(n || "");
+      return n.length > 24 ? `${n.slice(0, 23)}\u2026` : n;
+    }, last = (pid) => P[pid] ? String(P[pid][0]).split(" ").slice(-1)[0] : pid;
+    const ago = (ts) => {
+      if (!ts) return "";
+      const x = Date.now() - ts;
+      return x < 9e4 ? "just now" : x < 36e5 ? `${Math.round(x / 6e4)} min ago` : x < 864e5 ? `${Math.round(x / 36e5)} h ago` : new Date(ts).toLocaleDateString("en-US", { weekday: "short" });
+    };
+    d.append(Object.assign(document.createElement("b"), { textContent: "\u{1F691} INJURIES" }), ...rows.length ? rows.slice(0, 6).map((h) => {
+      const row = document.createElement("div");
+      row.style.color = h.up ? "" : "#ffb3a7";
+      row.append(
+        Object.assign(document.createElement("div"), { textContent: `${last(h.pid)} ${h.up ? "upgraded to" : "went down \xB7"} ${h.st}${h.part ? ` ${h.part}` : ""}` }),
+        Object.assign(document.createElement("div"), { textContent: `hits ${short(h.t.name)}${opp(h.t) ? ` (vs ${short(opp(h.t).name)})` : ""}${h.ts ? ` \xB7 ${ago(h.ts)}` : ""}`, style: "font-weight:400;font-size:12px;opacity:.8;padding-left:1.1em;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" })
+      );
+      return row;
+    }) : [Object.assign(document.createElement("div"), { textContent: "No new injuries today", style: "font-weight:400;opacity:.8" })]);
+    this.injCard = d;
+    if (old && old.parentNode) old.replaceWith(d);
+    else if (this.tradesCard && this.tradesCard.parentNode === rail) rail.insertBefore(d, this.tradesCard);
+    else rail.append(d);
+  }
   sweatLine(a, b) {
     const la = this.playersLeft(a), lb = this.playersLeft(b);
     if (!la.length && !lb.length) return { text: "FINAL", done: true };
@@ -2274,11 +2331,12 @@ ${r1(t.points)} pts`);
       if (o.pct.text !== t) o.pct.setText(t);
       const fs = Math.round(15 * DPR / Math.max(0.5, this.cameras.main.zoom / DPR));
       o.pct.setFontSize(Math.round(14 * DPR)).setStroke("#0f141a", Math.round(5 * DPR)).setScale(board.scaleX).setOrigin(0.5, 1).setPosition(a.mine ? x1 + len * 0.22 : b.mine ? x2 - len * 0.22 : kx, hy - 8).setDepth(board.depth + 1);
-      const sw = sweat || this.liveNow(a) || this.liveNow(b) ? this.sweatLine(a, b) : null, pt = sw ? sw.text : `proj ${a.proj.toFixed(1)} \u2013 ${b.proj.toFixed(1)}`;
+      const sw0 = sweat || this.liveNow(a) || this.liveNow(b) ? this.sweatLine(a, b) : null, il = this.injLine(a, b);
+      const sw = il && (!sw0 || Math.floor(now / 6e3) % 2) ? { text: il, done: false, inj: true } : sw0, pt = sw ? sw.text : `proj ${a.proj.toFixed(1)} \u2013 ${b.proj.toFixed(1)}`;
       if (projTxt.text !== pt) projTxt.setText(pt);
       const pcol = lead ? "#9dff7a" : "#e8e2ff";
       if (o.pct.style.color !== pcol) o.pct.setColor(pcol);
-      const tcol = sw && !sw.done ? "#ffd84a" : "#9aa3ad";
+      const tcol = sw && sw.inj ? "#ffb3a7" : sw && !sw.done ? "#ffd84a" : "#9aa3ad";
       if (projTxt.style.color !== tcol) projTxt.setColor(tcol);
       const sty = sw ? sweat ? 13 : 12 : 11;
       if (o.sweatStyle !== sty) {
