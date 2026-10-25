@@ -249,7 +249,7 @@ body:has(#panel:not([hidden])) #nudge { display: none; }
 
 @media (orientation: landscape) and (max-height: 500px) {
   #st-hud { padding-top: 4px !important; padding-bottom: 6px !important; }
-  #st-hud #st-league, #st-hud #st-proj:not(:has(#lg-id)) { display: none; } 
+  #st-hud #st-league, #st-hud #st-proj:not(:has(#lg-id)):not(:has(#gate-go)) { display: none; } 
   #st-hud #st-score { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0 0 4px; }
   #st-hud .st-btns button { min-height: 44px; padding: 4px 10px; font-size: 13px; } 
 }
