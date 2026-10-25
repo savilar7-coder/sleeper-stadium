@@ -1933,7 +1933,7 @@ function askLeague(note) {
     if (e) e.style.display = "none";
   }
   $("st-league").textContent = "Sleeper Stadium";
-  $("st-score").textContent = "Your fantasy league as a live pixel football stadium";
+  $("st-score").innerHTML = "Your fantasy league as a live pixel stadium &middot; $5 a season per league";
   const btns = document.querySelector(".st-btns");
   if (btns) btns.style.display = "none";
   const hudL = document.getElementById("st-hud");
@@ -1957,10 +1957,10 @@ function askLeague(note) {
   msg.style.cssText = "margin:6px auto 0;font:14px system-ui,sans-serif;color:#5a4a33;max-width:340px;text-align:center";
   const trust = document.createElement("div");
   trust.style.cssText = "margin:6px auto 0;font:13px system-ui,sans-serif;color:#7a6a50;text-align:center";
-  trust.innerHTML = '<b style="font-size:14px;color:#5a4a33">Sleeper @username or a public ESPN league link</b><br><span style="color:#5a4a33">Reads the same public data your leaguemates see \xB7 no login \xB7 free &amp; open source \xB7 not affiliated with Sleeper</span>';
+  trust.innerHTML = '<b style="font-size:14px;color:#5a4a33">Sleeper @username or a public ESPN league link</b><br><span style="color:#5a4a33">Reads the same public data your leaguemates see \xB7 no login \xB7 not affiliated with Sleeper</span>';
   const go = (id) => {
     try {
-      sessionStorage.setItem("st-own", "1");
+      sessionStorage.setItem("st-own", String(id));
     } catch (x) {
     }
     location.search = `?league=${id}`;
@@ -2017,8 +2017,10 @@ function askLeague(note) {
   demo.type = "button";
   demo.textContent = "No league? Try a sample league";
   demo.style.cssText = "display:block;margin:8px auto 0;font:600 14px sans-serif;padding:6px 12px;background:none;color:#5a4a33;border:1px dashed #9e7c0c;border-radius:8px;cursor:pointer";
+  const house = () => Object.keys(window.__PASSES || {}).find((k) => window.__PASSES[k].code === "P0");
   demo.onclick = () => {
-    location.search = "?league=1&sample=1";
+    const h = house();
+    location.search = h ? `?league=${h}` : "?league=1&sample=1";
   };
   const look = document.createElement("img");
   look.src = "stadium.gif";
@@ -2026,19 +2028,19 @@ function askLeague(note) {
   look.width = 300;
   look.height = 420;
   look.style.cssText = "display:block;margin:4px auto 0;width:min(440px,88vw,calc((100vh - 340px) * 300 / 420));width:min(440px,80vw,calc((100svh - 330px) * 300 / 420));height:auto;border-radius:12px;border:2px solid #9e7c0c;image-rendering:pixelated;cursor:pointer";
-  look.title = "Open the sample league";
+  look.title = "See a real one";
   look.onclick = demo.onclick;
   const tap = document.createElement("div");
   tap.style.cssText = "margin:12px auto 0;font:600 13px system-ui,sans-serif;color:#7a4b00;text-align:center;cursor:pointer";
-  tap.innerHTML = "Live scores, touchdown alerts, win odds, the ASS Bowl, and play your matchup as a 2-minute mini game<br><u>No league? Tap the stadium for a sample</u>";
+  tap.innerHTML = "Live scores, touchdown alerts, win odds, the ASS Bowl, and play your matchup as a 2-minute mini game<br><u>See a real one</u>";
   tap.style.fontWeight = "400";
   tap.onclick = () => demo.onclick();
   const star = document.createElement("a");
   star.href = "https://github.com/savilar7-coder/sleeper-stadium";
   star.target = "_blank";
   star.rel = "noopener";
-  star.style.cssText = "display:block;width:max-content;max-width:100%;box-sizing:border-box;margin:10px auto 0;padding:7px 14px;border-radius:10px;background:#24292f;color:#fff;text-decoration:none;font:700 14px system-ui,sans-serif";
-  star.textContent = "\u2B50 Star it on GitHub \xB7 free & open source";
+  star.style.cssText = "display:block;width:max-content;max-width:100%;box-sizing:border-box;margin:10px auto 0;padding:4px 10px;border-radius:8px;background:#24292f;color:#fff;text-decoration:none;font:600 12px system-ui,sans-serif";
+  star.innerHTML = "&#11088; Star on GitHub";
   const by = document.createElement("p");
   by.style.cssText = "margin:8px auto 0;font:13px system-ui,sans-serif;color:#5a4a33;max-width:320px;text-align:center";
   by.innerHTML = 'Built by <a style="color:#7a4b00" href="https://lamaisonwebstudio.com/" target="_blank" rel="noopener">lamaisonwebstudio.com</a>. Podcast, Discord or business? <a style="color:#7a4b00" href="https://lamaisonwebstudio.com/stadium/#custom" target="_blank" rel="noopener">Let&#39;s build yours.</a>';
@@ -2053,6 +2055,44 @@ function askLeague(note) {
     if (last && !note) document.getElementById("lg-id").value = last;
   } catch (x) {
   }
+}
+function gateLeague(id) {
+  for (const i of ["jump-btn", "share-btn", "inj-btn", "zoom-ctl", "play-btn", "st-fold", "gh-star", "tip-pill", "pass-foot"]) {
+    const e = document.getElementById(i);
+    if (e) e.style.display = "none";
+  }
+  const btns = document.querySelector(".st-btns");
+  if (btns) btns.style.display = "none";
+  const hudG = document.getElementById("st-hud");
+  if (hudG) {
+    hudG.style.maxHeight = "calc(100vh - 16px)";
+    hudG.style.maxHeight = "calc(100svh - 16px)";
+    hudG.style.overflowY = "auto";
+    hudG.style.touchAction = "pan-y";
+    hudG.style.overscrollBehavior = "contain";
+  }
+  const projG = document.getElementById("st-proj");
+  if (projG) projG.style.minWidth = "0";
+  $("st-league").textContent = "Sleeper Stadium";
+  $("st-score").innerHTML = "Your league&rsquo;s stadium: $5 for the season";
+  const card = document.createElement("div");
+  card.style.cssText = "margin:6px auto 0;max-width:360px;font:14px/1.45 system-ui,sans-serif;color:#2b1d12;text-align:left";
+  card.innerHTML = '<div style="text-align:center;color:#7a4b00;font-weight:700">$5 this weekend &middot; $10 from Monday</div><ul style="margin:10px 0 0;padding-left:20px"><li>Live scores every 10 seconds, touchdowns as they happen</li><li>Injuries box: who got hurt and who it hits</li><li>Your league&rsquo;s inside jokes on the field</li><li>The 2-minute game: play your own matchup</li><li>Weekly awards and playoff odds</li><li>No ads, no tip asks</li></ul><a id="gate-go" style="display:block;margin:14px 0 0;padding:12px;border-radius:10px;background:#1f6f4a;color:#fff;text-align:center;font:700 17px system-ui,sans-serif;text-decoration:none">Get my league&rsquo;s stadium</a><a id="gate-real" style="display:block;margin:10px 0 0;text-align:center;color:#7a4b00;font-weight:600">See a real one &rarr;</a><a id="gate-other" style="display:block;margin:8px 0 0;text-align:center;color:#5a4a33;font-size:13px">Not your league? Try another</a>';
+  card.querySelector("#gate-go").href = "https://lamaisonwebstudio.com/stadium/make/?league=" + encodeURIComponent(id);
+  const houseG = Object.keys(window.__PASSES || {}).find((k) => window.__PASSES[k].code === "P0");
+  card.querySelector("#gate-real").href = location.pathname + (houseG ? "?league=" + houseG : "?league=1&sample=1");
+  card.querySelector("#gate-other").href = location.pathname + "?new=1";
+  card.querySelector("#gate-go").addEventListener("click", function() {
+    try {
+      var day = (new Date()).toISOString().slice(0, 10);
+      if (localStorage.getItem("ev-demo-passfoot") !== day) {
+        localStorage.setItem("ev-demo-passfoot", day);
+        navigator.sendBeacon("https://philosophers-trail.pages.dev/e?k=demo-passfoot");
+      }
+    } catch (x) {
+    }
+  });
+  $("st-proj").replaceChildren(card);
 }
 (async function main() {
   {
@@ -2074,7 +2114,11 @@ function askLeague(note) {
     askLeague();
     return;
   }
-  if (!q.get("sample") && (own || store("st-me-" + leagueId) || !q.get("league"))) store("st-league-id", leagueId);
+  if (!q.get("sample") && !(window.__PASSES || {})[leagueId]) {
+    gateLeague(leagueId);
+    return;
+  }
+  if (!q.get("sample") && (own === leagueId || store("st-me-" + leagueId) || !q.get("league"))) store("st-league-id", leagueId);
   try {
     L = await load(leagueId);
   } catch (err) {
