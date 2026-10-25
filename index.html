@@ -74,7 +74,7 @@
     var hs = document.getElementById('st-score'); if (hs && hs.textContent && !/^DEMO/.test(hs.textContent)) hs.textContent = 'DEMO · ' + hs.textContent; // the folded phone bar shows only this line (round 4)
     if (lg && /^(Sample|Demo) League/.test(lg.textContent)) lg.textContent = 'Demo league · yours looks like this, live';
     document.querySelectorAll('.mu-share').forEach(function (b) { if (!b.dataset.demo) { b.dataset.demo = '1'; b.textContent = String.fromCodePoint(0x1F3C8) + ' See YOUR matchup like this'; } });
-    document.querySelectorAll('#panel p.small').forEach(function (q) { if (/points refresh every minute/.test(q.textContent)) q.textContent = 'A made-up sample week. Your own league updates live every minute during games.'; });
+    document.querySelectorAll('#panel p.small').forEach(function (q) { if (/points refresh every (minute|\d+ seconds)/.test(q.textContent)) q.textContent = 'A made-up sample week. Your own league updates live every minute during games.'; });
   };
   new MutationObserver(words).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
   document.addEventListener('click', function (e) {

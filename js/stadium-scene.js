@@ -64,6 +64,51 @@ const lum = (hex) => {
   return 0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255);
 };
 const CELL = typeof location !== "undefined" && /[?&]art24=0/.test(location.search) ? 16 : 24;
+const SANS = '"Segoe UI", "Helvetica Neue", Arial, sans-serif', SANS_BOLD = { fontFamily: SANS, fontStyle: "bold" };
+const RGBA = new Map();
+const rgbaOf = (col) => {
+  let v = RGBA.get(col);
+  if (v) return v;
+  const m = /^#([0-9a-f]{6})$/i.exec(col);
+  if (m) {
+    const n = parseInt(m[1], 16);
+    v = [n >> 16, n >> 8 & 255, n & 255, 255];
+  } else {
+    const c = document.createElement("canvas").getContext("2d");
+    c.fillStyle = col;
+    c.fillRect(0, 0, 1, 1);
+    v = [...c.getImageData(0, 0, 1, 1).data];
+  }
+  RGBA.set(col, v);
+  return v;
+};
+const putGrid = (img, ox, oy, grid, k = 1) => {
+  const d = img.data, w = img.width, h = img.height;
+  for (let y = 0; y < grid.length; y++) for (let x = 0; x < grid[y].length; x++) {
+    const col = grid[y][x];
+    if (!col) continue;
+    const [r, g, b, a] = rgbaOf(col);
+    for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) {
+      const X = ox + x * k + i, Y = oy + y * k + j;
+      if (X < 0 || X >= w || Y < 0 || Y >= h) continue;
+      const p = (Y * w + X) * 4;
+      d[p] = r;
+      d[p + 1] = g;
+      d[p + 2] = b;
+      d[p + 3] = a;
+    }
+  }
+};
+const METRICS = new Map();
+const fontOf = (st) => [st.fontStyle || "", typeof st.fontSize === "number" ? `${st.fontSize}px` : st.fontSize, st.fontFamily].join(" ").trim();
+const withMetrics = (st) => {
+  const m = METRICS.get(fontOf(st));
+  return m ? { ...st, metrics: m } : st;
+};
+const keepMetrics = (t) => {
+  if (!METRICS.has(t.style._font)) METRICS.set(t.style._font, t.style.getTextMetrics());
+  return t;
+};
 const SIDE_CARDS = typeof location === "undefined" || !/[?&]sidecards=0/.test(location.search);
 const sidewaysPhone = () => SIDE_CARDS && window.innerWidth < 1280 && window.innerWidth > window.innerHeight;
 const shade = (hex, f) => "#" + [1, 3, 5].map((i) => {
@@ -90,6 +135,7 @@ class StadiumScene extends World {
     for (const t of this.league.teams) if (!["Dumpster", "Steeler", "Raven", "Shorty"].includes(t.look) && !/^FB\d+$/.test(t.look) && !isMascot(t.look) && !this.textures.exists(`a-ch-${t.look}`)) this.load.image(`a-ch-${t.look}`, `assets/chars/${t.look}.png`);
   }
   create() {
+    performance.mark("st-create");
     this.uiTexts = [];
     this.uiScale = 1;
     this.moods = new Map();
@@ -99,8 +145,8 @@ class StadiumScene extends World {
     this.nudging = false;
     this.prevOdds = {};
     document.querySelectorAll(".td-banner").forEach((x) => x.remove());
-    makeTextures(this);
-    makeDecorTextures(this);
+    makeTextures(this, true);
+    makeDecorTextures(this, true);
     this.makeFootballer();
     const W = MAP_W * TILE, H = MAP_H * TILE;
     this.physics.world.setBounds(0, 0, W, H);
@@ -121,8 +167,13 @@ class StadiumScene extends World {
     this.npcs = new Map();
     this.teamSprites = new Map();
     this.placeTeams();
-    this.addLife();
-    this.addProps();
+    const extras = () => this.time.delayedCall(0, () => {
+      if (!this.sys.isActive() || !this.teamSprites) return;
+      this.addLife();
+      this.addProps();
+    });
+    this.game.events.once("postrender", extras);
+    this.events.once("shutdown", () => this.game.events.off("postrender", extras));
     this.nightLights(W, H);
     const mineTS = [...this.teamSprites.values()].find((x) => x.t.mine), x0 = ((FIELD.x0 + FIELD.x1 + 1) / 2 + 3.2) * TILE, y0 = (FIELD.y0 + 10.2) * TILE;
     const sx = mineTS ? mineTS.s.x + (mineTS.side === 0 ? 0.7 : -0.7) * TILE : x0, sy = mineTS ? mineTS.s.y + 1.6 * TILE : y0;
@@ -216,6 +267,8 @@ class StadiumScene extends World {
     this.ambient = { shadows: new Map() };
     this.near = null;
     this.promptKey = "";
+    performance.mark("st-teams");
+    this.game.events.once("postrender", () => performance.mark("st-painted"));
   }
   alignMine(mineTS) {
     if (!this.spawnOffset || !mineTS || !mineTS.tag || !this.sys.isActive()) return;
@@ -289,7 +342,7 @@ class StadiumScene extends World {
   }
   paintStadium(W, H) {
     if (this.textures.exists("ground")) this.textures.remove("ground");
-    const ct = this.textures.createCanvas("ground", W, H), g = ct.getContext(), r = rng(2023), T = TILE;
+    const ct = this.newCanvas("ground", W, H), g = ct.getContext(), r = rng(2023), T = TILE;
     const rr = (x, y, w, h, rad) => {
       g.beginPath();
       g.roundRect(x, y, w, h, Math.min(rad, w / 2, h / 2));
@@ -320,9 +373,10 @@ class StadiumScene extends World {
     const fan = ["#d9e1e8", "#e8a33d", "#3d6fb6", "#c94a4a", "#4f9a5a", "#f2e6c9", "#1d1d22", "#ffb612"];
     const skins = ["#f1c6a4", "#e3b08a", "#c98d68", "#8d5a3b", "#5c3a26"], hairs = ["#1d140c", "#3a2a1e", "#6b4423", "#c9a227", "#2a2420", "#8a8f98"];
     const inBowl = (x, y, inset) => {
-      g.beginPath();
-      g.roundRect(inset, inset, W - inset * 2, H - inset * 2, (W - inset * 2) / 2);
-      return g.isPointInPath(x, y);
+      const w = W - inset * 2, h = H - inset * 2, rad = Math.min(w, h) / 2;
+      if (w <= 0 || h <= 0 || x < inset || x > inset + w || y < inset || y > inset + h) return false;
+      const dx = Math.max(inset + rad - x, 0, x - (inset + w - rad)), dy = Math.max(inset + rad - y, 0, y - (inset + h - rad));
+      return dx * dx + dy * dy <= rad * rad;
     };
     for (let y = 10; y < H - 10; y += 12) {
       g.fillStyle = "rgba(0,0,0,0.18)";
@@ -585,7 +639,7 @@ class StadiumScene extends World {
   }
   makeDumpster() {
     if (this.textures.exists("a-ch-Dumpster")) return;
-    const ct = this.textures.createCanvas("a-ch-Dumpster", 64, 112), c = ct.getContext();
+    const ct = this.newCanvas("a-ch-Dumpster", 64, 112), c = ct.getContext();
     const draw = (ox, oy, open, wheel, stink) => {
       const g = [...Array(16)].map(() => Array(16).fill(null)), px = (x, y, col) => {
         if (x >= 0 && x < 16 && y >= 0 && y < 16) g[y][x] = col;
@@ -639,7 +693,7 @@ class StadiumScene extends World {
   }
   makeSteeler() {
     if (this.textures.exists("a-ch-Steeler")) return;
-    const ct = this.textures.createCanvas("a-ch-Steeler", 64, 112), c = ct.getContext();
+    const ct = this.newCanvas("a-ch-Steeler", 64, 112), c = ct.getContext();
     const K = "#16161a", KL = "#3a3a42", GOLD = "#ffb612", GD = "#c88a00", SK = "#c98d68", MASK = "#9aa1aa", WH = "#f4f1ea";
     const draw = (ox, oy, dir, f, pose) => {
       const g = [...Array(16)].map(() => Array(16).fill(null)), px = (x, y, col) => {
@@ -712,7 +766,7 @@ class StadiumScene extends World {
   }
   makeRaven() {
     if (this.textures.exists("a-ch-Raven")) return;
-    const ct = this.textures.createCanvas("a-ch-Raven", 64, 112), c = ct.getContext();
+    const ct = this.newCanvas("a-ch-Raven", 64, 112), c = ct.getContext();
     const B = "#17141c", BL = "#2c2536", P = "#4b2a7a", PL = "#7350a8", EYE = "#ffb612", BEAK = "#4a4752", BEAKL = "#6e6b78";
     const draw = (ox, oy, dir, f, pose) => {
       const g = [...Array(16)].map(() => Array(16).fill(null)), px = (x, y, col) => {
@@ -807,7 +861,7 @@ class StadiumScene extends World {
   }
   makeShorty() {
     if (this.textures.exists("a-ch-Shorty")) return;
-    const ct = this.textures.createCanvas("a-ch-Shorty", 64, 112), c = ct.getContext();
+    const ct = this.newCanvas("a-ch-Shorty", 64, 112), c = ct.getContext();
     const N = "#0b162a", NL = "#23365a", O = "#c83803", OL = "#e8642e", SK = "#e3b08a", SKD = "#c08a66", H = "#3a2a1e", P = "#8a8f98", SH = "#1d1d22";
     const draw = (ox, oy, dir, f, pose) => {
       const g = [...Array(16)].map(() => Array(16).fill(null)), px = (x, y, col) => {
@@ -889,10 +943,11 @@ class StadiumScene extends World {
     ct.refresh();
   }
   placeTeams() {
-    this.makeDumpster();
-    this.makeSteeler();
-    this.makeRaven();
-    this.makeShorty();
+    const worn = new Set(this.league.teams.map((t) => t.look));
+    if (worn.has("Dumpster")) this.makeDumpster();
+    if (worn.has("Steeler")) this.makeSteeler();
+    if (worn.has("Raven")) this.makeRaven();
+    if (worn.has("Shorty")) this.makeShorty();
     for (const t of this.league.teams) if (/^FB\d+$/.test(t.look)) this.makeTeamFootballer(t.look);
     for (const t of this.league.teams) t.sheet = isMascot(t.look) ? this.makeTeamFootballer(`FB${kitNum(t)}`, t.look) : t.look;
     const L = this.league, T = TILE, pairs = [...L.pairs].sort((a, b) => (b.some((t) => t.mine) ? 1 : 0) - (a.some((t) => t.mine) ? 1 : 0));
@@ -918,17 +973,15 @@ class StadiumScene extends World {
           this.tweens.add({ targets: halo, alpha: 0.45, duration: 900, yoyo: true, repeat: -1 });
         }
         if (t.mine) this.add.image(x, y - 2, "soft-glow").setScale(1.4, 0.7).setTint(16767050).setBlendMode(Phaser.BlendModes.ADD).setDepth(y - 2);
-        const tag = this.label(x, y - 62, "", t.mine ? "#ffe08a" : "#fff4d6").setFontSize(Math.round(18 * DPR));
+        const tl = this.tagLook(t), tag = this.label(x, y - 62, tl.text, tl.color, { fontSize: tl.size });
         this.addBlocker(x - 7, y - 8, 14, 8);
         this.teamSprites.set(t.roster_id, { s, tag, t, side, key });
         this.doors.push({ x, y: y + 14, id: `team-${t.roster_id}`, name: t.name, verb: "Scout", open: () => window.__stadium ? window.__stadium.teamPanel(t.roster_id) : this.teamPanel(t.roster_id) });
       });
       if (pair.length === 2 && !L.preseason) {
-        const board = this.label(mid, y + 4, "", "#ffffff").setOrigin(0.5, 0).setFontSize(Math.round(19 * DPR));
-        board.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", align: "center", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
+        const board = this.label(mid, y + 4, "", "#ffffff", { fontSize: `${Math.round(19 * DPR)}px`, backgroundColor: "rgba(24,30,38,0.92)", align: "center" }).setOrigin(0.5, 0);
         const bar = this.add.graphics().setDepth(1e5);
-        const projTxt = this.label(mid, y, "", "#9aa3ad").setOrigin(0.5, 0).setFontSize(Math.round(11 * DPR));
-        projTxt.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif' });
+        const projTxt = this.label(mid, y, "", "#9aa3ad", { fontSize: `${Math.round(11 * DPR)}px`, backgroundColor: "rgba(24,30,38,0.92)" }).setOrigin(0.5, 0);
         this.boards.push({ board, bar, projTxt, a: pair[0], b: pair[1] });
         if (pair === assBowl) for (const t of pair) {
           const x = this.teamSprites.get(t.roster_id), d = x.side === 0 ? -1 : 1;
@@ -936,9 +989,8 @@ class StadiumScene extends World {
           this.add.image(x.s.x + d * 12, y + 6, this.throneTex()).setOrigin(0.5, 1).setFlipX(x.side === 1).setDepth(y - 1);
         }
         if (pair === assBowl) {
-          const sign = this.label(mid, y + 60, "\u{1F6BD} ASS BOWL", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(16 * DPR));
+          const sign = this.label(mid, y + 60, "\u{1F6BD} ASS BOWL", "#ffd84a", { fontSize: `${Math.round(16 * DPR)}px`, backgroundColor: "rgba(92,52,20,0.95)" }).setOrigin(0.5, 0);
           this.boards[this.boards.length - 1].sign = sign;
-          sign.setStyle({ backgroundColor: "rgba(92,52,20,0.95)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
           this.tweens.add({ targets: sign, angle: { from: -3, to: 3 }, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
         }
         this.doors.push({ x: mid, y: y + 16, id: `board-${row}`, name: "the matchup", verb: "Watch", open: () => window.__stadium && window.__stadium.matchup(pair[0].roster_id) });
@@ -946,8 +998,7 @@ class StadiumScene extends World {
     });
     this.rows = pairs.length;
     if (L.preseason) {
-      const sign = this.label(mid, (FIELD.y0 + 7) * T + 4, "\u23F3 Live scores start in week 1", "#ffd84a").setOrigin(0.5, 0).setFontSize(Math.round(15 * DPR));
-      sign.setStyle({ backgroundColor: "rgba(24,30,38,0.92)", fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" });
+      this.label(mid, (FIELD.y0 + 7) * T + 4, "\u23F3 Live scores start in week 1", "#ffd84a", { fontSize: `${Math.round(15 * DPR)}px`, backgroundColor: "rgba(24,30,38,0.92)" }).setOrigin(0.5, 0);
     }
     this.refreshScores();
     this.placeExtras();
@@ -989,12 +1040,20 @@ ADDICT \xD7${c}`)
     }
     if (this._alignTS && !window.__tv) this.time.delayedCall(80, () => this.alignMine(this._alignTS));
   }
+  tagLook(t) {
+    const opp = this.league.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o.roster_id !== t.roster_id);
+    const ch = [...t.name], nm = ch.length > 22 ? `${ch.slice(0, 21).join("")}\u2026` : t.name, len = [...nm].length + (t.mine ? 2 : 0);
+    return {
+      size: `${Math.round((len <= 13 ? 18 : len <= 17 ? 15 : 13) * DPR)}px`,
+      color: t.mine ? "#ffe08a" : opp && t.points > opp.points ? "#b9f5a8" : "#fff4d6",
+      text: `${t.mine ? "\u{1F451} " : ""}${t.gold ? "\u{1F3C6} " : ""}${nm}`
+    };
+  }
   refreshScores() {
     for (const { tag, t } of this.teamSprites.values()) {
-      const opp = this.league.teams.find((o) => o.matchup_id && o.matchup_id === t.matchup_id && o.roster_id !== t.roster_id);
-      const ch = [...t.name], nm = ch.length > 22 ? `${ch.slice(0, 21).join("")}\u2026` : t.name, len = [...nm].length + (t.mine ? 2 : 0);
-      tag.setFontSize(Math.round((len <= 13 ? 18 : len <= 17 ? 15 : 13) * DPR));
-      tag.setText(`${t.mine ? "\u{1F451} " : ""}${t.gold ? "\u{1F3C6} " : ""}${nm}`).setColor(t.mine ? "#ffe08a" : opp && t.points > opp.points ? "#b9f5a8" : "#fff4d6");
+      const { size, color, text } = this.tagLook(t);
+      if (tag.style.fontSize !== size || tag.style.color !== color) keepMetrics(tag.setStyle(withMetrics({ fontStyle: tag.style.fontStyle, fontFamily: tag.style.fontFamily, fontSize: size, color })));
+      tag.setText(text);
     }
     for (const B of this.boards || []) this.tickBoard(B);
     this.updateMoods();
@@ -1005,10 +1064,14 @@ ADDICT \xD7${c}`)
     for (const { s, t } of this.teamSprites.values()) {
       if (prev[t.roster_id] != null && t.points > prev[t.roster_id] + 0.05) {
         const jump = t.points - prev[t.roster_id];
+        const cheer = this.cheerAt = this.cheerAt || {};
+        if (!cheer[t.roster_id]) cheer[t.roster_id] = { at: 0, pts: prev[t.roster_id] };
+        const ch = cheer[t.roster_id];
+        const gained = t.points - ch.pts, fresh = gained >= 5 || gained >= 2 && nowMs - ch.at > 3e4;
         if (stale) {
           awayPts += jump;
           awayTeams++;
-        } else if (jump >= 4) {
+        } else if (jump >= 4 && fresh) {
           const was2 = prevSP[t.roster_id] || [], now = t.starters_points || [];
           let best = -1, bestUp = 0;
           now.forEach((pts, i) => {
@@ -1021,11 +1084,14 @@ ADDICT \xD7${c}`)
           const pid = best >= 0 ? (t.starters || [])[best] : null, who = pid && this.league.players[pid] ? this.league.players[pid][0] : "";
           this.touchdown(t, jump, who);
         }
-        if (!stale) this.celebrate(s, t);
+        if (!stale && fresh) {
+          this.celebrate(s, t);
+          cheer[t.roster_id] = { at: nowMs, pts: t.points };
+        }
         const was = prevSP[t.roster_id] || [], P = this.league.players || {};
         (t.starters_points || []).forEach((pts, i) => {
           const up = pts - (was[i] || 0), pid = (t.starters || [])[i];
-          if (up > 0.05 && pid) (this.feedNew = this.feedNew || []).push({ up, text: `${P[pid] ? P[pid][1] === "DEF" ? String(P[pid][0]) : String(P[pid][0]).replace(/^(\S)\S*\s+/, "$1. ") : pid} +${up.toFixed(1)} \u2192 ${t.name.length > 16 ? `${t.name.slice(0, 15)}\u2026` : t.name}` });
+          if (up >= 2 && pid) (this.feedNew = this.feedNew || []).push({ up, text: `${P[pid] ? P[pid][1] === "DEF" ? String(P[pid][0]) : String(P[pid][0]).replace(/^(\S)\S*\s+/, "$1. ") : pid} +${up.toFixed(1)} \u2192 ${t.name.length > 16 ? `${t.name.slice(0, 15)}\u2026` : t.name}` });
         });
       }
       prev[t.roster_id] = t.points;
@@ -1040,9 +1106,17 @@ ADDICT \xD7${c}`)
     }
     const odds = this.prevOdds = this.prevOdds || {};
     for (const { a, b } of this.boards || []) {
-      const k = `${a.roster_id}-${b.roster_id}`, pa = this.winChance(a, b), was = odds[k];
-      odds[k] = pa;
-      if (was == null || stale || !this.sys.isActive() || Math.abs(pa - was) < 0.25) continue;
+      const k = `${a.roster_id}-${b.roster_id}`, pa = this.winChance(a, b), o = odds[k];
+      if (!o || stale || !this.sys.isActive() || nowMs - o.at > 9e4) {
+        odds[k] = { pa, at: nowMs };
+        continue;
+      }
+      const was = o.pa;
+      if (Math.abs(pa - was) < 0.25) {
+        if (nowMs - o.at >= 6e4) odds[k] = { pa, at: nowMs };
+        continue;
+      }
+      odds[k] = { pa, at: nowMs };
       const fav = pa >= 0.5 ? a : b, now = Math.round(Math.max(pa, 1 - pa) * 100), before = Math.round((fav === a ? was : 1 - was) * 100);
       this.tdQueue = this.tdQueue || [];
       const td = this.tdQueue.find((x) => x.rid != null && (x.rid === a.roster_id || x.rid === b.roster_id));
@@ -1101,7 +1175,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     if (!teams.length || teams.some((tm) => G[tm] && G[tm] !== "pre_game")) return null;
     const ds = teams.map((tm) => D[tm]).filter(Boolean).sort();
     if (!ds.length) return null;
-    return `KICKOFF ${(new Date(`${ds[0]}T12:00:00`)).toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}`;
+    return `KICKOFF ${["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][(new Date(`${ds[0]}T12:00:00`)).getDay()]}`;
   }
   touchdown(t, jump, who) {
     if (!this.sys.isActive()) return;
@@ -1252,11 +1326,27 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
       this.tweens.add({ targets: c, scaleX: 0.15, duration: 140 + Math.random() * 120, yoyo: true, repeat: 5 });
     }
   }
-  label(x, y, text, color) {
-    return super.label(x, y, text, color).setFontFamily('"Segoe UI", "Helvetica Neue", Arial, sans-serif').setFontStyle("bold");
+  newCanvas(key, w, h) {
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    const c = cv.getContext("2d");
+    c.imageSmoothingEnabled = false;
+    const frames = [];
+    return { getContext: () => c, add: (...a) => {
+      frames.push(a);
+    }, refresh: () => {
+      const t = this.textures.addCanvas(key, cv);
+      for (const a of frames) t.add(...a);
+      return t;
+    } };
+  }
+  label(x, y, text, color, style) {
+    const st = { ...SANS_BOLD, fontSize: `${Math.round(13 * DPR)}px`, ...style };
+    return keepMetrics(super.label(x, y, text, color, withMetrics(st)));
   }
   bubble(x, y, text) {
-    return super.bubble(x, y, text).setFontFamily('"Segoe UI", "Helvetica Neue", Arial, sans-serif').setFontStyle("bold");
+    return super.bubble(x, y, text, SANS_BOLD);
   }
   makeFootballer() {
     const me = this.league.teams.find((t) => t.mine), kit = kitOf(me);
@@ -1264,13 +1354,9 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     const draw = (dir, f, pose) => CELL === 24 ? this.footballerGrid24(dir, f, pose, C) : this.footballerGrid(dir, f, pose, C);
     const put = (key, grid) => {
       if (this.textures.exists(key)) this.textures.remove(key);
-      const ct = this.textures.createCanvas(key, CELL * 2, CELL * 2), c = ct.getContext();
-      grid.forEach((rw, y) => rw.forEach((col, x) => {
-        if (col) {
-          c.fillStyle = col;
-          c.fillRect(x * 2, y * 2, 2, 2);
-        }
-      }));
+      const ct = this.newCanvas(key, CELL * 2, CELL * 2), c = ct.getContext(), img = c.createImageData(CELL * 2, CELL * 2);
+      putGrid(img, 0, 0, grid, 2);
+      c.putImageData(img, 0, 0);
       ct.refresh();
     };
     for (const dir of ["down", "up", "left", "right"]) {
@@ -1285,7 +1371,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     const src = `a-ch-${who}`;
     if (this.textures.exists(key) || !this.textures.exists(src)) return;
     const img = this.textures.get(src).getSourceImage(), u = img.width / 4, d = u * 2;
-    const ct = this.textures.createCanvas(key, d * 4, d * 7), c = ct.getContext();
+    const ct = this.newCanvas(key, d * 4, d * 7), c = ct.getContext();
     c.imageSmoothingEnabled = false;
     c.drawImage(img, 0, 0, u * 4, u * 7, 0, 0, d * 4, d * 7);
     const add = (name, col, row) => ct.add(name, 0, col * d, row * d, d, d);
@@ -1316,18 +1402,14 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
       big: (Number(look.slice(2)) || 0) % 3 === 1,
       SKIN: ["#e8b48f", "#c98d68", "#9c6440", "#6f4428"][(Number(look.slice(2)) || 0) % 4]
     };
-    const U = CELL, ct = this.textures.createCanvas(key, U * 4, U * 7), c = ct.getContext(), grid = (d, r, p) => U === 24 ? this.footballerGrid24(d, r, p, C) : this.footballerGrid(d, r, p, C);
-    const put = (ox, oy, gr) => gr.forEach((rw, y) => rw.forEach((col, x) => {
-      if (col) {
-        c.fillStyle = col;
-        c.fillRect(ox + x, oy + y, 1, 1);
-      }
-    }));
+    const U = CELL, ct = this.newCanvas(key, U * 4, U * 7), c = ct.getContext(), grid = (d, r, p) => U === 24 ? this.footballerGrid24(d, r, p, C) : this.footballerGrid(d, r, p, C);
+    const img = c.createImageData(U * 4, U * 7), put = (ox, oy, gr) => putGrid(img, ox, oy, gr);
     ["down", "up", "left", "right"].forEach((dir, col) => {
       for (let row = 0; row < 4; row++) put(col * U, row * U, grid(dir, row, null));
       put(col * U, 4 * U, grid(dir, 0, "G"));
     });
     put(U, 6 * U, grid("down", 0, "item"));
+    c.putImageData(img, 0, 0);
     ct.refresh();
     return name;
   }
@@ -1473,8 +1555,11 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
         rect(9, hy + 7, 6, 1, MASK);
       }
     }
-    const out = g.map((rw) => rw.slice());
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (!g[y][x] && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => g[y + dy] && g[y + dy][x + dx] && g[y + dy][x + dx] !== "#1d140c")) out[y][x] = "#1d140c";
+    const out = g.map((rw) => rw.slice()), ink = (y, x) => {
+      const v = g[y] && g[y][x];
+      return !!v && v !== "#1d140c";
+    };
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (!g[y][x] && (ink(y, x + 1) || ink(y, x - 1) || ink(y + 1, x) || ink(y - 1, x))) out[y][x] = "#1d140c";
     return dir === "left" ? out.map((rw) => rw.slice().reverse()) : out;
   }
   footballerGrid(dir, f, pose, C) {
@@ -1601,7 +1686,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     const sans = { fontFamily: '"Segoe UI", "Helvetica Neue", Arial, sans-serif', fontStyle: "bold" };
     const px = (key, w, h, fn) => {
       if (this.textures.exists(key)) return;
-      const ct = this.textures.createCanvas(key, w * 2, h * 2), c = ct.getContext();
+      const ct = this.newCanvas(key, w * 2, h * 2), c = ct.getContext();
       fn((col, x, y, ww = 1, hh = 1) => {
         c.fillStyle = col;
         c.fillRect(x * 2, y * 2, ww * 2, hh * 2);
@@ -1685,6 +1770,7 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
     this.bench = this.add.image(0, 0, "bench").setOrigin(0.5, 1).setVisible(false);
     this.benchTag = this.add.text(0, 0, "", { ...sans, fontSize: "12px", color: "#ffd0c0", backgroundColor: "rgba(60,20,16,0.9)", padding: { x: 4, y: 2 } }).setOrigin(0.5, 0).setVisible(false).setDepth(99980);
     this.refs = [];
+    this.refsKey = null;
     px("blimp", 40, 16, (p) => {
       p("#9aa1aa", 4, 2, 32, 12);
       p("#b9bfc7", 2, 4, 36, 8);
@@ -1812,6 +1898,9 @@ ${fav.roster_id === td.rid ? "Now" : `${fav.name} now`} ${now}% to win (was ${be
         /* round 52: the 2x players moved the name tag up to y-62; at -80 the name covered this tag */
       ).setText(`\u{1FA91} ${shame.b.toFixed(1)} on the bench`);
     }
+    const negKey = teams.filter((x) => x.t.points < 0).map((x) => x.t.roster_id).join(",");
+    if (negKey === this.refsKey) return;
+    this.refsKey = negKey;
     for (const r of this.refs) {
       r.ref.destroy();
       r.ev.remove();
@@ -1900,13 +1989,13 @@ ${r1(t.points)} pts`);
     }
     for (const [id, icon] of want) {
       if (this.moods.has(id)) continue;
-      const txt = this.add.text(0, 0, icon, { fontSize: `${Math.round((icon === "\u{1F525}" ? 30 : 24) * DPR)}px` }).setOrigin(0.5, 1).setResolution(1).setScale(1 / DPR);
+      const txt = this.add.text(0, 0, icon, { fontSize: `${Math.round((icon === "\u{1F525}" ? 30 : 24) * DPR)}px`, resolution: 1 }).setOrigin(0.5, 1).setScale(1 / DPR);
       this.moods.set(id, { icon, txt });
     }
   }
   pixTex(key, w, h, draw, U = 3) {
     if (this.textures.exists(key)) return key;
-    const ct = this.textures.createCanvas(key, w * U, h * U), c = ct.getContext();
+    const ct = this.newCanvas(key, w * U, h * U), c = ct.getContext();
     draw((col, x, y, ww = 1, hh = 1) => {
       c.fillStyle = col;
       c.fillRect(x * U, y * U, ww * U, hh * U);
@@ -1995,7 +2084,7 @@ ${r1(t.points)} pts`);
   addLife() {
     const T = TILE, r = rng(77);
     if (!this.textures.exists("football")) {
-      const ct = this.textures.createCanvas("football", 16, 10), c = ct.getContext();
+      const ct = this.newCanvas("football", 16, 10), c = ct.getContext();
       c.fillStyle = "#3a1f10";
       c.fillRect(2, 1, 12, 8);
       c.fillRect(0, 3, 16, 4);
@@ -2326,11 +2415,10 @@ ${r1(t.points)} pts`);
       bar.fillStyle(13777466, 1).fillRect(kx - 5, hy - 5, 10, 10).fillRect(kx - 4, hy + 5, 8, 11);
       bar.fillStyle(16747146, 1).fillRect(kx - 4, hy - 4, 3, 3);
       bar.setDepth(Math.min(A.s.depth, B.s.depth) - 1);
-      if (!o.pct) o.pct = this.add.text(0, 0, "", { fontFamily: 'system-ui, "Segoe UI", Arial, sans-serif', fontStyle: "bold", color: "#9dff7a", stroke: "#0f141a" }).setOrigin(0.5, 0).setResolution(1);
+      if (!o.pct) o.pct = this.add.text(0, 0, "", { fontFamily: 'system-ui, "Segoe UI", Arial, sans-serif', fontStyle: "bold", color: "#9dff7a", stroke: "#0f141a", strokeThickness: Math.round(5 * DPR), fontSize: `${Math.round(14 * DPR)}px`, resolution: 1 }).setOrigin(0.5, 0);
       const pct = Math.round(Math.max(pa, 1 - pa) * 100), t = a.mine || b.mine ? `YOU ${Math.round((a.mine ? pa : 1 - pa) * 100)}%` : lead ? lead === A ? `\u25C0 ${pct}%` : `${pct}% \u25B6` : "50 / 50";
       if (o.pct.text !== t) o.pct.setText(t);
-      const fs = Math.round(15 * DPR / Math.max(0.5, this.cameras.main.zoom / DPR));
-      o.pct.setFontSize(Math.round(14 * DPR)).setStroke("#0f141a", Math.round(5 * DPR)).setScale(board.scaleX).setOrigin(0.5, 1).setPosition(a.mine ? x1 + len * 0.22 : b.mine ? x2 - len * 0.22 : kx, hy - 8).setDepth(board.depth + 1);
+      o.pct.setScale(board.scaleX).setOrigin(0.5, 1).setPosition(a.mine ? x1 + len * 0.22 : b.mine ? x2 - len * 0.22 : kx, hy - 8).setDepth(board.depth + 1);
       const sw0 = sweat || this.liveNow(a) || this.liveNow(b) ? this.sweatLine(a, b) : null, il = this.injLine(a, b);
       const sw = il && (!sw0 || Math.floor(now / 6e3) % 2) ? { text: il, done: false, inj: true } : sw0, pt = sw ? sw.text : `proj ${a.proj.toFixed(1)} \u2013 ${b.proj.toFixed(1)}`;
       if (projTxt.text !== pt) projTxt.setText(pt);
@@ -2504,7 +2592,27 @@ ${r1(t.points)} pts`);
     }
   }
 }
+class StadiumBoot extends Phaser.Scene {
+  constructor() {
+    super("stadium-boot");
+  }
+  init(data) {
+    this.ready = data.ready;
+    performance.mark("st-phaser");
+  }
+  preload() {
+    preloadArt(this, true);
+    preloadDecor(this, true);
+  }
+  create() {
+    makeTextures(this, true);
+    makeDecorTextures(this, true);
+    performance.mark("st-boot");
+    this.ready();
+  }
+}
 export {
   LOOKS,
+  StadiumBoot,
   StadiumScene
 };

@@ -14,7 +14,7 @@ class World extends Phaser.Scene {
     this.physics.add.existing(z, true);
     this.blockers.add(z);
   }
-  label(x, y, text, color = "#fff4d6") {
+  label(x, y, text, color = "#fff4d6", style = {}) {
     return this.keepReadable(this.add.text(x, y, text, {
       fontFamily: "Pixelify Sans, Segoe UI, sans-serif",
       fontSize: `${Math.round(13 * DPR)}px`,
@@ -22,8 +22,10 @@ class World extends Phaser.Scene {
       backgroundColor: "rgba(52,34,20,0.92)",
       padding: { x: Math.round(5 * DPR), y: Math.round(2 * DPR) },
       stroke: "#1d140c",
-      strokeThickness: Math.round(2 * DPR)
-    }).setOrigin(0.5, 1).setDepth(1e5).setResolution(1));
+      strokeThickness: Math.round(2 * DPR),
+      resolution: 1,
+      ...style
+    }).setOrigin(0.5, 1).setDepth(1e5));
   }
   keepReadable(t) {
     (this.uiTexts = this.uiTexts || []).push(t);
@@ -49,14 +51,16 @@ class World extends Phaser.Scene {
   logicalZoom() {
     return villageZoom || this.cameras.main.zoom / DPR;
   }
-  bubble(x, y, text) {
+  bubble(x, y, text, style = {}) {
     return this.keepReadable(this.add.text(x, y, text, {
       fontFamily: "Pixelify Sans, Segoe UI, sans-serif",
       fontSize: `${Math.round(11 * DPR)}px`,
       color: "#2b1d12",
       backgroundColor: "rgba(255,250,236,0.96)",
-      padding: { x: Math.round(5 * DPR), y: Math.round(2 * DPR) }
-    }).setOrigin(0.5, 1).setDepth(1e5).setResolution(1));
+      padding: { x: Math.round(5 * DPR), y: Math.round(2 * DPR) },
+      resolution: 1,
+      ...style
+    }).setOrigin(0.5, 1).setDepth(1e5));
   }
   setZoom(z) {
     const b = this.cameras.main.getBounds(), minCam = Math.max(this.scale.width / b.width, this.scale.height / b.height, 0.4 * DPR);

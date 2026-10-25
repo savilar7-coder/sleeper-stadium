@@ -89,6 +89,7 @@ async function fetchInjuries(force) {
     injAt = Date.now();
     applyInjuries(d);
   } catch {
+    injAt = Date.now();
   } finally {
     injBusy = false;
   }
@@ -194,6 +195,37 @@ function injuriesBox() {
     el("p", { class: "small" }, `${rows.length ? "New since you last looked. The \u{1F691} on a board marks the team it hits." : "When a starter goes down during the games it shows here within minutes, and the \u{1F691} on the board marks the team it hits."} ${injAt ? `Checked ${ago(injAt)}` : "Checking the injury report\u2026"}${Object.values(L.games || {}).includes("in_game") ? " \xB7 every 10 min while games are on." : "."}`)
   ]);
 }
+let bootP = null, bootStopped = false;
+function startBoot() {
+  if (bootP) return bootP;
+  bootP = new Promise((done) => {
+    scenes.then(([{ StadiumBoot }]) => {
+      if (bootStopped) {
+        done();
+        return;
+      }
+      game = new Phaser.Game({
+        type: (navigator.maxTouchPoints || 0) > 0 ? Phaser.AUTO : Phaser.CANVAS,
+        parent: "game",
+        pixelArt: true,
+        roundPixels: true,
+        backgroundColor: "#20262e",
+        scale: { mode: Phaser.Scale.NONE, width: Math.round(window.innerWidth * DPR), height: Math.round(window.innerHeight * DPR), zoom: 1 / DPR },
+        physics: { default: "arcade", arcade: { debug: false } },
+        audio: { noAudio: true }
+      });
+      game.scene.add("stadium-boot", StadiumBoot, true, { ready: done });
+    }).catch(() => done());
+  });
+  return bootP;
+}
+function stopBoot() {
+  bootStopped = true;
+  if (game) {
+    game.destroy(true);
+    game = null;
+  }
+}
 async function weekProjections(season, week) {
   const key = `st-proj-${season}-${week}`;
   try {
@@ -282,6 +314,7 @@ function applyLooks(teams, picked) {
 }
 const blimpOf = (blimpFile) => (new URLSearchParams(location.search).get("blimp") || (window.__pass || {}).blimp || (blimpFile || {}).message || "").slice(0, 60);
 async function load(leagueId) {
+  startBoot();
   if (isEspn(leagueId)) return loadEspn(leagueId);
   let [state, lg] = await Promise.all([get(`${API}/state/nfl`), get(`${API}/league/${leagueId}`)]);
   const season = state.league_season || state.season, week = Math.max(1, state.display_week || state.week || 1);
@@ -734,7 +767,7 @@ function matchup(rid) {
       b.onclick = () => matchupCard(me, opp);
       return b;
     })(),
-    el("p", { class: "small" }, `Week ${L.week} \xB7 points refresh every minute during games \xB7 projections from ${L.espn ? "ESPN (your league's scoring)" : "Sleeper (half PPR)"}.`)
+    el("p", { class: "small" }, `Week ${L.week} \xB7 points refresh every ${L.espn ? 15 : 10} seconds during games \xB7 projections from ${L.espn ? "ESPN (your league's scoring)" : "Sleeper (half PPR)"}.`)
   ], true);
 }
 const NAME_LOOKS = [
@@ -1733,7 +1766,8 @@ function setMine(rid) {
   if (!/[?&]sample=1/.test(location.search)) store("st-league-id", String(L.id));
   for (const t of L.teams) t.mine = t.roster_id === rid;
   hud();
-  if (game) game.scene.getScene("stadium").scene.restart({ league: L });
+  const sc = game && game.scene.getScene("stadium");
+  if (sc) sc.scene.restart({ league: L });
   if (shareAfterPick) {
     shareAfterPick = false;
     setTimeout(shareMine, 700);
@@ -1801,13 +1835,25 @@ function liveProj(t) {
 function updateProj() {
   for (const t of L.teams) t.proj = liveProj(t);
 }
+const LIVE_MS = 1e4, LIVE_ESPN_MS = 15e3, IDLE_MS = 6e4;
+const gamesLive = () => !!L && Object.values(L.games || {}).some((s) => s === "in_game");
+let pollT = null, schedAt = 0, espnFullAt = 0;
+function schedulePoll() {
+  clearTimeout(pollT);
+  pollT = setTimeout(async () => {
+    await refreshPoints();
+    schedulePoll();
+  }, gamesLive() ? L.espn ? LIVE_ESPN_MS : LIVE_MS : IDLE_MS);
+}
 let refreshN = 0;
 async function refreshPoints() {
   if (!L || document.hidden && !window.__tv) return;
   const n = ++refreshN;
   try {
-    const full = L.espn && (!L.lineupCounts || n % 10 === 0);
+    const full = L.espn && (!L.lineupCounts || Date.now() - espnFullAt > 6e5);
+    if (full) espnFullAt = Date.now();
     const r = L.espn ? await (full ? espnLeague(L.id, L.season) : espnLive(L.id, L.season, L.lineupCounts)) : null, fresh = r ? r.teams : await get(`${API}/league/${L.id}/matchups/${L.week}`);
+    const t0 = performance.now();
     if (r && r.lineupCounts) L.lineupCounts = r.lineupCounts;
     if (n !== refreshN) return;
     if (r) {
@@ -1820,12 +1866,22 @@ async function refreshPoints() {
       if (t) Object.assign(t, { starters: x.starters || t.starters, points: x.points || 0, starters_points: x.starters_points || [], players_points: x.players_points || {} });
       if (t && r) t.projPre = t.starters.reduce((s2, pid) => s2 + (L.proj[pid] || 0), 0);
     }
-    await gameStatus();
     updateProj();
     if (r && full) injBaseline();
     const s = game && game.scene.getScene("stadium");
     if (s && s.refreshScores) s.refreshScores();
     hud();
+    window.__liveMs = Math.round(performance.now() - t0);
+    if (Date.now() - schedAt > 6e4) {
+      schedAt = Date.now();
+      gameStatus().then(() => {
+        if (n !== refreshN) return;
+        updateProj();
+        const sc = game && game.scene.getScene("stadium");
+        if (sc && sc.refreshScores && sc.sys.isActive()) sc.refreshScores();
+        hud();
+      });
+    }
     if (Object.values(L.games || {}).includes("in_game")) fetchInjuries(false);
   } catch {
   }
@@ -2015,7 +2071,10 @@ function askLeague(note) {
     }
     askLeague(err.message === "private" ? "That ESPN league is private. The commissioner can open it: ESPN League Settings > Basic Settings > Make league viewable to public." : /ESPN/.test(err.message) ? "No ESPN league with that ID. Paste the link from your ESPN league page." : /^404/.test(err.message) || err instanceof TypeError ? "No Sleeper league with that ID. Check it, or type your Sleeper username." : `Could not reach Sleeper (${err.message}). Try again in a minute.`);
     return;
+  } finally {
+    if (!L) stopBoot();
   }
+  performance.mark("st-data");
   injBaseline();
   count("league");
   if (L.espn) count("espn");
@@ -2046,17 +2105,9 @@ function askLeague(note) {
       whoAreYou();
     }
   } else setTimeout(drillTeaser, 3e4);
-  game = new Phaser.Game({
-    type: (navigator.maxTouchPoints || 0) > 0 ? Phaser.AUTO : Phaser.CANVAS,
-    parent: "game",
-    pixelArt: true,
-    roundPixels: true,
-    backgroundColor: "#20262e",
-    scale: { mode: Phaser.Scale.NONE, width: Math.round(window.innerWidth * DPR), height: Math.round(window.innerHeight * DPR), zoom: 1 / DPR },
-    physics: { default: "arcade", arcade: { debug: false } },
-    audio: { noAudio: true }
-  });
+  await startBoot();
   const [{ StadiumScene }, { MiniGameScene }] = await scenes;
+  game.scene.remove("stadium-boot");
   game.scene.add("stadium", StadiumScene, true, { league: L });
   game.scene.add("minigame", MiniGameScene, false);
   window.__village = game;
@@ -2133,8 +2184,13 @@ function askLeague(note) {
   if (!mine() && !navigator.webdriver) setTimeout(() => {
     if ($("panel").hidden && !playAfterPick && !mine()) whoAreYou();
   }, 600);
-  setInterval(refreshPoints, 6e4);
-  setTimeout(() => fetchInjuries(true), 2500);
+  schedAt = Date.now();
+  schedulePoll();
+  {
+    const go = () => setTimeout(() => (window.requestIdleCallback || ((f) => f()))(() => fetchInjuries(true), { timeout: 3e3 }), 2500);
+    const wait = () => performance.getEntriesByName("st-painted").length ? go() : setTimeout(wait, 200);
+    wait();
+  }
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) refreshPoints();
   });

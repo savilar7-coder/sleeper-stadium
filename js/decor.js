@@ -1,7 +1,9 @@
 import { TILE } from "./core.js";
 import { halloween, season, seasonizeTexture } from "./sectors.js";
 function preloadDecor(scene, lite = false) {
-  const sheet = (key, file, w, h) => scene.load.spritesheet(key, `assets/anim/${file}`, { frameWidth: w, frameHeight: h });
+  const sheet = (key, file, w, h) => {
+    if (!scene.textures.exists(key)) scene.load.spritesheet(key, `assets/anim/${file}`, { frameWidth: w, frameHeight: h });
+  };
   sheet("a-flag-red", "flag-red.png", 16, 16);
   sheet("a-flag-blue", "flag-blue.png", 16, 16);
   if (lite) return;
@@ -13,7 +15,7 @@ function preloadDecor(scene, lite = false) {
   sheet("a-leaf-pink", "leaf-pink.png", 6, 7);
   sheet("a-mill", "watermill.png", 34, 36);
 }
-function makeDecorTextures(scene) {
+function makeDecorTextures(scene, lite = false) {
   const cut = (key, src, sx, sy, sw, sh) => {
     if (scene.textures.exists(key) || !scene.textures.exists(src)) return;
     const ct = scene.textures.createCanvas(key, sw * 2, sh * 2), c = ct.getContext();
@@ -48,7 +50,7 @@ function makeDecorTextures(scene) {
     const n = parseInt(hex.slice(1), 16);
     return `rgb(${Math.min(255, (n >> 16) + 60)},${Math.min(255, (n >> 8 & 255) + 60)},${Math.min(255, (n & 255) + 60)})`;
   };
-  for (const [k, col] of [["bf0", "#f6d04d"], ["bf1", "#f2f2f2"], ["bf2", "#7ec8f0"], ["bf3", "#f39ab5"]]) {
+  if (!lite) for (const [k, col] of [["bf0", "#f6d04d"], ["bf1", "#f2f2f2"], ["bf2", "#7ec8f0"], ["bf3", "#f39ab5"]]) {
     for (const open of [0, 1, 2]) {
       const key = `${k}-${open}`;
       if (scene.textures.exists(key)) continue;
@@ -90,7 +92,7 @@ function makeDecorTextures(scene) {
       ct.refresh();
     }
   }
-  if (!scene.textures.exists("spark0")) {
+  if (!lite && !scene.textures.exists("spark0")) {
     for (const [key, cross] of [["spark0", false], ["spark1", true]]) {
       const ct2 = scene.textures.createCanvas(key, 10, 10), c2 = ct2.getContext();
       c2.fillStyle = "#ffffff";
@@ -135,6 +137,7 @@ function makeDecorTextures(scene) {
     c.fillRect(0, 0, 64, 64);
     ct.refresh();
   }
+  if (lite) return;
   if (!scene.textures.exists("cloud-shadow")) {
     const ct = scene.textures.createCanvas("cloud-shadow", 256, 128), c = ct.getContext();
     for (const [x, y, rr] of [[80, 64, 56], [140, 52, 64], [190, 70, 48], [120, 80, 50]]) {

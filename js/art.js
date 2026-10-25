@@ -34,7 +34,7 @@ function preloadArt(scene, lite = false) {
   if (!lite) for (const c of new Set([...Object.values(CHAR), ...CHAR_POOL, ...FOLK])) scene.load.image(`a-ch-${c}`, `assets/chars/${c}.png`);
   if (!scene.textures.exists("a-smoke")) scene.load.spritesheet("a-smoke", "assets/fx/Smoke.png", { frameWidth: 32, frameHeight: 32 });
 }
-function makeTextures(scene) {
+function makeTextures(scene, lite = false) {
   const cut = (key, src, sx, sy, sw, sh, scale = 2, cw = sw * scale, ch = sh * scale) => {
     if (scene.textures.exists(key) || !scene.textures.exists(src)) return;
     const img = scene.textures.get(src).getSourceImage();
@@ -67,7 +67,7 @@ function makeTextures(scene) {
     c.putImageData(d, 0, 0);
     ct.refresh();
   }
-  for (const [id, rec] of [["claude", false], ["claude-tiktok", true]]) {
+  if (!lite) for (const [id, rec] of [["claude", false], ["claude-tiktok", true]]) {
     const key = `a-ch-look-spark-${id}`;
     if (scene.textures.exists(key)) continue;
     const ct = scene.textures.createCanvas(key, 64, 112), c = ct.getContext();
@@ -126,7 +126,7 @@ function makeTextures(scene) {
     ["pic", 128, 160, 16, 16],
     ["pot", 0, 160, 16, 16]
   ]) cut(`f-${k}`, "a-int", x, y, w, h);
-  if (!scene.textures.exists("wood-floor")) {
+  if (!lite && !scene.textures.exists("wood-floor")) {
     const ct = scene.textures.createCanvas("wood-floor", TILE, TILE), c = ct.getContext();
     c.fillStyle = "#c08a55";
     c.fillRect(0, 0, TILE, TILE);
@@ -180,6 +180,7 @@ function makeTextures(scene) {
     });
     ct.refresh();
   };
+  if (lite) return;
   const ink = "#1d140c";
   ctex("shopsign", 36, 30, (px) => {
     px(ink, 0, 0, 17, 3);
